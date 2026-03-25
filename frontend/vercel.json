@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm i -g pnpm@9 && pnpm install",
-  "buildCommand": "pnpm --filter frontend build",
+  "installCommand": "cd .. && corepack prepare pnpm@9 --activate && pnpm install",
+  "buildCommand": "cd .. && pnpm --filter frontend build",
   "outputDirectory": "frontend/.next",
   "regions": ["iad1"]
 }
