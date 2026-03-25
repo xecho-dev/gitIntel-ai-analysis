@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd .. && pnpm install && pnpm --filter frontend build",
-  "installCommand": "cd .. && pnpm install",
+  "installCommand": "npm i -g pnpm@9 && cd .. && pnpm install",
+  "buildCommand": "cd .. && pnpm --filter frontend build",
   "regions": ["iad1"]
 }
