@@ -1,0 +1,172 @@
+---
+description: Next.js + Tailwind 前端开发规范
+globs: app/**/*.{ts,tsx} components/**/*.{ts,tsx} lib/**/*.{ts,tsx} store/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# 前端开发规范（Next.js + Tailwind）
+
+## 组件规范
+
+### 组件文件结构
+- 一个组件一个文件，文件名与组件名一致
+- 组件放在 `components/` 下对应的子目录
+- 组件必须使用函数式组件 + TypeScript
+
+```typescript
+// ✅ 正确
+export function ArchitectureAgent({ repoUrl }: ArchitectureAgentProps) {}
+
+// ❌ 错误 - 不要使用类组件
+class ArchitectureAgent extends Component {}
+```
+
+### "use client" 声明
+- 有交互逻辑（useState/useEffect/事件处理）的组件必须加 `"use client"`
+- 纯展示型组件不加 `"use client"`，放在 `components/` 下由父组件引用
+
+```typescript
+// 需要交互的组件
+"use client";
+export function RepoInput() {
+  const [value, setValue] = useState("");
+  // ...
+}
+```
+
+### 组件拆分原则
+- 按 Agent 类型拆分，每个 Agent 对应一个独立组件
+- 通用 UI 组件放在 `components/ui/`
+- 组件状态优先使用 Zustand，而非层层 prop drilling
+
+## Tailwind CSS 规范
+
+### 颜色系统
+使用自定义深色主题，不要使用 Tailwind 默认的亮色默认值：
+
+```html
+<!-- ✅ 使用内联自定义颜色 -->
+<div className="bg-[#10141a] text-[#dfe2eb]">
+
+<!-- ✅ 使用透明度和分割线 -->
+<div className="border-white/5 bg-white/5">
+```
+
+### Tailwind v3 关键规则
+- **必须使用 `@tailwind base/components/utilities` 三行指令**，不要用 v4 的 `@import "tailwindcss"`
+- **不要用 `@theme {}` 块**，那是 Tailwind v4 语法
+- **自定义颜色在 `tailwind.config.ts` 中 `colors` 下声明**，通过 `bg-` / `text-` / `border-` 前缀使用
+- **动画在 `tailwind.config.ts` 中 `keyframes` + `animation` 下声明**
+
+### 动画组件
+优先使用 Framer Motion（`motion/react`）而非原生 CSS 动画：
+
+```typescript
+import { motion, AnimatePresence } from "motion/react";
+
+// ✅ 带动画的入口
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -20 }}
+>
+
+// ✅ 条件渲染动画
+<AnimatePresence mode="wait">
+  {isVisible && <Component key="..." />}
+</AnimatePresence>
+```
+
+## 状态管理（Zustand）
+
+### Store 命名与拆分
+- 按功能域拆分 Store，不要把所有状态塞进一个 Store
+- 文件名：`use{功能}Store.ts`
+
+```typescript
+// ✅ 按功能域拆分
+// store/useAnalysisStore.ts - 分析状态（isAnalyzing, progress, results）
+// store/useAppStore.ts - 全局 UI 状态（activeTab, sidebarOpen）
+
+// ❌ 不要把所有状态塞进一个大 Store
+```
+
+### Store 类型定义
+始终为 Store 状态和操作定义 TypeScript 接口：
+
+```typescript
+interface AnalysisState {
+  isAnalyzing: boolean;
+  progress: number;
+  results: AnalysisResult | null;
+  setProgress: (p: number) => void;
+  setResults: (r: AnalysisResult) => void;
+}
+
+export const useAnalysisStore = create<AnalysisState>((set) => ({
+  isAnalyzing: false,
+  progress: 0,
+  results: null,
+  setProgress: (p) => set({ progress: p }),
+  setResults: (r) => set({ results: r, isAnalyzing: false }),
+}));
+```
+
+## API 层（BFF Route Handler）
+
+### 路由文件位置
+所有 API 路由统一放在 `app/api/` 下，使用 kebab-case：
+
+```
+app/api/analyze/route.ts        → POST /api/analyze
+app/api/agents/status/route.ts   → GET /api/agents/status
+```
+
+### SSE 流式响应
+Agent 分析结果通过 SSE 流式推送到前端，**必须在 Route Handler 层处理 SSE 解析，前端不应直接调用 FastAPI**：
+
+```typescript
+// app/api/analyze/route.ts
+import { analyzeRepository } from "@/lib/analysis";
+
+export async function POST(req: Request) {
+  const { repoUrl } = await req.json();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      await analyzeRepository(repoUrl, (event) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      });
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
+}
+```
+
+### API 类型定义
+所有 API 请求/响应类型放在 `lib/types.ts`，与后端共享：
+
+```typescript
+// lib/types.ts
+export interface AnalyzeRequest {
+  repoUrl: string;
+  branch?: string;
+}
+
+export interface AgentEvent {
+  type: "status" | "progress" | "result" | "error";
+  agent: "architecture" | "quality" | "dependency" | "optimization";
+  message?: string;
+  percent?: number;
+  data?: unknown;
+}
+```

@@ -1,0 +1,210 @@
+---
+description: FastAPI + LangGraph Agent 层开发规范
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Agent 层开发规范（FastAPI + LangGraph）
+
+## 项目结构
+
+```
+backend/
+├── agents/              # 各 Agent 实现
+│   ├── __init__.py
+│   ├── base_agent.py    # Agent 基类（通用接口）
+│   ├── architecture.py  # 架构分析 Agent
+│   ├── quality.py        # 代码质量 Agent
+│   ├── dependency.py     # 依赖风险 Agent
+│   └── optimization.py  # 优化建议 Agent
+├── graph/               # LangGraph 工作流
+│   ├── __init__.py
+│   ├── state.py          # SharedState 定义
+│   └── analysis_graph.py # 主工作流编排
+├── tools/               # Agent 可用工具
+│   ├── git_scanner.py
+│   ├── code_analyzer.py
+│   └── dependency_checker.py
+├── schemas/             # Pydantic 数据模型
+│   ├── request.py
+│   └── response.py
+├── main.py              # FastAPI 入口
+└── requirements.txt
+```
+
+## Agent 设计原则
+
+### 基类抽象
+所有 Agent 继承 `BaseAgent`，统一工具调用和输出格式：
+
+```python
+# agents/base_agent.py
+from abc import ABC, abstractmethod
+from typing import AsyncGenerator, TypedDict
+
+class AgentEvent(TypedDict):
+    type: str        # "status" | "progress" | "result" | "error"
+    agent: str       # agent name
+    message: str | None
+    percent: int | None
+    data: dict | None
+
+class BaseAgent(ABC):
+    name: str
+
+    @abstractmethod
+    async def run(self, repo_url: str, callback) -> dict:
+        """执行 Agent，返回结果字典"""
+        pass
+
+    async def stream(self, repo_url: str) -> AsyncGenerator[AgentEvent, None]:
+        """流式输出事件（SSE 用）"""
+        yield AgentEvent(type="status", agent=self.name, message="启动中...", percent=0, data=None)
+```
+
+### Agent 实现示例
+
+```python
+# agents/architecture.py
+from .base_agent import BaseAgent, AgentEvent
+from typing import AsyncGenerator
+
+class ArchitectureAgent(BaseAgent):
+    name = "architecture"
+
+    async def stream(self, repo_url: str) -> AsyncGenerator[AgentEvent, None]:
+        yield AgentEvent(type="status", agent=self.name, message="正在扫描项目目录...", percent=10, data=None)
+
+        tree = await self._scan_directory(repo_url)
+        yield AgentEvent(type="progress", agent=self.name, message="目录扫描完成", percent=30, data=None)
+
+        components = await self._parse_components(tree)
+        yield AgentEvent(type="status", agent=self.name, message=f"解析到 {len(components)} 个组件", percent=60, data=None)
+
+        result = await self._analyze_dependencies(components)
+        yield AgentEvent(type="result", agent=self.name, message="架构分析完成", percent=100, data=result)
+```
+
+## LangGraph 工作流编排
+
+### SharedState 定义
+所有 Agent 共享同一个 State，所有结果存入其中：
+
+```python
+# graph/state.py
+from typing import TypedDict, Optional
+
+class AnalysisState(TypedDict):
+    repo_url: str
+    branch: str
+    # 各 Agent 结果
+    architecture_result: Optional[dict]
+    quality_result: Optional[dict]
+    dependency_result: Optional[dict]
+    optimization_result: Optional[dict]
+    # 元数据
+    errors: list[str]
+```
+
+### 工作流组装
+
+```python
+# graph/analysis_graph.py
+from langgraph.graph import StateGraph
+from .state import AnalysisState
+
+def build_analysis_graph():
+    graph = StateGraph(AnalysisState)
+
+    # 四个 Agent 节点并行执行
+    graph.add_node("architecture", architecture_agent.stream)
+    graph.add_node("quality", quality_agent.stream)
+    graph.add_node("dependency", dependency_agent.stream)
+    graph.add_node("optimization", optimization_agent.stream)
+
+    # 全部并行
+    graph.add_edge("__start__", ["architecture", "quality", "dependency", "optimization"])
+    graph.add_edge(["architecture", "quality", "dependency", "optimization"], "__end__")
+
+    return graph.compile()
+```
+
+## FastAPI 接口
+
+### SSE 流式端点
+
+```python
+# main.py
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from graph.analysis_graph import build_analysis_graph
+
+app = FastAPI()
+
+@app.post("/analyze")
+async def analyze_repo(repo_url: str, branch: str = "main"):
+    graph = build_analysis_graph()
+
+    async def event_stream():
+        async for event in graph.astream({"repo_url": repo_url, "branch": branch}):
+            yield f"data: {json.dumps(event)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+```
+
+### CORS 配置
+允许前端 BFF 跨域调用：
+
+```python
+# main.py
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # 前端地址
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+## 错误处理
+
+```python
+# agents/base_agent.py
+async def stream(self, repo_url: str) -> AsyncGenerator[AgentEvent, None]:
+    try:
+        yield AgentEvent(type="status", agent=self.name, message="启动中...", percent=0, data=None)
+        result = await self._do_work(repo_url)
+        yield AgentEvent(type="result", agent=self.name, message="完成", percent=100, data=result)
+    except Exception as e:
+        yield AgentEvent(
+            type="error",
+            agent=self.name,
+            message=f"执行失败: {str(e)}",
+            percent=0,
+            data=None,
+        )
+```
+
+## 依赖管理
+
+```
+# backend/requirements.txt
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+httpx>=0.27.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+```

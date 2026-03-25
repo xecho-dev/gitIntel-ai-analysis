@@ -1,0 +1,90 @@
+---
+description: 项目整体架构与目录结构规范
+alwaysApply: true
+---
+
+# GitIntel 项目架构规范
+
+## 技术架构
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      前端 (Next.js)                      │
+│         Next.js App Router + Tailwind CSS               │
+│                    Zustand 状态管理                      │
+└─────────────────────────┬───────────────────────────────┘
+                          │ HTTP / SSE 流式响应
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                  BFF 层 (Next.js Route Handler)          │
+│              /app/api/**/route.ts                       │
+└─────────────────────────┬───────────────────────────────┘
+                          │ HTTP
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                Agent 层 (FastAPI + LangGraph)           │
+│                 /backend/agents/**/*.py                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+## 目录结构
+
+```
+gitintel-ai-analysis/
+├── app/                        # Next.js App Router
+│   ├── api/                    # BFF Route Handler（所有对外接口）
+│   │   └── analyze/
+│   │       └── route.ts        # POST /api/analyze
+│   ├── page.tsx                # 主页面
+│   └── globals.css
+├── components/                 # React 组件
+│   ├── agents/                 # Agent 结果展示组件
+│   │   ├── ArchitectureAgent.tsx
+│   │   ├── QualityAgent.tsx
+│   │   └── ...
+│   └── ui/                     # 通用 UI 组件
+├── lib/                        # 前端工具库
+│   ├── api.ts                  # 统一 API 调用封装（含 SSE）
+│   ├── utils.ts
+│   └── types.ts                # API 响应类型定义
+├── store/                      # Zustand 状态管理
+│   ├── useAnalysisStore.ts
+│   └── useAppStore.ts
+└── backend/                    # FastAPI Agent 层（独立服务）
+    ├── agents/
+    │   ├── __init__.py
+    │   ├── architecture.py     # 架构分析 Agent
+    │   ├── quality.py           # 代码质量 Agent
+    │   ├── dependency.py       # 依赖风险 Agent
+    │   └── optimization.py      # 优化建议 Agent
+    ├── graph/
+    │   └── analysis_graph.py   # LangGraph 工作流编排
+    ├── main.py                 # FastAPI 入口
+    └── requirements.txt
+```
+
+## 前端通信规范
+
+- **BFF 调用 Agent 层**：`POST /api/analyze`，响应使用 **SSE 流式**返回中间结果
+- **Agent 层 SSE 格式**：
+
+```typescript
+// 事件类型
+data: {"type": "status", "agent": "architecture", "message": "正在扫描项目目录..."}
+data: {"type": "progress", "agent": "quality", "percent": 45}
+data: {"type": "result", "agent": "architecture", "data": {...}}
+data: [DONE]
+```
+
+- **前端通过 `fetch` + `ReadableStream` 消费 SSE，不直接调用 FastAPI**
+
+## 命名规范
+
+| 模块 | 命名风格 | 示例 |
+|------|---------|------|
+| Next.js 页面/路由 | kebab-case | `analysis-result/page.tsx` |
+| React 组件 | PascalCase | `ArchitectureAgent.tsx` |
+| Zustand Store | camelCase + use 前缀 | `useAnalysisStore.ts` |
+| API Route | kebab-case | `route-handler.ts` |
+| FastAPI Agent | snake_case | `architecture_agent.py` |
+| LangGraph State | snake_case | `analysis_state.py` |
