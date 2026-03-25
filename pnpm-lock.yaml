@@ -17,9 +17,6 @@ importers:
 
   frontend:
     dependencies:
-      '@gitintel/types':
-        specifier: workspace:*
-        version: link:../packages/types
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
