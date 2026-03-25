@@ -1,6 +1,6 @@
 ---
 description: Next.js + Tailwind 前端开发规范
-globs: app/**/*.{ts,tsx} components/**/*.{ts,tsx} lib/**/*.{ts,tsx} store/**/*.{ts,tsx}
+globs: frontend/**/*.{ts,tsx}
 alwaysApply: false
 ---
 
@@ -115,33 +115,31 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
 ## API 层（BFF Route Handler）
 
 ### 路由文件位置
-所有 API 路由统一放在 `app/api/` 下，使用 kebab-case：
+所有 API 路由统一放在 `frontend/app/api/` 下，使用 kebab-case：
 
 ```
-app/api/analyze/route.ts        → POST /api/analyze
-app/api/agents/status/route.ts   → GET /api/agents/status
+frontend/app/api/analyze/route.ts   → POST /api/analyze
+frontend/app/api/history/route.ts  → GET /api/history
 ```
 
 ### SSE 流式响应
-Agent 分析结果通过 SSE 流式推送到前端，**必须在 Route Handler 层处理 SSE 解析，前端不应直接调用 FastAPI**：
+Agent 分析结果通过 SSE 流式推送到前端，**必须在 BFF Route Handler 层处理 SSE 解析，前端不应直接调用 FastAPI**：
 
 ```typescript
-// app/api/analyze/route.ts
-import { analyzeRepository } from "@/lib/analysis";
+// frontend/app/api/analyze/route.ts
 
 export async function POST(req: Request) {
-  const { repoUrl } = await req.json();
+  const { repoUrl, branch } = await req.json();
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      await analyzeRepository(repoUrl, (event) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-      });
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-    },
+  // 调用 Agent 层
+  const response = await fetch("http://localhost:8000/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo_url: repoUrl, branch }),
   });
 
+  // 将 Agent 层 SSE 流透传给前端
+  const stream = response.body;
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
@@ -153,20 +151,11 @@ export async function POST(req: Request) {
 ```
 
 ### API 类型定义
-所有 API 请求/响应类型放在 `lib/types.ts`，与后端共享：
+所有 API 请求/响应类型从 `packages/types` 导入：
 
 ```typescript
-// lib/types.ts
-export interface AnalyzeRequest {
-  repoUrl: string;
-  branch?: string;
-}
+// ✅ 从共享类型包导入
+import { AgentEvent, AnalyzeRequest, AnalysisResult } from "@gitintel/types";
 
-export interface AgentEvent {
-  type: "status" | "progress" | "result" | "error";
-  agent: "architecture" | "quality" | "dependency" | "optimization";
-  message?: string;
-  percent?: number;
-  data?: unknown;
-}
+// ❌ 不要在 frontend 内重新定义相同类型
 ```

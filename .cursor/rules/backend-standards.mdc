@@ -22,13 +22,12 @@ backend/
 │   ├── state.py          # SharedState 定义
 │   └── analysis_graph.py # 主工作流编排
 ├── tools/               # Agent 可用工具
-│   ├── git_scanner.py
-│   ├── code_analyzer.py
-│   └── dependency_checker.py
 ├── schemas/             # Pydantic 数据模型
+│   ├── __init__.py
 │   ├── request.py
 │   └── response.py
 ├── main.py              # FastAPI 入口
+├── pyproject.toml
 └── requirements.txt
 ```
 
@@ -53,13 +52,17 @@ class BaseAgent(ABC):
     name: str
 
     @abstractmethod
-    async def run(self, repo_url: str, callback) -> dict:
-        """执行 Agent，返回结果字典"""
-        pass
-
-    async def stream(self, repo_url: str) -> AsyncGenerator[AgentEvent, None]:
+    async def stream(self, repo_url: str, branch: str = "main") -> AsyncGenerator[AgentEvent, None]:
         """流式输出事件（SSE 用）"""
-        yield AgentEvent(type="status", agent=self.name, message="启动中...", percent=0, data=None)
+        ...
+
+    async def run(self, repo_url: str, branch: str = "main") -> dict:
+        """执行 Agent，返回结果字典"""
+        result = None
+        async for event in self.stream(repo_url, branch):
+            if event["type"] == "result":
+                result = event["data"]
+        return result or {}
 ```
 
 ### Agent 实现示例
@@ -72,17 +75,26 @@ from typing import AsyncGenerator
 class ArchitectureAgent(BaseAgent):
     name = "architecture"
 
-    async def stream(self, repo_url: str) -> AsyncGenerator[AgentEvent, None]:
-        yield AgentEvent(type="status", agent=self.name, message="正在扫描项目目录...", percent=10, data=None)
-
+    async def stream(self, repo_url: str, branch: str = "main") -> AsyncGenerator[AgentEvent, None]:
+        yield AgentEvent(
+            type="status", agent=self.name,
+            message="正在扫描项目目录...", percent=10, data=None
+        )
         tree = await self._scan_directory(repo_url)
-        yield AgentEvent(type="progress", agent=self.name, message="目录扫描完成", percent=30, data=None)
-
+        yield AgentEvent(
+            type="progress", agent=self.name,
+            message="目录扫描完成", percent=30, data=None
+        )
         components = await self._parse_components(tree)
-        yield AgentEvent(type="status", agent=self.name, message=f"解析到 {len(components)} 个组件", percent=60, data=None)
-
+        yield AgentEvent(
+            type="status", agent=self.name,
+            message=f"解析到 {len(components)} 个组件", percent=60, data=None
+        )
         result = await self._analyze_dependencies(components)
-        yield AgentEvent(type="result", agent=self.name, message="架构分析完成", percent=100, data=result)
+        yield AgentEvent(
+            type="result", agent=self.name,
+            message="架构分析完成", percent=100, data=result
+        )
 ```
 
 ## LangGraph 工作流编排
@@ -97,12 +109,10 @@ from typing import TypedDict, Optional
 class AnalysisState(TypedDict):
     repo_url: str
     branch: str
-    # 各 Agent 结果
     architecture_result: Optional[dict]
     quality_result: Optional[dict]
     dependency_result: Optional[dict]
     optimization_result: Optional[dict]
-    # 元数据
     errors: list[str]
 ```
 
@@ -110,23 +120,39 @@ class AnalysisState(TypedDict):
 
 ```python
 # graph/analysis_graph.py
-from langgraph.graph import StateGraph
-from .state import AnalysisState
+import asyncio
+import json
+from typing import AsyncGenerator
 
-def build_analysis_graph():
-    graph = StateGraph(AnalysisState)
+from agents.architecture import ArchitectureAgent
+from agents.quality import QualityAgent
+from agents.dependency import DependencyAgent
+from agents.optimization import OptimizationAgent
 
-    # 四个 Agent 节点并行执行
-    graph.add_node("architecture", architecture_agent.stream)
-    graph.add_node("quality", quality_agent.stream)
-    graph.add_node("dependency", dependency_agent.stream)
-    graph.add_node("optimization", optimization_agent.stream)
 
-    # 全部并行
-    graph.add_edge("__start__", ["architecture", "quality", "dependency", "optimization"])
-    graph.add_edge(["architecture", "quality", "dependency", "optimization"], "__end__")
+async def stream_analysis(repo_url: str, branch: str = "main") -> AsyncGenerator[str, None]:
+    """并行执行四个 Agent，流式输出所有事件"""
+    agents = [
+        ArchitectureAgent(),
+        QualityAgent(),
+        DependencyAgent(),
+        OptimizationAgent(),
+    ]
 
-    return graph.compile()
+    async def run_agent(agent) -> list:
+        results = []
+        async for event in agent.stream(repo_url, branch):
+            results.append(event)
+        return results
+
+    # 并行执行所有 Agent
+    all_results = await asyncio.gather(*[run_agent(a) for a in agents])
+
+    # 按顺序 yield 每个 Agent 的事件
+    for agent_results in all_results:
+        for event in agent_results:
+            yield f"data: {json.dumps(event)}\n\n"
+    yield "data: [DONE]\n\n"
 ```
 
 ## FastAPI 接口
@@ -137,21 +163,15 @@ def build_analysis_graph():
 # main.py
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
-from graph.analysis_graph import build_analysis_graph
+from graph.analysis_graph import stream_analysis
+from schemas.request import AnalyzeRequest
 
-app = FastAPI()
+app = FastAPI(title="GitIntel Agent API", version="0.1.0")
 
-@app.post("/analyze")
-async def analyze_repo(repo_url: str, branch: str = "main"):
-    graph = build_analysis_graph()
-
-    async def event_stream():
-        async for event in graph.astream({"repo_url": repo_url, "branch": branch}):
-            yield f"data: {json.dumps(event)}\n\n"
-        yield "data: [DONE]\n\n"
-
+@app.post("/api/analyze")
+async def analyze(req: AnalyzeRequest):
     return StreamingResponse(
-        event_stream(),
+        stream_analysis(req.repo_url, req.branch),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -165,12 +185,11 @@ async def analyze_repo(repo_url: str, branch: str = "main"):
 允许前端 BFF 跨域调用：
 
 ```python
-# main.py
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # 前端地址
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -180,19 +199,15 @@ app.add_middleware(
 ## 错误处理
 
 ```python
-# agents/base_agent.py
-async def stream(self, repo_url: str) -> AsyncGenerator[AgentEvent, None]:
+async def stream(self, repo_url: str, branch: str = "main") -> AsyncGenerator[AgentEvent, None]:
     try:
         yield AgentEvent(type="status", agent=self.name, message="启动中...", percent=0, data=None)
         result = await self._do_work(repo_url)
         yield AgentEvent(type="result", agent=self.name, message="完成", percent=100, data=result)
     except Exception as e:
         yield AgentEvent(
-            type="error",
-            agent=self.name,
-            message=f"执行失败: {str(e)}",
-            percent=0,
-            data=None,
+            type="error", agent=self.name,
+            message=f"执行失败: {str(e)}", percent=0, data=None
         )
 ```
 
