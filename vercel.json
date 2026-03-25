@@ -1,6 +1,5 @@
 {
   "version": 2,
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm turbo build --filter=@gitintel/frontend",
-  "outputDirectory": "frontend/.next"
+  "buildCommand": "pnpm turbo build"
 }
