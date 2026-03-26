@@ -3,13 +3,15 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   History,
   UserCircle,
   Bell,
   Settings,
-  Zap,
+  LogOut,
+  Github,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,15 @@ const NAV_ITEMS = [
 
 export const Header = () => {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+
+  const isLoginPage = pathname === "/login";
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: "/login" });
+  };
+
+  if (isLoginPage) return null;
 
   return (
     <header className="fixed top-0 w-full z-50 bg-[#10141a]/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-6 h-16">
@@ -56,21 +67,47 @@ export const Header = () => {
         <button className="hidden md:block px-4 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-sm hover:bg-blue-500/20 transition-all font-medium text-xs uppercase tracking-widest">
           升级专业版
         </button>
+
         <div className="flex items-center gap-2">
           <button className="p-2 text-slate-400 hover:bg-white/5 rounded-full transition-colors">
             <Bell size={20} />
           </button>
-          <button className="p-2 text-slate-400 hover:bg-white/5 rounded-full transition-colors">
-            <Settings size={20} />
-          </button>
-          <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center overflow-hidden border border-white/10 ml-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkPsi_KTxSXNH9ttW5l6V7hIV-OQ3BDUygCu3ymWaH3BM-g9HKp1L-QsN9HdOcQLssuyWdLPDLGZXTeBDrd12OmGNn31RfbEk222AfDci-T9UmIAsj6AKzQ5Du0gU3T7Xjx34J2426XlzRq9tLWgr_S7yyYRSb7jpw9BNa2O6R52iBtUQmU96WfwgIAhrAHTF3YPRQVFF3SZqiXCYw9wEtJtUye7Gf1sVl0K40UOWk3RD7FONeqNz7EAtC-lcuYiE00jPwBDLHwmVP"
-              alt="Avatar"
-              className="w-full h-full object-cover"
-            />
-          </div>
+
+          {status === "loading" ? (
+            <div className="w-8 h-8 rounded bg-slate-800 animate-pulse" />
+          ) : session?.user ? (
+            <>
+              <div className="flex items-center gap-2 px-2">
+                <Github size={14} className="text-slate-400" />
+                <span className="text-xs text-slate-300 hidden md:block">
+                  {(session.user as { login?: string }).login ?? session.user.name}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded overflow-hidden border border-white/10">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={session.user.image ?? ""}
+                  alt={session.user.name ?? "avatar"}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="p-2 text-slate-400 hover:bg-white/5 rounded-full transition-colors"
+                title="退出登录"
+              >
+                <LogOut size={20} />
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded hover:bg-blue-600 transition-colors"
+            >
+              <Github size={14} />
+              登录
+            </Link>
+          )}
         </div>
       </div>
     </header>

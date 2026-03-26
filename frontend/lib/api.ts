@@ -1,12 +1,9 @@
 /**
  * GitIntel API Client
  *
- * 在本地开发时指向 localhost:8000
- * 在 Vercel 部署后通过 NEXT_PUBLIC_API_URL 环境变量指定后端地址
+ * 所有请求通过前端 BFF 层（/api/*）代理，
+ * BFF 会自动从 NextAuth Session 中注入 JWT Token。
  */
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /**
  * 发起仓库分析请求（支持 SSE 流式响应）
@@ -19,11 +16,13 @@ export async function analyzeRepo(
   branch?: string,
   onEvent?: (data: unknown) => void
 ) {
-  const params = new URLSearchParams({ repoUrl });
-  if (branch) params.set("branch", branch);
+  const body: { repoUrl: string; branch?: string } = { repoUrl };
+  if (branch) body.branch = branch;
 
-  const res = await fetch(`${API_BASE}/analyze?${params}`, {
-    headers: { Accept: "text/event-stream" },
+  const res = await fetch(`/api/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -35,7 +34,6 @@ export async function analyzeRepo(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
 
-  // SSE 解析：data: {...}\n\n
   let buffer = "";
 
   while (true) {
@@ -59,4 +57,3 @@ export async function analyzeRepo(
   }
 }
 
-export { API_BASE };

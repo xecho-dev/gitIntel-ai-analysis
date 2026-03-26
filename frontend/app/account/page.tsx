@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion } from "motion/react";
+import { signOut } from "next-auth/react";
 import {
   Github,
   Check,
@@ -15,11 +16,71 @@ import {
   Trash2,
   Copy,
   ChevronRight,
+  LogOut,
+  AlertTriangle,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
+interface GitHubProfile {
+  login?: string;
+  name?: string;
+  email?: string;
+  image?: string;
+  bio?: string;
+  company?: string;
+  location?: string;
+  blog?: string;
+  public_repos?: number;
+  followers?: number;
+  following?: number;
+  created_at?: string;
+}
 
 export default function AccountPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const profile = session?.user as (GitHubProfile & { login?: string }) | undefined;
+
+  if (status === "loading") {
+    return (
+      <div className="space-y-8 animate-pulse">
+        <div className="h-12 w-64 bg-white/5 rounded" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 h-96 bg-white/5 rounded-lg" />
+          <div className="lg:col-span-8 h-96 bg-white/5 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || !profile) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+        <AlertTriangle size={48} className="text-amber-400" />
+        <h2 className="text-2xl font-bold">请先登录</h2>
+        <p className="text-slate-400">登录后即可查看账户信息</p>
+        <button
+          onClick={() => router.push("/login")}
+          className="px-6 py-2.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+        >
+          去登录
+        </button>
+      </div>
+    );
+  }
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "未知";
+    return new Date(dateStr).toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -42,8 +103,8 @@ export default function AccountPage() {
             <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-blue-400 to-purple-400">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCA8VBxQEer3YNEz3ruxzs8t0WvwyhUU_sE2cZorPOm8nQRjxbC9uSgGBFyqoJrnoA0d_Py5Dp6c-iXkfaCC7ao_tmk10bX1YRrVaRYeM5KvtQ0szzwYP_imSoy0-8n4xyB6Sa5eTvIVmzTM3jHAhpZAsVrZBl737uQYrRybfUbAjH7VG5TsBElF_1NmUBkUlY5KZ5qGeOQkkCeuFM7Qso2R86fXssEq5ChI-vdmVbS4W78lL0deh3M6EBG1-tQDrsw3iRa5_tsEZ-5"
-                alt="Profile"
+                src={profile.image ?? `https://github.com/${profile.login}.png`}
+                alt={profile.name ?? profile.login ?? "avatar"}
                 className="w-full h-full rounded-full bg-[#10141a] border-4 border-[#10141a] object-cover"
               />
             </div>
@@ -55,23 +116,52 @@ export default function AccountPage() {
               />
             </div>
           </div>
-          <h2 className="text-2xl font-bold mb-1">李伟勋 (WeiXun Li)</h2>
-          <div className="flex items-center gap-2 text-blue-400 text-sm font-mono mb-4">
-            <Github size={14} />
-            github.com/weixun-dev
-          </div>
+          <h2 className="text-2xl font-bold mb-1">{profile.name ?? profile.login}</h2>
+          {profile.login && (
+            <div className="flex items-center gap-2 text-blue-400 text-sm font-mono mb-4">
+              <Github size={14} />
+              github.com/{profile.login}
+            </div>
+          )}
+          {profile.bio && (
+            <p className="text-slate-400 text-xs mb-4">{profile.bio}</p>
+          )}
           <div className="w-full pt-6 border-t border-white/5 text-left space-y-4">
+            {profile.location && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">位置</span>
+                <span className="font-medium">{profile.location}</span>
+              </div>
+            )}
+            {profile.company && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">公司</span>
+                <span className="font-medium">{profile.company}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">仓库</span>
+              <span className="font-medium">{profile.public_repos ?? 0}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">粉丝</span>
+              <span className="font-medium">{profile.followers ?? 0}</span>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">加入日期</span>
-              <span className="font-medium">2023年10月12日</span>
+              <span className="font-medium">{formatDate(profile.created_at)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">账户角色</span>
               <span className="font-medium">技术专家 (Architect)</span>
             </div>
           </div>
-          <button className="mt-8 w-full py-2.5 border border-white/10 text-sm hover:bg-white/5 transition-colors rounded-sm font-medium">
-            编辑个人资料
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="mt-6 w-full py-2.5 border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-colors rounded-sm font-medium flex items-center justify-center gap-2"
+          >
+            <LogOut size={14} />
+            退出登录
           </button>
         </GlassCard>
 
@@ -191,7 +281,7 @@ export default function AccountPage() {
                 电子邮箱
               </label>
               <div className="flex items-center justify-between gap-4">
-                <p className="text-sm font-medium">wei***.li@intel.com</p>
+                <p className="text-sm font-medium">{profile.email ?? "未公开邮箱"}</p>
                 <button className="text-[10px] text-blue-400 hover:underline uppercase font-bold">
                   更改
                 </button>

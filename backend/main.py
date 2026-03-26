@@ -1,12 +1,16 @@
-import json
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+load_dotenv()
+
 from agents import BaseAgent, AgentEvent
 from graph.analysis_graph import stream_analysis, build_analysis_state
+from middleware.auth import require_auth
 from schemas.request import AnalyzeRequest, HealthRequest
 from schemas.response import HealthResponse
 
@@ -28,9 +32,16 @@ app = FastAPI(
 )
 
 # CORS 配置
+_allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+if os.getenv("FRONTEND_URL"):
+    _allowed_origins.append(os.getenv("FRONTEND_URL"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,8 +55,9 @@ async def health():
 
 
 @app.post("/api/analyze")
-async def analyze(req: AnalyzeRequest):
-    """分析仓库 - SSE 流式响应"""
+async def analyze(req: AnalyzeRequest, request: Request):
+    """分析仓库 - SSE 流式响应（需要登录）"""
+    user = require_auth(request)
     initial_state = build_analysis_state(req.repo_url, req.branch)
 
     async def event_stream():
