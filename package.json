@@ -6,9 +6,9 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "dev:frontend": "pnpm --filter frontend dev",
-    "dev:backend": "pnpm --filter backend dev",
+    "dev:backend": "cd backend && .venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
     "build:frontend": "pnpm --filter frontend build",
-    "build:backend": "pnpm --filter backend build"
+    "build:backend": "cd backend && .venv/bin/python3 -m pip install -r requirements.txt"
   },
   "devDependencies": {
     "turbo": "^2.5.3",
