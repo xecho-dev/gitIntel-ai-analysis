@@ -8,7 +8,10 @@ RepoLoaderAgent — 智能代码仓库加载 Agent，基于 LangChain + 多轮 L
   4. 阶段四：加载 P1 重要文件
   5. 阶段五：LLM 深度决策 —— 基于已加载内容，决定是否需要更多
   6. 阶段六：按需迭代加载（最多 3 轮，每轮都调用 LLM 决策）
-  7. 阶段七：代码分 chunk（大文件拆成 80 行块，防止 token 爆炸）
+  7. 阶段七：语言检测（识别仓库使用的编程语言）
+
+注意：代码语义分块已移至 CodeParserAgent，利用 tree-sitter AST 在函数/类边界拆分，
+保持语义完整性。详情见 _semantic_chunk_file() 方法。
 
 每个阶段都 yield AgentEvent，支持 SSE 实时推送。
 支持从 SharedState 断点恢复（LangGraph checkpoint）。
@@ -89,37 +92,6 @@ def _parse_github_url(url: str) -> tuple[str, str] | None:
     if m:
         return m.group(1), m.group(2)
     return None
-
-
-# ─── 代码分块 ────────────────────────────────────────────────────────
-
-def chunk_code(source: str, max_lines: int = 80, overlap: int = 10) -> list[dict]:
-    """将源代码拆分成重叠的块，防止 token 爆炸。"""
-    lines = source.splitlines()
-    if not lines:
-        return []
-
-    chunks = []
-    start = 0
-    chunk_id = 0
-    while start < len(lines):
-        end = min(start + max_lines, len(lines))
-        chunk_lines = lines[start:end]
-        chunks.append({
-            "chunk_id": chunk_id,
-            "start_line": start + 1,
-            "end_line": end,
-            "content": "\n".join(chunk_lines),
-        })
-        chunk_id += 1
-        if end - start < overlap:
-            break
-        start += max_lines - overlap
-
-    total = len(chunks)
-    for c in chunks:
-        c["total_chunks"] = total
-    return chunks
 
 
 # ─── Agent ──────────────────────────────────────────────────────────
@@ -268,25 +240,19 @@ class RepoLoaderAgent(BaseAgent):
                     80, {"decision": decision_history[-1]}
                 )
 
-            # 阶段七：语言统计 + 代码分块
+            # 阶段七：语言检测
             languages = self._infer_languages(tree_items)
-            chunked_files: dict[str, list[dict]] = {}
-            for path, content in loaded.items():
-                if content and content.strip():
-                    chunks = chunk_code(content)
-                    if chunks:
-                        chunked_files[path] = chunks
-
-            total_chunks = sum(len(v) for v in chunked_files.values())
 
             yield _make_event(
                 self.name, "progress",
-                f"加载完成: {len(loaded)} 个文件, {total_chunks} 个代码块，"
+                f"加载完成: {len(loaded)} 个文件，"
                 f"检测到语言: {', '.join(languages) if languages else '未知'}",
                 95, None
             )
 
             # 阶段八：返回结果
+            # 注意：代码语义分块已移至 CodeParserAgent，利用 tree-sitter AST
+            # 在函数/类边界拆分，保持语义完整性
             yield _make_event(
                 self.name, "result", "仓库加载完成",
                 100,
@@ -299,7 +265,6 @@ class RepoLoaderAgent(BaseAgent):
                     "total_loaded": len(loaded),
                     "languages": languages,
                     "file_contents": loaded,
-                    "chunked_files": chunked_files,
                     "llm_decision_rounds": decision_rounds,
                     "llm_decision_history": decision_history,
                     "classified_files": classified,

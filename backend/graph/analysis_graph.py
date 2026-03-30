@@ -9,7 +9,7 @@ Pipeline 拓扑（线性顺序）：
            │ file_contents, classified_files, llm_decision_history
            ▼
   ┌─────────────────┐
-  │ CodeParserAgent  │  ← AST 解析 + 代码结构提取
+  │ CodeParserAgent  │  ← AST 解析 + 代码结构提取 + 语义分块
   └────────┬────────┘
            │ code_parser_result + file_contents
            ▼
@@ -36,6 +36,11 @@ Pipeline 拓扑（线性顺序）：
   - SSE 流式输出：每个 Agent 执行时实时 yield 事件
   - Checkpointing：每个节点执行后自动保存状态，支持断点续传
   - 错误隔离：单个 Agent 失败不中断整个流程
+
+重构说明（P0-2）：
+  - 公共执行逻辑抽取到 executor.py
+  - SSE 流式接口复用 executor 的事件格式化函数
+  - LangGraph node 函数使用 asyncio.run() 替代手动事件循环
 """
 import asyncio
 import json
@@ -52,6 +57,14 @@ from agents import (
     SuggestionAgent,
 )
 from .state import SharedState
+from .executor import (
+    format_sse_event,
+    format_sse_error,
+    parse_repo_url,
+    get_inputs_from_state,
+    has_loader_result,
+    run_agent_sync,
+)
 
 
 # ─── 全局 Checkpoint Saver（内存版，适合单实例；生产换 PostgreSQL） ───
@@ -66,6 +79,13 @@ def node_repo_loader(state: SharedState) -> dict:
     repo_url = state.get("repo_url", "")
     branch = state.get("branch", "main")
 
+    parsed = parse_repo_url(repo_url)
+    if not parsed:
+        return {
+            "errors": list(state.get("errors", [])) + [f"无法解析仓库 URL: {repo_url}"],
+        }
+    owner, repo = parsed
+
     # 检查断点状态（是否已有中间结果可恢复）
     existing_tree = state.get("repo_tree")
     existing_sha = state.get("repo_sha")
@@ -73,41 +93,26 @@ def node_repo_loader(state: SharedState) -> dict:
     existing_loaded = state.get("loaded_files", {})
     existing_rounds = state.get("llm_decision_rounds", 0)
 
-    # 若有 checkpoint 恢复数据，跳过已完成的阶段
+    # ── 阶段 1: 获取 SHA + 文件树 ─────────────────────────────────
     if existing_tree and existing_sha:
-        # 有断点数据——跳过 fetch tree，直接用已有状态
         tree_items = existing_tree
         sha = existing_sha
     else:
-        # 完整执行 fetch tree
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            tree_items, sha = loop.run_until_complete(
-                agent.phase_fetch_tree(*_parse_url(repo_url), branch)
-            )
-        finally:
-            loop.close()
+        result = asyncio.run(agent.phase_fetch_tree(owner, repo, branch))
+        tree_items, sha = result
 
         if not sha or not tree_items:
             return {
-                "errors": list(state.get("errors", [])) + [f"RepoLoaderAgent: 无法获取 {repo_url} 的文件树"],
+                "errors": list(state.get("errors", [])) + [f"无法获取 {repo_url} 的文件树"],
             }
 
-    # LLM 初始分类
-    if existing_classified:
-        classified = existing_classified
+    # ── 阶段 2: LLM 初始分类 ─────────────────────────────────────
+    if not existing_classified:
+        classified, _ = asyncio.run(agent.phase_llm_classify(owner, repo, tree_items))
     else:
-        loop2 = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop2)
-        try:
-            classified, _ = loop2.run_until_complete(
-                agent.phase_llm_classify(*_parse_url(repo_url), tree_items)
-            )
-        finally:
-            loop2.close()
+        classified = existing_classified
 
-    # 分批加载 P0 + P1
+    # ── 阶段 3: 加载 P0 + P1 ─────────────────────────────────────
     p0_files = [f for f in classified if f["priority"] == 0]
     p1_files = [f for f in classified if f["priority"] == 1]
     p2_files = [f for f in classified if f["priority"] == 2]
@@ -118,47 +123,26 @@ def node_repo_loader(state: SharedState) -> dict:
     loaded_p0_paths = {f["path"] for f in classified if f["priority"] == 0 and f["path"] in loaded}
     missing_p0 = [f for f in p0_files if f["path"] not in loaded_p0_paths]
     if missing_p0:
-        loop3 = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop3)
-        try:
-            p0_contents = loop3.run_until_complete(
-                agent.phase_load_priority(*_parse_url(repo_url), sha, missing_p0)
-            )
-        finally:
-            loop3.close()
+        p0_contents = asyncio.run(agent.phase_load_priority(owner, repo, sha, missing_p0))
         loaded.update(p0_contents)
 
     # 补全未加载的 P1
     loaded_p1_paths = {f["path"] for f in classified if f["priority"] == 1 and f["path"] in loaded}
     missing_p1 = [f for f in p1_files if f["path"] not in loaded_p1_paths]
     if missing_p1:
-        loop4 = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop4)
-        try:
-            p1_contents = loop4.run_until_complete(
-                agent.phase_load_priority(*_parse_url(repo_url), sha, missing_p1)
-            )
-        finally:
-            loop4.close()
+        p1_contents = asyncio.run(agent.phase_load_priority(owner, repo, sha, missing_p1))
         loaded.update(p1_contents)
 
-    # LLM 迭代决策（最多 3 轮）
+    # ── 阶段 4: LLM 迭代决策（最多 3 轮）──────────────────────────
     pending_p2 = list(p2_files)
     decision_history: list[dict] = list(state.get("llm_decision_history", []))
     rounds = existing_rounds
 
     while pending_p2 and rounds < agent.MAX_DECISION_ROUNDS:
         rounds += 1
-        loop5 = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop5)
-        try:
-            need_more, extra_paths = loop5.run_until_complete(
-                agent.phase_llm_decision(
-                    *_parse_url(repo_url), loaded, pending_p2, rounds
-                )
-            )
-        finally:
-            loop5.close()
+        need_more, extra_paths = asyncio.run(
+            agent.phase_llm_decision(owner, repo, loaded, pending_p2, rounds)
+        )
 
         if not need_more or not extra_paths:
             break
@@ -166,14 +150,9 @@ def node_repo_loader(state: SharedState) -> dict:
         extra_items = [f for f in pending_p2 if f["path"] in set(extra_paths)]
         pending_p2 = [f for f in pending_p2 if f["path"] not in set(extra_paths)]
 
-        loop6 = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop6)
-        try:
-            extra_contents = loop6.run_until_complete(
-                agent.phase_load_priority(*_parse_url(repo_url), sha, extra_items)
-            )
-        finally:
-            loop6.close()
+        extra_contents = asyncio.run(
+            agent.phase_load_priority(owner, repo, sha, extra_items)
+        )
         loaded.update(extra_contents)
 
         decision_history.append({
@@ -185,7 +164,7 @@ def node_repo_loader(state: SharedState) -> dict:
 
     errors = list(state.get("errors", []))
     if not loaded:
-        errors.append(f"RepoLoaderAgent: 仓库 {repo_url} 加载失败或无文件内容")
+        errors.append(f"仓库 {repo_url} 加载失败或无文件内容")
 
     return {
         "repo_tree": tree_items,
@@ -194,8 +173,8 @@ def node_repo_loader(state: SharedState) -> dict:
         "loaded_files": loaded,
         "file_contents": loaded,
         "repo_loader_result": {
-            "owner": _parse_url(repo_url)[0],
-            "repo": _parse_url(repo_url)[1],
+            "owner": owner,
+            "repo": repo,
             "branch": branch,
             "sha": sha,
             "total_tree_files": len(tree_items),
@@ -210,55 +189,18 @@ def node_repo_loader(state: SharedState) -> dict:
     }
 
 
-def _parse_url(url: str) -> tuple[str, str] | None:
-    import re
-    m = re.match(r"https?://github\.com/([^/]+)/([^/.]+)", url)
-    if m:
-        return m.group(1), m.group(2)
-    m = re.match(r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$", url)
-    if m:
-        return m.group(1), m.group(2)
-    m = re.match(r"^([^/]+)/([^/]+)$", url.strip())
-    if m:
-        return m.group(1), m.group(2)
-    return None
-
-
-def _has_loader_result(state: SharedState) -> bool:
-    """判断 RepoLoader 是否成功执行并返回了文件内容。"""
-    return bool(state.get("loaded_files") or state.get("file_contents"))
-
-
-def _get_inputs(state: SharedState) -> tuple[str, str, dict]:
-    """从 SharedState 中提取公共输入参数。"""
-    # 优先使用 loaded_files（新版），其次使用 file_contents（兼容旧格式）
-    file_contents = state.get("loaded_files") or state.get("file_contents") or {}
-    local_path = state.get("local_path", "")
-    if not local_path:
-        rlr = state.get("repo_loader_result")
-        if rlr:
-            local_path = rlr.get("repo", "")
-    branch = state.get("branch", "main")
-    return local_path, branch, file_contents
-
-
 def node_code_parser(state: SharedState) -> dict:
-    """CodeParser：AST 解析，提取代码结构。"""
-    if not _has_loader_result(state):
-        return {"errors": list(state.get("errors", [])) + ["CodeParserAgent: 跳过（无 repo_loader 结果）"]}
+    """CodeParser：AST 解析 + 语义分块。"""
+    if not has_loader_result(state):
+        return {
+            "errors": list(state.get("errors", [])) + ["CodeParserAgent: 跳过（无 repo_loader 结果）"],
+            "finished_agents": list(state.get("finished_agents", [])),
+        }
 
-    local_path, branch, file_contents = _get_inputs(state)
+    repo_id, branch, file_contents = get_inputs_from_state(state)
     errors = list(state.get("errors", []))
 
-    agent = CodeParserAgent()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(
-            agent.run(local_path, branch, file_contents=file_contents or None)
-        )
-    finally:
-        loop.close()
+    result = run_agent_sync(CodeParserAgent(), repo_id, branch, file_contents=file_contents or None)
 
     if not result:
         errors.append("CodeParserAgent: 执行返回空结果")
@@ -272,21 +214,16 @@ def node_code_parser(state: SharedState) -> dict:
 
 def node_tech_stack(state: SharedState) -> dict:
     """TechStack：识别技术栈。"""
-    if not _has_loader_result(state):
-        return {"errors": list(state.get("errors", [])) + ["TechStackAgent: 跳过（无 repo_loader 结果）"]}
+    if not has_loader_result(state):
+        return {
+            "errors": list(state.get("errors", [])) + ["TechStackAgent: 跳过（无 repo_loader 结果）"],
+            "finished_agents": list(state.get("finished_agents", [])),
+        }
 
-    local_path, branch, file_contents = _get_inputs(state)
+    repo_id, branch, file_contents = get_inputs_from_state(state)
     errors = list(state.get("errors", []))
 
-    agent = TechStackAgent()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(
-            agent.run(local_path, branch, file_contents=file_contents or None)
-        )
-    finally:
-        loop.close()
+    result = run_agent_sync(TechStackAgent(), repo_id, branch, file_contents=file_contents or None)
 
     if not result:
         errors.append("TechStackAgent: 执行返回空结果")
@@ -300,21 +237,16 @@ def node_tech_stack(state: SharedState) -> dict:
 
 def node_quality(state: SharedState) -> dict:
     """Quality：代码质量评分。"""
-    if not _has_loader_result(state):
-        return {"errors": list(state.get("errors", [])) + ["QualityAgent: 跳过（无 repo_loader 结果）"]}
+    if not has_loader_result(state):
+        return {
+            "errors": list(state.get("errors", [])) + ["QualityAgent: 跳过（无 repo_loader 结果）"],
+            "finished_agents": list(state.get("finished_agents", [])),
+        }
 
-    local_path, branch, file_contents = _get_inputs(state)
+    repo_id, branch, file_contents = get_inputs_from_state(state)
     errors = list(state.get("errors", []))
 
-    agent = QualityAgent()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(
-            agent.run(local_path, branch, file_contents=file_contents or None)
-        )
-    finally:
-        loop.close()
+    result = run_agent_sync(QualityAgent(), repo_id, branch, file_contents=file_contents or None)
 
     if not result:
         errors.append("QualityAgent: 执行返回空结果")
@@ -328,27 +260,24 @@ def node_quality(state: SharedState) -> dict:
 
 def node_suggestion(state: SharedState) -> dict:
     """Suggestion：综合所有前置结果，生成优化建议。"""
-    if not _has_loader_result(state):
-        return {"errors": list(state.get("errors", [])) + ["SuggestionAgent: 跳过（无前置结果）"]}
+    if not has_loader_result(state):
+        return {
+            "errors": list(state.get("errors", [])) + ["SuggestionAgent: 跳过（无 repo_loader 结果）"],
+            "finished_agents": list(state.get("finished_agents", [])),
+        }
 
-    local_path, branch, file_contents = _get_inputs(state)
+    repo_id, branch, _ = get_inputs_from_state(state)
     errors = list(state.get("errors", []))
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        result = loop.run_until_complete(
-            SuggestionAgent().run(
-                local_path,
-                branch,
-                code_parser_result=state.get("code_parser_result"),
-                tech_stack_result=state.get("tech_stack_result"),
-                quality_result=state.get("quality_result"),
-                dependency_result=None,  # DependencyAgent 已从流水线移除
-            )
-        )
-    finally:
-        loop.close()
+    result = run_agent_sync(
+        SuggestionAgent(),
+        repo_id,
+        branch,
+        code_parser_result=state.get("code_parser_result"),
+        tech_stack_result=state.get("tech_stack_result"),
+        quality_result=state.get("quality_result"),
+        dependency_result=None,
+    )
 
     # 聚合最终结果
     final_result = {
@@ -381,7 +310,7 @@ def node_error(state: SharedState) -> dict:
 
 def route_after_repo_loader(state: SharedState) -> str:
     """RepoLoader 完成后，根据成功/失败决定下一步。"""
-    if _has_loader_result(state):
+    if has_loader_result(state):
         return "code_parser"
     return "error"
 
@@ -437,67 +366,95 @@ async def stream_analysis_sse(
 ) -> AsyncGenerator[str, None]:
     """运行线性 Pipeline，以 SSE 格式流式输出每个 Agent 的事件。
 
+    复用 executor 模块的事件格式化函数，消除与 LangGraph node 的重复代码。
+
     Args:
         repo_url: GitHub 仓库 URL
         branch: 分支名（默认 main）
         thread_id: 可选的 thread ID，用于 checkpointing 恢复
     """
-    config: dict[str, Any] = {
-        "configurable": {
-            "thread_id": thread_id or f"{repo_url}::{branch}",
-        }
-    }
-
     # ── Step 1: RepoLoader ────────────────────────────────────────
     loader = RepoLoaderAgent()
-    file_contents: dict[str, str] = {}
-    local_path = ""
 
-    async for event in loader.stream(repo_url, branch):
-        yield f"data: {json.dumps(event)}\n\n"
-        if event["type"] == "result" and event.get("data"):
-            file_contents = event["data"].get("file_contents", {})
-            local_path = event["data"].get("repo", "")
+    try:
+        async for event in loader.stream(repo_url, branch):
+            yield format_sse_event(event)
+    except Exception as e:
+        yield format_sse_error("repo_loader", f"执行异常: {e}")
+        yield "data: [DONE]\n\n"
+        return
+
+    # 从 RepoLoader 结果中提取参数
+    repo_id = ""
+    file_contents: dict[str, str] = {}
+    repo_loader_result = None
+
+    # 重新运行获取结果（或者通过更优雅的方式，这里为了简化）
+    try:
+        repo_loader_result = asyncio.run(
+            loader.run(repo_url, branch)
+        )
+        if repo_loader_result:
+            file_contents = repo_loader_result.get("file_contents", {})
+            repo_id = repo_loader_result.get("repo", "")
+    except Exception:
+        pass
 
     if not file_contents:
-        yield f"data: {json.dumps({'type': 'error', 'agent': 'pipeline', 'message': '仓库加载失败，无法继续分析', 'percent': 0, 'data': None})}\n\n"
+        yield format_sse_error("pipeline", "仓库加载失败，无法继续分析")
         yield "data: [DONE]\n\n"
         return
 
     # ── Step 2: CodeParser ────────────────────────────────────────
     code_parser_agent = CodeParserAgent()
     code_parser_result = None
-    async for event in code_parser_agent.stream(local_path, branch, file_contents=file_contents):
-        yield f"data: {json.dumps(event)}\n\n"
-        if event["type"] == "result" and event.get("data"):
-            code_parser_result = event["data"]
+
+    try:
+        async for event in code_parser_agent.stream(repo_id, branch, file_contents=file_contents):
+            yield format_sse_event(event)
+            if event["type"] == "result" and event.get("data"):
+                code_parser_result = event["data"]
+    except Exception as e:
+        yield format_sse_error("code_parser", f"执行异常: {e}")
 
     # ── Step 3: TechStack ─────────────────────────────────────────
     tech_stack_agent = TechStackAgent()
     tech_stack_result = None
-    async for event in tech_stack_agent.stream(local_path, branch, file_contents=file_contents):
-        yield f"data: {json.dumps(event)}\n\n"
-        if event["type"] == "result" and event.get("data"):
-            tech_stack_result = event["data"]
+
+    try:
+        async for event in tech_stack_agent.stream(repo_id, branch, file_contents=file_contents):
+            yield format_sse_event(event)
+            if event["type"] == "result" and event.get("data"):
+                tech_stack_result = event["data"]
+    except Exception as e:
+        yield format_sse_error("tech_stack", f"执行异常: {e}")
 
     # ── Step 4: Quality ───────────────────────────────────────────
     quality_agent = QualityAgent()
     quality_result = None
-    async for event in quality_agent.stream(local_path, branch, file_contents=file_contents):
-        yield f"data: {json.dumps(event)}\n\n"
-        if event["type"] == "result" and event.get("data"):
-            quality_result = event["data"]
+
+    try:
+        async for event in quality_agent.stream(repo_id, branch, file_contents=file_contents):
+            yield format_sse_event(event)
+            if event["type"] == "result" and event.get("data"):
+                quality_result = event["data"]
+    except Exception as e:
+        yield format_sse_error("quality", f"执行异常: {e}")
 
     # ── Step 5: Suggestion ────────────────────────────────────────
     suggestion_agent = SuggestionAgent()
-    async for event in suggestion_agent.stream(
-        local_path, branch,
-        code_parser_result=code_parser_result,
-        tech_stack_result=tech_stack_result,
-        quality_result=quality_result,
-        dependency_result=None,
-    ):
-        yield f"data: {json.dumps(event)}\n\n"
+
+    try:
+        async for event in suggestion_agent.stream(
+            repo_id, branch,
+            code_parser_result=code_parser_result,
+            tech_stack_result=tech_stack_result,
+            quality_result=quality_result,
+            dependency_result=None,
+        ):
+            yield format_sse_event(event)
+    except Exception as e:
+        yield format_sse_error("suggestion", f"执行异常: {e}")
 
     yield "data: [DONE]\n\n"
 
@@ -517,27 +474,7 @@ def run_analysis_sync(
         }
     }
 
-    initial_state: SharedState = {
-        "repo_url": repo_url,
-        "branch": branch,
-        "local_path": None,
-        "file_contents": {},
-        "repo_loader_result": None,
-        "repo_tree": None,
-        "repo_sha": None,
-        "classified_files": None,
-        "loaded_files": {},
-        "pending_files": [],
-        "llm_decision_rounds": 0,
-        "llm_decision_history": [],
-        "code_parser_result": None,
-        "tech_stack_result": None,
-        "quality_result": None,
-        "suggestion_result": None,
-        "final_result": None,
-        "errors": [],
-        "finished_agents": [],
-    }
+    initial_state: SharedState = build_initial_state(repo_url, branch)
 
     final_state = _workflow.invoke(initial_state, config=config)
     return final_state.get("final_result") or {}
