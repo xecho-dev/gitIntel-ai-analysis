@@ -345,6 +345,167 @@ class RepoLoaderAgent(BaseAgent):
         """LLM 决策一轮：判断是否需要加载更多，返回 (need_more, paths)。"""
         return await self._llm_decide(owner, repo, loaded, pending, round_num)
 
+    async def phase_ai_decide_p1(
+        self,
+        owner: str,
+        repo: str,
+        loaded: dict[str, str],
+        code_parser_result: dict | None,
+        p1_files: list[dict],
+        p2_files: list[dict],
+    ) -> tuple[bool, list[str], str]:
+        """AI 决策是否需要加载 P1。
+
+        基于 P0 代码的解析结果，决定是否需要继续加载 P1 文件。
+
+        Args:
+            owner: 仓库所有者
+            repo: 仓库名
+            loaded: 已加载的 P0 文件内容
+            code_parser_result: P0 文件的 AST 解析结果
+            p1_files: 待加载的 P1 文件列表
+            p2_files: 待加载的 P2 文件列表
+
+        Returns:
+            tuple[need_more, extra_paths, reason]
+            - need_more: 是否需要加载更多文件
+            - extra_paths: 需要加载的文件路径列表（此方法中为空）
+            - reason: AI 决策的原因说明
+        """
+        llm = _get_llm()
+
+        # 构建代码上下文摘要
+        code_summary = ""
+        if code_parser_result:
+            func_count = code_parser_result.get("total_functions", 0)
+            class_count = code_parser_result.get("total_classes", 0)
+            lang_stats = code_parser_result.get("language_stats", {})
+            langs = list(lang_stats.keys())[:5]
+            code_summary = f"已分析 {func_count} 个函数, {class_count} 个类, 主要语言: {', '.join(langs)}"
+
+        p1_count = len(p1_files)
+        p2_count = len(p2_files)
+
+        if llm is None:
+            # LLM 不可用时的降级策略
+            if p1_count > 0:
+                return True, [], f"加载 {p1_count} 个 P1 文件以获得更全面的分析（LLM 不可用，使用规则决策）"
+            return False, [], "没有 P1 文件需要加载"
+
+        try:
+            from .prompts import build_p1_decision_prompt
+
+            prompt_template = build_p1_decision_prompt(
+                repo_path=f"{owner}/{repo}",
+                p0_summary=code_summary,
+                p0_loaded_count=len(loaded),
+                p1_files=[f["path"] for f in p1_files[:30]],
+                p1_count=p1_count,
+                p2_count=p2_count,
+            )
+
+            response = await llm.ainvoke(
+                prompt_template.invoke({"system_context": "你是一个专业的代码架构分析师。"})
+            )
+            raw = response.content.strip()
+
+            result = _json.loads(raw)
+            need_more = bool(result.get("need_more", False))
+            reason = result.get("reason", "基于代码分析的决定")
+
+            return need_more, [], reason
+
+        except Exception:
+            # LLM 失败时的降级策略
+            if p1_count > 0:
+                return True, [], f"LLM 调用失败，使用规则决定加载 {p1_count} 个 P1 文件"
+            return False, [], "没有 P1 文件需要加载"
+
+    async def phase_ai_decide_p2(
+        self,
+        owner: str,
+        repo: str,
+        loaded: dict[str, str],
+        code_parser_p0_result: dict | None,
+        code_parser_p1_result: dict | None,
+        p2_files: list[dict],
+    ) -> tuple[bool, list[str], str]:
+        """AI 决策 P2 文件：决定需要加载哪些 P2 文件。
+
+        基于已加载的 P0/P1 代码分析结果，选择性地加载最有价值的 P2 文件。
+
+        Args:
+            owner: 仓库所有者
+            repo: 仓库名
+            loaded: 已加载的所有文件内容
+            code_parser_p0_result: P0 文件的 AST 解析结果
+            code_parser_p1_result: P1 文件的 AST 解析结果
+            p2_files: 待加载的 P2 文件列表
+
+        Returns:
+            tuple[need_more, extra_paths, reason]
+            - need_more: 是否需要加载更多文件
+            - extra_paths: 需要加载的 P2 文件路径列表
+            - reason: AI 决策的原因说明
+        """
+        llm = _get_llm()
+
+        # 构建代码上下文摘要
+        total_funcs = 0
+        total_classes = 0
+        all_langs = []
+        for result in [code_parser_p0_result, code_parser_p1_result]:
+            if result:
+                total_funcs += result.get("total_functions", 0)
+                total_classes += result.get("total_classes", 0)
+                lang_stats = result.get("language_stats", {})
+                all_langs.extend(list(lang_stats.keys())[:3])
+
+        code_summary = f"已分析 {total_funcs} 个函数, {total_classes} 个类"
+
+        # 准备 P2 文件信息（取前 50 个让 AI 决策）
+        p2_info = []
+        for f in p2_files[:50]:
+            p2_info.append({
+                "path": f["path"],
+                "size": f.get("size", 0),
+            })
+
+        if llm is None:
+            # LLM 不可用时的降级策略：按大小排序取前 20 个
+            sorted_p2 = sorted(p2_files, key=lambda f: f.get("size", 0), reverse=True)
+            paths = [f["path"] for f in sorted_p2[:20]]
+            return True, paths, f"LLM 不可用，按文件大小加载最大的 20 个 P2 文件"
+
+        try:
+            from .prompts import build_p2_decision_prompt
+
+            prompt_template = build_p2_decision_prompt(
+                repo_path=f"{owner}/{repo}",
+                code_summary=code_summary,
+                loaded_count=len(loaded),
+                p2_files=p2_info,
+                max_extra=30,
+            )
+
+            response = await llm.ainvoke(
+                prompt_template.invoke({"system_context": "你是一个专业的代码架构分析师。"})
+            )
+            raw = response.content.strip()
+
+            result = _json.loads(raw)
+            need_more = bool(result.get("need_more", False))
+            extra_paths: list[str] = result.get("additional_paths", [])[:30]
+            reason = result.get("reason", "基于代码分析的决定")
+
+            return need_more, extra_paths, reason
+
+        except Exception:
+            # LLM 失败时的降级策略
+            sorted_p2 = sorted(p2_files, key=lambda f: f.get("size", 0), reverse=True)
+            paths = [f["path"] for f in sorted_p2[:20]]
+            return True, paths, "LLM 调用失败，按文件大小加载最大的 20 个 P2 文件"
+
     # ── 内部阶段实现 ────────────────────────────────────────────────
 
     async def _phase_fetch_tree(

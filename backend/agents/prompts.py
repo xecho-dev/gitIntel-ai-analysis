@@ -139,7 +139,108 @@ def build_repo_loader_decision_prompt(
     summaries_str = "\n\n".join(summaries_parts)
     return ChatPromptTemplate.from_messages([
         ("system", REPO_LOADER_SYSTEM),
-        ("human", REPO_LOADER_DECISION_HUMAN),
+        ("human", REPO_LOADER_DECISION_HUMAN.format(
+            repo_path=repo_path,
+            loaded_count=len(loaded_paths),
+            loaded_paths=loaded_paths_str,
+            content_summaries=summaries_str,
+            p2_count=len(p2_files),
+            p2_list=p2_list,
+            max_extra=max_extra,
+        )),
+    ])
+
+
+# ─── P1 决策 Prompt ─────────────────────────────────────────────────
+
+P1_DECISION_HUMAN = """仓库: {repo_path}
+
+已加载 P0 核心文件的分析结果:
+{p0_summary}
+
+已加载 {p0_loaded_count} 个 P0 核心文件。
+
+待候选 P1 文件（共 {p1_count} 个）:
+{p1_list}
+
+待候选 P2 文件（共 {p2_count} 个）:
+（暂不列出，基于文件类型判断）
+
+请判断：基于 P0 文件的分析结果，是否需要加载 P1 文件？
+- 如果项目架构清晰、核心代码已充分分析，可以跳过 P1
+- 如果需要更全面的代码覆盖，建议加载 P1
+
+返回格式（严格 JSON）:
+{{"need_more": true/false, "reason": "判断原因（100字以内）"}}
+"""
+
+
+def build_p1_decision_prompt(
+    repo_path: str,
+    p0_summary: str,
+    p0_loaded_count: int,
+    p1_files: list[str],
+    p1_count: int,
+    p2_count: int,
+) -> ChatPromptTemplate:
+    p1_list = "\n".join(f"- {p}" for p in p1_files[:30])
+    return ChatPromptTemplate.from_messages([
+        ("system", REPO_LOADER_SYSTEM),
+        ("human", P1_DECISION_HUMAN.format(
+            repo_path=repo_path,
+            p0_summary=p0_summary,
+            p0_loaded_count=p0_loaded_count,
+            p1_list=p1_list,
+            p1_count=p1_count,
+            p2_count=p2_count,
+        )),
+    ])
+
+
+# ─── P2 决策 Prompt ─────────────────────────────────────────────────
+
+P2_DECISION_HUMAN = """仓库: {repo_path}
+
+已加载文件的代码分析结果:
+{code_summary}
+
+已加载 {loaded_count} 个文件。
+
+待候选 P2 文件（共 {p2_count} 个，取前 50 个候选）:
+{p2_list}
+
+请判断：基于已加载文件的分析结果，是否需要加载更多 P2 文件？
+如需要，返回最多 {max_extra} 个最重要的文件路径（必须是上述列表中的路径）。
+如不需要，need_more 设为 false。
+
+考虑因素：
+- 补充核心模块的边界代码
+- 加载还未分析过的关键业务逻辑
+- 避免重复分析已加载文件的功能
+
+返回格式（严格 JSON）:
+{{"need_more": true/false, "reason": "判断原因（100字以内）", "additional_paths": ["path1", ...]}}
+"""
+
+
+def build_p2_decision_prompt(
+    repo_path: str,
+    code_summary: str,
+    loaded_count: int,
+    p2_files: list[dict],
+    max_extra: int = 30,
+) -> ChatPromptTemplate:
+    p2_list = "\n".join(f"- {f['path']} (~{f.get('size', 0)} bytes)" for f in p2_files[:50])
+    return ChatPromptTemplate.from_messages([
+        ("system", REPO_LOADER_SYSTEM),
+        ("human", P2_DECISION_HUMAN.format(
+            repo_path=repo_path,
+            code_summary=code_summary,
+            loaded_count=loaded_count,
+            p2_list=p2_list,
+            p2_count=len(p2_files),
+            max_extra=max_extra,
+        )),
     ])
 
 
