@@ -69,7 +69,12 @@ LangGraph 工作流 — 编排 GitIntel 分析 Pipeline。
 """
 import asyncio
 import json
-from typing import Any, AsyncGenerator
+import logging
+import os
+from typing import Any, AsyncGenerator, Awaitable, Coroutine, TypeVar
+
+# 配置日志
+logger = logging.getLogger("gitintel")
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
@@ -79,7 +84,9 @@ from agents import (
     CodeParserAgent,
     TechStackAgent,
     QualityAgent,
+    DependencyAgent,
     SuggestionAgent,
+    ArchitectureAgent,
 )
 from .state import SharedState
 from .executor import (
@@ -97,6 +104,32 @@ _checkpointer = MemorySaver()
 
 
 # ─── 辅助函数 ─────────────────────────────────────────────────────
+
+T = TypeVar("T")
+
+
+async def _run_with_timeout(
+    coro: Coroutine[Any, Any, T],
+    timeout: float,
+    error_msg: str = "操作超时",
+) -> T:
+    """带超时的协程执行。
+
+    Args:
+        coro: 要执行的协程
+        timeout: 超时时间（秒）
+        error_msg: 超时时抛出的错误信息
+
+    Returns:
+        协程的返回值
+
+    Raises:
+        asyncio.TimeoutError: 超时时抛出
+    """
+    try:
+        return await asyncio.wait_for(coro, timeout=timeout)
+    except asyncio.TimeoutError:
+        raise asyncio.TimeoutError(f"{error_msg}（超时 {timeout}秒）")
 
 def _has_tree_and_classified(state: SharedState) -> bool:
     """判断是否已完成文件树获取和分类。"""
@@ -584,43 +617,104 @@ def node_quality(state: SharedState) -> dict:
     }
 
 
-def node_suggestion(state: SharedState) -> dict:
-    """节点 12：综合所有前置结果，生成优化建议。"""
+def node_dependency(state: SharedState) -> dict:
+    """节点 13：依赖风险分析（并行分支）。"""
     if not has_loader_result(state):
         return {
-            "errors": list(state.get("errors", [])) + ["SuggestionAgent: 跳过（无前置结果）"],
+            "errors": list(state.get("errors", [])) + ["DependencyAgent: 跳过（无加载结果）"],
             "finished_agents": list(state.get("finished_agents", [])),
         }
 
-    repo_id, branch, _ = get_inputs_from_state(state)
+    repo_id, branch, file_contents = get_inputs_from_state(state)
     errors = list(state.get("errors", []))
 
     result = run_agent_sync(
-        SuggestionAgent(),
+        DependencyAgent(),
+        repo_id,
+        branch,
+        file_contents=file_contents or None,
+    )
+
+    if not result:
+        errors.append("DependencyAgent: 执行返回空结果")
+
+    return {
+        "dependency_result": result,
+        "errors": errors,
+        "finished_agents": list(state.get("finished_agents", [])) + ["dependency"],
+    }
+
+
+def node_architecture(state: SharedState) -> dict:
+    """节点 14：架构评估（并行分支，基于 AST + TechStack + Quality + LLM）。"""
+    repo_id, branch, file_contents = get_inputs_from_state(state)
+    errors = list(state.get("errors", []))
+
+    result = ArchitectureAgent.parse_and_build(
         repo_id,
         branch,
         code_parser_result=state.get("code_parser_result"),
         tech_stack_result=state.get("tech_stack_result"),
         quality_result=state.get("quality_result"),
-        dependency_result=None,
+        total_tree_files=len(state.get("repo_tree") or []),
     )
 
-    # 聚合最终结果
+    if not result:
+        errors.append("ArchitectureAgent: 执行返回空结果")
+
+    return {
+        "architecture_result": result,
+        "errors": errors,
+        "finished_agents": list(state.get("finished_agents", [])) + ["architecture"],
+    }
+
+
+def node_optimization(state: SharedState) -> dict:
+    """节点 15：优化建议（基于 SuggestionAgent，传入真实代码内容 + 所有分析结果）。"""
+    repo_id, branch, _ = get_inputs_from_state(state)
+    errors = list(state.get("errors", []))
+
+    # 合并所有已加载的代码文件内容，供 LLM 做深度分析
+    file_contents = (
+        state.get("loaded_files") or
+        {**state.get("loaded_p0", {}), **state.get("loaded_p1", {})}
+    )
+
+    result = run_agent_sync(
+        SuggestionAgent(),
+        repo_id,
+        branch,
+        file_contents=file_contents or None,
+        code_parser_result=state.get("code_parser_result"),
+        tech_stack_result=state.get("tech_stack_result"),
+        quality_result=state.get("quality_result"),
+        dependency_result=state.get("dependency_result"),
+    )
+
+    # 聚合最终结果（含架构）
+    architecture_result = state.get("architecture_result") or {}
     final_result = {
         "repo_loader": state.get("repo_loader_result"),
         "code_parser": state.get("code_parser_result"),
         "tech_stack": state.get("tech_stack_result"),
         "quality": state.get("quality_result"),
+        "dependency": state.get("dependency_result"),
+        "architecture": architecture_result,
         "suggestion": result,
-        "errors": errors,
     }
 
     return {
+        "optimization_result": result,
         "suggestion_result": result,
         "final_result": final_result,
         "errors": errors,
-        "finished_agents": list(state.get("finished_agents", [])) + ["suggestion"],
+        "finished_agents": list(state.get("finished_agents", [])) + ["optimization"],
     }
+
+
+def node_suggestion(state: SharedState) -> dict:
+    """节点 16：综合所有前置结果（向后兼容，委托给 node_optimization）。"""
+    return node_optimization(state)
 
 
 # ─── 错误处理节点 ─────────────────────────────────────────────────
@@ -682,8 +776,10 @@ def _build_graph() -> StateGraph:
     graph.add_node("code_parser_final", node_code_parser_final)
     graph.add_node("tech_stack", node_tech_stack)
     graph.add_node("quality", node_quality)
+    graph.add_node("dependency", node_dependency)
+    graph.add_node("architecture", node_architecture)
     graph.add_node("merge_analysis", node_merge_analysis)
-    graph.add_node("suggestion", node_suggestion)
+    graph.add_node("optimization", node_optimization)
     graph.add_node("error", node_error)
 
     # ── 入口 ──────────────────────────────────────────────────────
@@ -728,20 +824,25 @@ def _build_graph() -> StateGraph:
         },
     )
 
-    # ── 并行分析阶段：code_parser_final → tech_stack + quality ────
-    # Fan-out: 同时触发两个并行节点
+    # ── 并行分析阶段：code_parser_final → tech_stack + quality + dependency ───
+    # Fan-out: 三个节点并行执行
     graph.add_edge("code_parser_final", "tech_stack")
     graph.add_edge("code_parser_final", "quality")
+    graph.add_edge("code_parser_final", "dependency")
 
-    # Fan-in: 两个节点都完成后汇聚到 merge_analysis
-    graph.add_edge("tech_stack", "merge_analysis")
-    graph.add_edge("quality", "merge_analysis")
+    # Fan-in: 三个节点都完成后进入架构评估
+    graph.add_edge("tech_stack", "architecture")
+    graph.add_edge("quality", "architecture")
+    graph.add_edge("dependency", "architecture")
+
+    # ── 架构评估完成后合并 ─────────────────────────────────────────
+    graph.add_edge("architecture", "merge_analysis")
 
     # ── 最终阶段 ──────────────────────────────────────────────────
-    graph.add_edge("merge_analysis", "suggestion")
+    graph.add_edge("merge_analysis", "optimization")
 
     # ── 结束 ──────────────────────────────────────────────────────
-    graph.add_edge("suggestion", END)
+    graph.add_edge("optimization", END)
     graph.add_edge("error", END)
 
     return graph
@@ -766,26 +867,70 @@ async def stream_analysis_sse(
         branch: 分支名（默认 main）
         thread_id: 可选的 thread ID，用于 checkpointing 恢复
     """
+    # 阶段超时配置（秒）
+    PHASE_TIMEOUT = 120  # 每个主要阶段的最大执行时间
+
+    logger.info(f"[stream_analysis_sse] 开始分析: repo_url={repo_url}, branch={branch}")
+
+    try:
+        async for event in _stream_analysis_impl(repo_url, branch, thread_id, PHASE_TIMEOUT):
+            yield event
+    except Exception as e:
+        logger.error(f"[stream_analysis_sse] 未捕获异常: {type(e).__name__}: {e}")
+        yield format_sse_error("pipeline", f"分析异常: {type(e).__name__}: {str(e)}")
+        yield "data: [DONE]\n\n"
+
+
+async def _stream_analysis_impl(
+    repo_url: str,
+    branch: str,
+    thread_id: str | None,
+    PHASE_TIMEOUT: float,
+) -> AsyncGenerator[str, None]:
+    """stream_analysis_sse 的内部实现，所有核心逻辑在这里。"""
+    logger.info(f"[_stream_analysis_impl] 入口")
+
     parsed = parse_repo_url(repo_url)
     if not parsed:
+        logger.error(f"[stream_analysis_sse] URL 解析失败: {repo_url}")
         yield format_sse_error("pipeline", f"无法解析仓库 URL: {repo_url}")
         yield "data: [DONE]\n\n"
         return
 
     owner, repo = parsed
+    logger.info(f"[stream_analysis_sse] URL 解析成功: owner={owner}, repo={repo}")
 
     # ── Step 1: fetch_tree_classify ───────────────────────────────
     loader = RepoLoaderAgent()
 
-    # 获取文件树
-    tree_items, sha = await loader.phase_fetch_tree(owner, repo, branch)
+    # 发送开始状态
     yield format_sse_event({
-        "type": "progress",
+        "type": "status",
         "agent": "fetch_tree_classify",
-        "message": f"获取文件树完成，共 {len(tree_items)} 个文件",
-        "percent": 15,
-        "data": {"total_files": len(tree_items)},
+        "message": f"正在获取 {owner}/{repo} 文件树...",
+        "percent": 5,
+        "data": None,
     })
+
+    try:
+        tree_items, sha = await _run_with_timeout(
+            loader.phase_fetch_tree(owner, repo, branch),
+            timeout=PHASE_TIMEOUT,
+            error_msg="获取文件树超时"
+        )
+        logger.info(f"[stream_analysis_sse] 文件树获取完成: {len(tree_items)} 个文件, sha={sha}")
+        yield format_sse_event({
+            "type": "progress",
+            "agent": "fetch_tree_classify",
+            "message": f"获取文件树完成，共 {len(tree_items)} 个文件",
+            "percent": 15,
+            "data": {"total_files": len(tree_items)},
+        })
+    except Exception as e:
+        logger.error(f"[stream_analysis_sse] 获取文件树异常: {e}")
+        yield format_sse_error("fetch_tree_classify", f"获取文件树失败: {str(e)}")
+        yield "data: [DONE]\n\n"
+        return
 
     if not tree_items or not sha:
         yield format_sse_error("pipeline", "仓库加载失败，无法继续分析")
@@ -793,7 +938,19 @@ async def stream_analysis_sse(
         return
 
     # LLM 分类
-    classified, _ = await loader.phase_llm_classify(owner, repo, tree_items)
+    yield format_sse_event({
+        "type": "status",
+        "agent": "fetch_tree_classify",
+        "message": "正在进行 AI 分类...",
+        "percent": 20,
+        "data": None,
+    })
+
+    classified, _ = await _run_with_timeout(
+        loader.phase_llm_classify(owner, repo, tree_items),
+        timeout=PHASE_TIMEOUT,
+        error_msg="AI 分类超时"
+    )
     p0 = [f for f in classified if f.get("priority") == 0]
     p1 = [f for f in classified if f.get("priority") == 1]
     p2 = [f for f in classified if f.get("priority") == 2]
@@ -806,42 +963,95 @@ async def stream_analysis_sse(
     })
 
     # ── Step 2: load_p0 ────────────────────────────────────────────
+    p0_contents = {}
     if p0:
-        p0_contents = await loader.phase_load_priority(owner, repo, sha, p0)
         yield format_sse_event({
-            "type": "progress",
+            "type": "status",
             "agent": "load_p0",
-            "message": f"P0 核心文件加载完成: {len(p0_contents)} 个",
-            "percent": 35,
-            "data": {"loaded": len(p0_contents)},
+            "message": f"正在加载 {len(p0)} 个 P0 核心文件...",
+            "percent": 30,
+            "data": None,
         })
-    else:
-        p0_contents = {}
+        try:
+            p0_contents = await _run_with_timeout(
+                loader.phase_load_priority(owner, repo, sha, p0),
+                timeout=PHASE_TIMEOUT,
+                error_msg="P0 文件加载超时"
+            )
+            yield format_sse_event({
+                "type": "progress",
+                "agent": "load_p0",
+                "message": f"P0 核心文件加载完成: {len(p0_contents)} 个",
+                "percent": 35,
+                "data": {"loaded": len(p0_contents)},
+            })
+        except Exception as e:
+            yield format_sse_event({
+                "type": "error",
+                "agent": "load_p0",
+                "message": f"P0 文件加载失败: {str(e)}，继续分析已加载内容",
+                "percent": 35,
+                "data": None,
+            })
 
     # ── Step 3: code_parser_p0 ───────────────────────────────────
+    p0_result = {}
     if p0_contents:
-        parser = CodeParserAgent()
-        p0_result = await parser._analyze_inmemory_files(
-            [{"path": k, "content": v} for k, v in p0_contents.items()]
-        )
         yield format_sse_event({
-            "type": "progress",
+            "type": "status",
             "agent": "code_parser_p0",
-            "message": f"P0 代码解析完成: {p0_result.get('total_functions', 0)} 个函数, {p0_result.get('total_classes', 0)} 个类",
-            "percent": 45,
-            "data": {"functions": p0_result.get("total_functions"), "classes": p0_result.get("total_classes")},
+            "message": "正在解析 P0 代码结构...",
+            "percent": 40,
+            "data": None,
         })
-    else:
-        p0_result = {}
+        try:
+            parser = CodeParserAgent()
+            p0_result = await _run_with_timeout(
+                parser._analyze_inmemory_files(
+                    [{"path": k, "content": v} for k, v in p0_contents.items()]
+                ),
+                timeout=PHASE_TIMEOUT,
+                error_msg="P0 代码解析超时"
+            )
+            yield format_sse_event({
+                "type": "progress",
+                "agent": "code_parser_p0",
+                "message": f"P0 代码解析完成: {p0_result.get('total_functions', 0)} 个函数, {p0_result.get('total_classes', 0)} 个类",
+                "percent": 45,
+                "data": {"functions": p0_result.get("total_functions"), "classes": p0_result.get("total_classes")},
+            })
+        except Exception as e:
+            yield format_sse_event({
+                "type": "error",
+                "agent": "code_parser_p0",
+                "message": f"P0 代码解析失败: {str(e)}",
+                "percent": 45,
+                "data": None,
+            })
 
     # ── Step 4: decide_p1 ───────────────────────────────────────
+    need_more = False
+    extra_paths: list[str] = []
+    reason = "没有 P1/P2 文件"
+
     if p1 or p2:
-        need_more, extra_paths, reason = await loader.phase_ai_decide_p1(
-            owner, repo,
-            loaded=p0_contents,
-            code_parser_result=p0_result,
-            p1_files=p1,
-            p2_files=p2,
+        yield format_sse_event({
+            "type": "status",
+            "agent": "decide_p1",
+            "message": "正在等待 AI 决策是否加载更多文件...",
+            "percent": 48,
+            "data": None,
+        })
+        need_more, extra_paths, reason = await _run_with_timeout(
+            loader.phase_ai_decide_p1(
+                owner, repo,
+                loaded=p0_contents,
+                code_parser_result=p0_result,
+                p1_files=p1,
+                p2_files=p2,
+            ),
+            timeout=PHASE_TIMEOUT,
+            error_msg="P1 决策超时"
         )
         yield format_sse_event({
             "type": "progress",
@@ -850,49 +1060,96 @@ async def stream_analysis_sse(
             "percent": 50,
             "data": {"needs_more": need_more, "reason": reason},
         })
-    else:
-        need_more = False
-        extra_paths = []
-        reason = "没有 P1/P2 文件"
 
     # ── Step 5: load_p1 (条件) ───────────────────────────────────
     p1_contents = {}
     p1_result = {}
     if need_more and p1:
-        p1_contents = await loader.phase_load_priority(owner, repo, sha, p1)
         yield format_sse_event({
-            "type": "progress",
+            "type": "status",
             "agent": "load_p1",
-            "message": f"P1 文件加载完成: {len(p1_contents)} 个",
-            "percent": 60,
-            "data": {"loaded": len(p1_contents)},
+            "message": f"正在加载 {len(p1)} 个 P1 文件...",
+            "percent": 55,
+            "data": None,
         })
-
-        # code_parser_p1
-        if p1_contents:
-            parser = CodeParserAgent()
-            p1_result = await parser._analyze_inmemory_files(
-                [{"path": k, "content": v} for k, v in p1_contents.items()]
+        try:
+            p1_contents = await _run_with_timeout(
+                loader.phase_load_priority(owner, repo, sha, p1),
+                timeout=PHASE_TIMEOUT,
+                error_msg="P1 文件加载超时"
             )
             yield format_sse_event({
                 "type": "progress",
-                "agent": "code_parser_p1",
-                "message": f"P1 代码解析完成",
-                "percent": 65,
-                "data": {"functions": p1_result.get("total_functions"), "classes": p1_result.get("total_classes")},
+                "agent": "load_p1",
+                "message": f"P1 文件加载完成: {len(p1_contents)} 个",
+                "percent": 60,
+                "data": {"loaded": len(p1_contents)},
             })
+        except Exception as e:
+            yield format_sse_event({
+                "type": "error",
+                "agent": "load_p1",
+                "message": f"P1 文件加载失败: {str(e)}",
+                "percent": 60,
+                "data": None,
+            })
+
+        # code_parser_p1
+        if p1_contents:
+            yield format_sse_event({
+                "type": "status",
+                "agent": "code_parser_p1",
+                "message": "正在解析 P1 代码结构...",
+                "percent": 62,
+                "data": None,
+            })
+            try:
+                parser = CodeParserAgent()
+                p1_result = await _run_with_timeout(
+                    parser._analyze_inmemory_files(
+                        [{"path": k, "content": v} for k, v in p1_contents.items()]
+                    ),
+                    timeout=PHASE_TIMEOUT,
+                    error_msg="P1 代码解析超时"
+                )
+                yield format_sse_event({
+                    "type": "progress",
+                    "agent": "code_parser_p1",
+                    "message": f"P1 代码解析完成",
+                    "percent": 65,
+                    "data": {"functions": p1_result.get("total_functions"), "classes": p1_result.get("total_classes")},
+                })
+            except Exception as e:
+                yield format_sse_event({
+                    "type": "error",
+                    "agent": "code_parser_p1",
+                    "message": f"P1 代码解析失败: {str(e)}",
+                    "percent": 65,
+                    "data": None,
+                })
 
     # ── Step 6: load_p2 (条件) ───────────────────────────────────
     all_loaded = {**p0_contents, **p1_contents}
     p2_contents = {}
 
     if p2 and need_more:
-        need_p2, p2_paths, p2_reason = await loader.phase_ai_decide_p2(
-            owner, repo,
-            loaded=all_loaded,
-            code_parser_p0_result=p0_result,
-            code_parser_p1_result=p1_result,
-            p2_files=p2,
+        yield format_sse_event({
+            "type": "status",
+            "agent": "load_p2_decide",
+            "message": "正在等待 AI 决策 P2 文件...",
+            "percent": 66,
+            "data": None,
+        })
+        need_p2, p2_paths, p2_reason = await _run_with_timeout(
+            loader.phase_ai_decide_p2(
+                owner, repo,
+                loaded=all_loaded,
+                code_parser_p0_result=p0_result,
+                code_parser_p1_result=p1_result,
+                p2_files=p2,
+            ),
+            timeout=PHASE_TIMEOUT,
+            error_msg="P2 决策超时"
         )
         yield format_sse_event({
             "type": "progress",
@@ -904,40 +1161,154 @@ async def stream_analysis_sse(
 
         if need_p2 and p2_paths:
             p2_to_load = [f for f in p2 if f.get("path") in set(p2_paths[:30])]
-            p2_contents = await loader.phase_load_priority(owner, repo, sha, p2_to_load)
-            all_loaded.update(p2_contents)
             yield format_sse_event({
-                "type": "progress",
+                "type": "status",
                 "agent": "load_p2",
-                "message": f"P2 文件加载完成: {len(p2_contents)} 个",
-                "percent": 70,
-                "data": {"loaded": len(p2_contents)},
+                "message": f"正在加载 {len(p2_to_load)} 个 P2 文件...",
+                "percent": 69,
+                "data": None,
             })
+            try:
+                p2_contents = await _run_with_timeout(
+                    loader.phase_load_priority(owner, repo, sha, p2_to_load),
+                    timeout=PHASE_TIMEOUT,
+                    error_msg="P2 文件加载超时"
+                )
+                all_loaded.update(p2_contents)
+                yield format_sse_event({
+                    "type": "progress",
+                    "agent": "load_p2",
+                    "message": f"P2 文件加载完成: {len(p2_contents)} 个",
+                    "percent": 70,
+                    "data": {"loaded": len(p2_contents)},
+                })
+            except Exception as e:
+                yield format_sse_event({
+                    "type": "error",
+                    "agent": "load_p2",
+                    "message": f"P2 文件加载失败: {str(e)}",
+                    "percent": 70,
+                    "data": None,
+                })
 
     # ── Step 7: code_parser_final ────────────────────────────────
+    code_parser_result = {}
     if all_loaded:
-        final_files = [{"path": k, "content": v} for k, v in all_loaded.items()]
-        parser = CodeParserAgent()
-        code_parser_result = await parser._analyze_inmemory_files(final_files)
+        logger.info(f"[code_parser_final] 开始，共 {len(all_loaded)} 个文件: {list(all_loaded.keys())}")
         yield format_sse_event({
-            "type": "progress",
+            "type": "status",
             "agent": "code_parser_final",
-            "message": f"代码解析完成: {code_parser_result.get('total_files', 0)} 个文件, {code_parser_result.get('total_chunks', 0)} 个语义块",
-            "percent": 75,
-            "data": code_parser_result,
+            "message": f"正在合并解析 {len(all_loaded)} 个代码文件...",
+            "percent": 72,
+            "data": None,
         })
-    else:
-        code_parser_result = {}
+        try:
+            final_files = [{"path": k, "content": v} for k, v in all_loaded.items()]
+            parser = CodeParserAgent()
+            code_parser_result = await _run_with_timeout(
+                parser._analyze_inmemory_files(final_files),
+                timeout=PHASE_TIMEOUT,
+                error_msg="代码合并解析超时"
+            )
+            logger.info(f"[code_parser_final] 完成: parsed={code_parser_result.get('parsed_files', '?')}, chunks={code_parser_result.get('total_chunks', '?')}")
+            yield format_sse_event({
+                "type": "progress",
+                "agent": "code_parser_final",
+                "message": f"代码解析完成: {code_parser_result.get('parsed_files', len(all_loaded))} 个文件, {code_parser_result.get('total_chunks', 0)} 个语义块",
+                "percent": 75,
+                "data": code_parser_result,
+            })
+        except Exception as e:
+            logger.error(f"[code_parser_final] 异常: {e}")
+            yield format_sse_event({
+                "type": "error",
+                "agent": "code_parser_final",
+                "message": f"代码解析失败: {str(e)}",
+                "percent": 75,
+                "data": None,
+            })
 
-    # ── Step 8: tech_stack + quality 并行执行 ────────────────────
+    # ── Step 7: 加载依赖配置文件（供 DependencyAgent 使用）──────────
+    # 只加载项目根目录或 src/ 下的依赖文件，排除 node_modules/ 等第三方依赖目录
+    dep_file_names = {
+        "package.json", "requirements.txt", "requirements-dev.txt",
+        "Pipfile", "pyproject.toml", "go.mod", "Cargo.toml",
+        "Gemfile", "composer.json", "pom.xml", "build.gradle",
+    }
+    EXCLUDED_DEP_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv",
+                          "dist", "build", ".next", ".nuxt", "target", "site-packages"}
+    dep_files_to_load = [
+        f for f in (classified or [])
+        if os.path.basename(f.get("path", "")) in dep_file_names
+        and not any(part in EXCLUDED_DEP_DIRS for part in f.get("path", "").split(os.sep))
+    ]
+    dep_file_contents: dict[str, str] = {}
+    if dep_files_to_load:
+        logger.info(f"[dependency_preload] 找到 {len(dep_files_to_load)} 个依赖文件")
+        try:
+            dep_file_contents = await _run_with_timeout(
+                loader.phase_load_priority(owner, repo, sha, dep_files_to_load),
+                timeout=PHASE_TIMEOUT,
+                error_msg="依赖文件加载超时"
+            )
+            logger.info(f"[dependency_preload] 加载完成: {list(dep_file_contents.keys())}")
+        except Exception as e:
+            logger.error(f"[dependency_preload] 加载失败: {e}")
+
+    # ── Step 8: tech_stack + quality + dependency 并行执行 ─────────
     tech_agent = TechStackAgent()
     quality_agent = QualityAgent()
+    dependency_agent = DependencyAgent()
 
-    # 并行执行两个 Agent
+    logger.info(f"[parallel_agents] 启动 tech_stack + quality + dependency，文件数={len(all_loaded)}, 依赖文件数={len(dep_file_contents)}")
+    yield format_sse_event({
+        "type": "status",
+        "agent": "tech_stack",
+        "message": "正在识别技术栈...",
+        "percent": 76,
+        "data": None,
+    })
+    yield format_sse_event({
+        "type": "status",
+        "agent": "quality",
+        "message": "正在分析代码质量...",
+        "percent": 76,
+        "data": None,
+    })
+    yield format_sse_event({
+        "type": "status",
+        "agent": "dependency",
+        "message": "正在分析依赖风险...",
+        "percent": 76,
+        "data": None,
+    })
+
+    # 并行执行三个 Agent；dependency 需要包含显式加载的依赖配置文件
+    dep_all_contents = {**all_loaded, **dep_file_contents}
     tech_task = tech_agent.run(repo, branch, file_contents=all_loaded)
     quality_task = quality_agent.run(repo, branch, file_contents=all_loaded)
+    dependency_task = dependency_agent.run(repo, branch, file_contents=dep_all_contents)
 
-    tech_result, quality_result = await asyncio.gather(tech_task, quality_task, return_exceptions=True)
+    # 带超时的并行执行
+    try:
+        tech_result, quality_result, dependency_result = await _run_with_timeout(
+            asyncio.gather(tech_task, quality_task, dependency_task, return_exceptions=True),
+            timeout=PHASE_TIMEOUT * 2,  # 并行任务给更多时间
+            error_msg="技术栈/质量/依赖分析超时"
+        )
+        logger.info(f"[parallel_agents] 完成: tech={type(tech_result).__name__}, quality={type(quality_result).__name__}, dependency={type(dependency_result).__name__}")
+    except Exception as e:
+        logger.error(f"[parallel_agents] 超时/异常: {e}")
+        yield format_sse_event({
+            "type": "error",
+            "agent": "tech_stack",
+            "message": f"并行分析超时: {str(e)}",
+            "percent": 82,
+            "data": None,
+        })
+        tech_result = {}
+        quality_result = {}
+        dependency_result = {}
 
     # 处理异常情况
     if isinstance(tech_result, Exception):
@@ -976,23 +1347,131 @@ async def stream_analysis_sse(
             "data": quality_result,
         })
 
-    # ── Step 9: suggestion ──────────────────────────────────────
-    suggestion_agent = SuggestionAgent()
-    suggestion_result = await suggestion_agent.run(
-        repo, branch,
-        code_parser_result=code_parser_result,
-        tech_stack_result=tech_result,
-        quality_result=quality_result,
-        dependency_result=None,
-    )
+    if isinstance(dependency_result, Exception):
+        yield format_sse_event({
+            "type": "error",
+            "agent": "dependency",
+            "message": f"依赖风险分析失败: {str(dependency_result)}",
+            "percent": 87,
+            "data": None,
+        })
+        dependency_result = {}
+    else:
+        # 使用 type: "result" 让前端 DependencyAgentCard 正确标记 finishedAgents
+        yield format_sse_event({
+            "type": "result",
+            "agent": "dependency",
+            "message": "依赖风险分析完成（并行）",
+            "percent": 87,
+            "data": dependency_result,
+        })
 
+    # ── Step 9: architecture — 基于 AST + TechStack + Quality + LLM ──
+    logger.info(f"[architecture] 启动...")
+    yield format_sse_event({
+        "type": "status",
+        "agent": "architecture",
+        "message": "正在评估项目架构...",
+        "percent": 88,
+        "data": None,
+    })
+
+    try:
+        arch_result = await _run_with_timeout(
+            ArchitectureAgent().run(
+                repo, branch,
+                file_contents=all_loaded or None,
+                code_parser_result=code_parser_result,
+                tech_stack_result=tech_result,
+                quality_result=quality_result,
+                total_tree_files=len(tree_items),
+            ),
+            timeout=PHASE_TIMEOUT,
+            error_msg="架构评估超时"
+        )
+        logger.info(f"[architecture] 完成")
+        yield format_sse_event({
+            "type": "progress",
+            "agent": "architecture",
+            "message": "架构评估完成",
+            "percent": 91,
+            "data": arch_result,
+        })
+    except Exception as e:
+        logger.error(f"[architecture] 异常: {e}")
+        yield format_sse_event({
+            "type": "error",
+            "agent": "architecture",
+            "message": f"架构评估失败: {str(e)}",
+            "percent": 91,
+            "data": None,
+        })
+        arch_result = {}
+
+    # ── Step 10: optimization — 真实 LLM 驱动的优化建议 ─────────────
+    logger.info(f"[optimization] 启动...")
+    yield format_sse_event({
+        "type": "status",
+        "agent": "optimization",
+        "message": "正在生成优化建议...",
+        "percent": 93,
+        "data": None,
+    })
+
+    try:
+        opt_agent = SuggestionAgent()
+        opt_result = await _run_with_timeout(
+            opt_agent.run(
+                repo, branch,
+                file_contents=all_loaded or None,
+                code_parser_result=code_parser_result,
+                tech_stack_result=tech_result,
+                quality_result=quality_result,
+                dependency_result=dependency_result or None,
+            ),
+            timeout=PHASE_TIMEOUT,
+            error_msg="生成优化建议超时"
+        )
+        logger.info(f"[optimization] 完成: {len(opt_result.get('suggestions', []))} 条建议")
+        yield format_sse_event({
+            "type": "result",
+            "agent": "optimization",
+            "message": "分析完成",
+            "percent": 100,
+            "data": opt_result,
+        })
+    except Exception as e:
+        logger.error(f"[optimization] 异常: {e}")
+        yield format_sse_event({
+            "type": "error",
+            "agent": "optimization",
+            "message": f"生成优化建议失败: {str(e)}，但分析已完成",
+            "percent": 100,
+            "data": {
+                "tech_stack": tech_result,
+                "quality": quality_result,
+                "dependency": dependency_result,
+                "architecture": arch_result,
+            },
+        })
+
+    # ── Step 11: 发送 final_result SSE 事件 ──────────────────────────
+    final_result_data = {
+        "code_parser": code_parser_result,
+        "tech_stack": tech_result,
+        "quality": quality_result,
+        "dependency": dependency_result,
+        "architecture": arch_result,
+        "suggestion": opt_result,
+    }
     yield format_sse_event({
         "type": "result",
-        "agent": "suggestion",
-        "message": "分析完成",
+        "agent": "final_result",
+        "message": "全部分析完成",
         "percent": 100,
-        "data": suggestion_result,
+        "data": final_result_data,
     })
+
     yield "data: [DONE]\n\n"
 
 

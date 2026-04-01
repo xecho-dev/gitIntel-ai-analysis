@@ -48,27 +48,22 @@ def _build_headers() -> dict:
 # ─── LangChain LLM ───────────────────────────────────────────────────
 
 def _get_llm():
-    """懒加载 LangChain LLM client，优先 Anthropic，其次 OpenAI。"""
-    try:
-        from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(
-            model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
-            temperature=0.3,
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
-            max_tokens=1024,
-            base_url=os.getenv("ANTHROPIC_BASE_URL", "").strip() or None,
-        )
-    except Exception:
+    """懒加载 LangChain LLM client（当前使用阿里云 DashScope OpenAI 兼容接口）。"""
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+
+    if openai_key:
         try:
             from langchain_openai import ChatOpenAI
             return ChatOpenAI(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                model=os.getenv("OPENAI_MODEL", "qwen-plus"),
                 temperature=0.3,
-                openai_api_key=os.getenv("OPENAI_API_KEY"),
-                base_url=os.getenv("OPENAI_BASE_URL"),
+                openai_api_key=openai_key,
+                base_url=os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
             )
         except Exception:
-            return None
+            pass
+
+    return None
 
 
 # ─── URL 解析 ────────────────────────────────────────────────────────
@@ -358,6 +353,8 @@ class RepoLoaderAgent(BaseAgent):
 
         基于 P0 代码的解析结果，决定是否需要继续加载 P1 文件。
 
+        注意：必须使用 LLM，不支持降级。
+
         Args:
             owner: 仓库所有者
             repo: 仓库名
@@ -373,8 +370,11 @@ class RepoLoaderAgent(BaseAgent):
             - reason: AI 决策的原因说明
         """
         llm = _get_llm()
+        if llm is None:
+            raise RuntimeError(
+                "LLM 不可用，无法进行 P1 加载决策。请确保 OPENAI_API_KEY 或其他 LLM API Key 已配置。"
+            )
 
-        # 构建代码上下文摘要
         code_summary = ""
         if code_parser_result:
             func_count = code_parser_result.get("total_functions", 0)
@@ -386,40 +386,25 @@ class RepoLoaderAgent(BaseAgent):
         p1_count = len(p1_files)
         p2_count = len(p2_files)
 
-        if llm is None:
-            # LLM 不可用时的降级策略
-            if p1_count > 0:
-                return True, [], f"加载 {p1_count} 个 P1 文件以获得更全面的分析（LLM 不可用，使用规则决策）"
-            return False, [], "没有 P1 文件需要加载"
+        from .prompts import build_p1_decision_prompt
 
-        try:
-            from .prompts import build_p1_decision_prompt
+        prompt_template = build_p1_decision_prompt(
+            repo_path=f"{owner}/{repo}",
+            p0_summary=code_summary,
+            p0_loaded_count=len(loaded),
+            p1_files=[f["path"] for f in p1_files[:30]],
+            p1_count=p1_count,
+            p2_count=p2_count,
+        )
 
-            prompt_template = build_p1_decision_prompt(
-                repo_path=f"{owner}/{repo}",
-                p0_summary=code_summary,
-                p0_loaded_count=len(loaded),
-                p1_files=[f["path"] for f in p1_files[:30]],
-                p1_count=p1_count,
-                p2_count=p2_count,
-            )
+        response = await llm.ainvoke(prompt_template.invoke({}))
+        raw = response.content.strip()
 
-            response = await llm.ainvoke(
-                prompt_template.invoke({"system_context": "你是一个专业的代码架构分析师。"})
-            )
-            raw = response.content.strip()
+        result = _json.loads(raw)
+        need_more = bool(result.get("need_more", False))
+        reason = result.get("reason", "基于代码分析的决定")
 
-            result = _json.loads(raw)
-            need_more = bool(result.get("need_more", False))
-            reason = result.get("reason", "基于代码分析的决定")
-
-            return need_more, [], reason
-
-        except Exception:
-            # LLM 失败时的降级策略
-            if p1_count > 0:
-                return True, [], f"LLM 调用失败，使用规则决定加载 {p1_count} 个 P1 文件"
-            return False, [], "没有 P1 文件需要加载"
+        return need_more, [], reason
 
     async def phase_ai_decide_p2(
         self,
@@ -433,6 +418,8 @@ class RepoLoaderAgent(BaseAgent):
         """AI 决策 P2 文件：决定需要加载哪些 P2 文件。
 
         基于已加载的 P0/P1 代码分析结果，选择性地加载最有价值的 P2 文件。
+
+        注意：必须使用 LLM，不支持降级。
 
         Args:
             owner: 仓库所有者
@@ -449,8 +436,11 @@ class RepoLoaderAgent(BaseAgent):
             - reason: AI 决策的原因说明
         """
         llm = _get_llm()
+        if llm is None:
+            raise RuntimeError(
+                "LLM 不可用，无法进行 P2 加载决策。请确保 OPENAI_API_KEY 或其他 LLM API Key 已配置。"
+            )
 
-        # 构建代码上下文摘要
         total_funcs = 0
         total_classes = 0
         all_langs = []
@@ -463,7 +453,6 @@ class RepoLoaderAgent(BaseAgent):
 
         code_summary = f"已分析 {total_funcs} 个函数, {total_classes} 个类"
 
-        # 准备 P2 文件信息（取前 50 个让 AI 决策）
         p2_info = []
         for f in p2_files[:50]:
             p2_info.append({
@@ -471,40 +460,25 @@ class RepoLoaderAgent(BaseAgent):
                 "size": f.get("size", 0),
             })
 
-        if llm is None:
-            # LLM 不可用时的降级策略：按大小排序取前 20 个
-            sorted_p2 = sorted(p2_files, key=lambda f: f.get("size", 0), reverse=True)
-            paths = [f["path"] for f in sorted_p2[:20]]
-            return True, paths, f"LLM 不可用，按文件大小加载最大的 20 个 P2 文件"
+        from .prompts import build_p2_decision_prompt
 
-        try:
-            from .prompts import build_p2_decision_prompt
+        prompt_template = build_p2_decision_prompt(
+            repo_path=f"{owner}/{repo}",
+            code_summary=code_summary,
+            loaded_count=len(loaded),
+            p2_files=p2_info,
+            max_extra=30,
+        )
 
-            prompt_template = build_p2_decision_prompt(
-                repo_path=f"{owner}/{repo}",
-                code_summary=code_summary,
-                loaded_count=len(loaded),
-                p2_files=p2_info,
-                max_extra=30,
-            )
+        response = await llm.ainvoke(prompt_template.invoke({}))
+        raw = response.content.strip()
 
-            response = await llm.ainvoke(
-                prompt_template.invoke({"system_context": "你是一个专业的代码架构分析师。"})
-            )
-            raw = response.content.strip()
+        result = _json.loads(raw)
+        need_more = bool(result.get("need_more", False))
+        extra_paths: list[str] = result.get("additional_paths", [])[:30]
+        reason = result.get("reason", "基于代码分析的决定")
 
-            result = _json.loads(raw)
-            need_more = bool(result.get("need_more", False))
-            extra_paths: list[str] = result.get("additional_paths", [])[:30]
-            reason = result.get("reason", "基于代码分析的决定")
-
-            return need_more, extra_paths, reason
-
-        except Exception:
-            # LLM 失败时的降级策略
-            sorted_p2 = sorted(p2_files, key=lambda f: f.get("size", 0), reverse=True)
-            paths = [f["path"] for f in sorted_p2[:20]]
-            return True, paths, "LLM 调用失败，按文件大小加载最大的 20 个 P2 文件"
+        return need_more, extra_paths, reason
 
     # ── 内部阶段实现 ────────────────────────────────────────────────
 
@@ -582,70 +556,60 @@ class RepoLoaderAgent(BaseAgent):
 
     async def _llm_initial_classify(
         self, owner: str, repo: str, tree_items: list[dict]
-    ) -> tuple[list[dict], dict | None]:
+    ) -> tuple[list[dict], dict]:
         """使用 LLM 对文件树做初始 P0/P1/P2 分类。
 
-        降级策略：LLM 不可用时使用规则分类。
+        注意：必须使用 LLM，不支持降级。LLM 不可用或调用失败时抛出异常。
         """
-        # 过滤出 blob
+        llm = _get_llm()
+        if llm is None:
+            raise RuntimeError(
+                "LLM 不可用，无法进行文件分类。请确保 OPENAI_API_KEY 或其他 LLM API Key 已配置。"
+            )
+
         blobs = [
             {"path": item["path"], "type": item["type"], "size": item.get("size", 0)}
             for item in tree_items
             if item["type"] == "blob"
         ]
 
-        llm = _get_llm()
-        if llm is None:
-            # 降级：使用规则分类
-            classified = self._rule_classify(blobs)
-            return classified, None
+        from .prompts import build_repo_loader_initial_prompt
+        tree_list = "\n".join(
+            f"- {b['path']} (~{b.get('size', 0)} bytes)"
+            for b in blobs[:150]
+        )
+        prompt_template = build_repo_loader_initial_prompt(
+            repo_path=f"{owner}/{repo}",
+            tree_list=tree_list,
+            total_files=len(blobs),
+        )
 
-        try:
-            from .prompts import build_repo_loader_initial_prompt
-            tree_list = "\n".join(
-                f"- {b['path']} (~{b.get('size', 0)} bytes)"
-                for b in blobs[:150]
-            )
-            prompt_template = build_repo_loader_initial_prompt(
-                repo_path=f"{owner}/{repo}",
-                tree_list=tree_list,
-                total_files=len(blobs),
-            )
+        response = await llm.ainvoke(prompt_template.invoke({}))
+        raw = response.content.strip()
 
-            response = await llm.ainvoke(
-                prompt_template.invoke({"system_context": "你是一个专业的代码分析助手。"})
-            )
-            raw = response.content.strip()
+        result = _json.loads(raw)
+        p0_set = set(result.get("p0_paths", []))
+        p1_set = set(result.get("p1_paths", []))
 
-            result = _json.loads(raw)
-            p0_set = set(result.get("p0_paths", []))
-            p1_set = set(result.get("p1_paths", []))
-            # 其余为 P2
+        classified: list[dict] = []
+        for b in blobs:
+            path = b["path"]
+            if path in p0_set:
+                priority = 0
+            elif path in p1_set:
+                priority = 1
+            else:
+                priority = 2
+            classified.append({"path": path, "priority": priority, "size": b.get("size", 0)})
 
-            classified: list[dict] = []
-            for b in blobs:
-                path = b["path"]
-                if path in p0_set:
-                    priority = 0
-                elif path in p1_set:
-                    priority = 1
-                else:
-                    priority = 2
-                classified.append({"path": path, "priority": priority, "size": b.get("size", 0)})
-
-            llm_result = {
-                "round": 0,
-                "decision": "initial_classify",
-                "p0_count": len(p0_set),
-                "p1_count": len(p1_set),
-                "p2_count": len(classified) - len(p0_set) - len(p1_set),
-            }
-            return classified, llm_result
-
-        except Exception:
-            # LLM 调用失败，降级到规则分类
-            classified = self._rule_classify(blobs)
-            return classified, None
+        llm_result = {
+            "round": 0,
+            "decision": "initial_classify",
+            "p0_count": len(p0_set),
+            "p1_count": len(p1_set),
+            "p2_count": len(classified) - len(p0_set) - len(p1_set),
+        }
+        return classified, llm_result
 
     async def _llm_decide(
         self,
@@ -657,44 +621,35 @@ class RepoLoaderAgent(BaseAgent):
     ) -> tuple[bool, list[str]]:
         """使用 LLM 判断是否需要加载更多 P2 文件。
 
-        降级策略：LLM 不可用时按行数加载最大的 P2。
+        注意：必须使用 LLM，不支持降级。LLM 不可用或调用失败时抛出异常。
         """
         llm = _get_llm()
         if llm is None:
-            # 降级：按大小排序，取前 20 个
-            sorted_p2 = sorted(p2_files, key=lambda f: f.get("size", 0), reverse=True)
-            paths = [f["path"] for f in sorted_p2[:20]]
-            return True, paths
-
-        try:
-            from .prompts import build_repo_loader_decision_prompt
-
-            summaries: dict[str, str] = {}
-            for path, content in list(loaded.items())[:30]:
-                summaries[path] = content[:300].replace("\n", " ")
-
-            prompt_template = build_repo_loader_decision_prompt(
-                repo_path=f"{owner}/{repo}",
-                loaded_paths=list(loaded.keys())[:50],
-                content_summaries=summaries,
-                p2_files=p2_files[:50],
-                max_extra=30,
+            raise RuntimeError(
+                "LLM 不可用，无法进行加载决策。请确保 OPENAI_API_KEY 或其他 LLM API Key 已配置。"
             )
 
-            response = await llm.ainvoke(
-                prompt_template.invoke({"system_context": "你是一个专业的代码分析助手。"})
-            )
-            raw = response.content.strip()
+        from .prompts import build_repo_loader_decision_prompt
 
-            result = _json.loads(raw)
-            need_more = bool(result.get("need_more", False))
-            paths: list[str] = result.get("additional_paths", [])[:30]
-            return need_more, paths
+        summaries: dict[str, str] = {}
+        for path, content in list(loaded.items())[:30]:
+            summaries[path] = content[:300].replace("\n", " ")
 
-        except Exception:
-            # LLM 失败，降级
-            sorted_p2 = sorted(p2_files, key=lambda f: f.get("size", 0), reverse=True)
-            return True, [f["path"] for f in sorted_p2[:20]]
+        prompt_template = build_repo_loader_decision_prompt(
+            repo_path=f"{owner}/{repo}",
+            loaded_paths=list(loaded.keys())[:50],
+            content_summaries=summaries,
+            p2_files=p2_files[:50],
+            max_extra=30,
+        )
+
+        response = await llm.ainvoke(prompt_template.invoke({}))
+        raw = response.content.strip()
+
+        result = _json.loads(raw)
+        need_more = bool(result.get("need_more", False))
+        paths: list[str] = result.get("additional_paths", [])[:30]
+        return need_more, paths
 
     # ── 规则分类（降级策略）────────────────────────────────────────
 

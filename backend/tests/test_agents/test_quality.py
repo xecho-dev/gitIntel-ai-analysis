@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from agents.quality import QualityAgent, _read_text, _cyclomatic_complexity
+from agents.quality import QualityAgent, _read_text, _cyclomatic_complexity, _q_load_parser
 
 
 class TestReadText:
@@ -335,8 +335,7 @@ class TestWalkPython:
     """Tests for QualityAgent._walk_python static method."""
 
     def test_walk_python_counts_functions(self):
-        from tree_sitter_languages import get_parser
-        parser = get_parser("python")
+        parser = _q_load_parser("python")
 
         source = b"""
 def func_a():
@@ -355,8 +354,7 @@ def func_b(x):
         assert classes == 0
 
     def test_walk_python_counts_classes(self):
-        from tree_sitter_languages import get_parser
-        parser = get_parser("python")
+        parser = _q_load_parser("python")
 
         source = b"""
 class Foo:
@@ -376,8 +374,7 @@ class TestWalkTS:
     """Tests for QualityAgent._walk_ts static method."""
 
     def test_walk_ts_counts_functions(self):
-        from tree_sitter_languages import get_parser
-        parser = get_parser("typescript")
+        parser = _q_load_parser("typescript")
 
         source = b"""
 export const foo = () => 1;
@@ -391,8 +388,7 @@ export function bar(x: number): number {
         assert funcs >= 2
 
     def test_walk_ts_counts_classes(self):
-        from tree_sitter_languages import get_parser
-        parser = get_parser("typescript")
+        parser = _q_load_parser("typescript")
 
         source = b"""
 class Greeter {

@@ -2,10 +2,64 @@
 import asyncio
 import os
 import re
+import tree_sitter
 from collections import defaultdict
 from typing import AsyncGenerator
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
+
+
+# ── tree-sitter 解析器统一加载（复用 code_parser.py 的修复策略）─────────────
+_LANG_PKG: dict[str, tuple[str, str]] = {
+    "python": ("tree_sitter_python", "language"),
+    "javascript": ("tree_sitter_javascript", "language"),
+    "typescript": ("tree_sitter_typescript", "language_typescript"),
+    "tsx": ("tree_sitter_typescript", "language_tsx"),
+    "go": ("tree_sitter_go", "language"),
+    "rust": ("tree_sitter_rust", "language"),
+    "java": ("tree_sitter_java", "language"),
+    "c": ("tree_sitter_c", "language"),
+    "cpp": ("tree_sitter_cpp", "language"),
+    "ruby": ("tree_sitter_ruby", "language"),
+    "swift": ("tree_sitter_swift", "language"),
+    "kotlin": ("tree_sitter_kotlin", "language"),
+    "scala": ("tree_sitter_scala", "language"),
+    "php": ("tree_sitter_php", "language"),
+    "dart": ("tree_sitter_dart", "language"),
+    "zig": ("tree_sitter_zig", "language"),
+    "csharp": ("tree_sitter_csharp", "language"),
+}
+_Q_PARSER_CACHE: dict[str, object] = {}
+
+
+def _q_load_parser(language: str):
+    """懒加载 tree-sitter 解析器，优先独立包，fallback tree_sitter_languages。"""
+    if language in _Q_PARSER_CACHE:
+        return _Q_PARSER_CACHE[language]
+
+    if language in _LANG_PKG:
+        mod_name, attr_name = _LANG_PKG[language]
+        try:
+            mod = __import__(mod_name, fromlist=[attr_name])
+            lang_fn = getattr(mod, attr_name)
+            capsule = lang_fn() if callable(lang_fn) else lang_fn
+            ts_lang = tree_sitter.Language(capsule)
+            parser = tree_sitter.Parser(ts_lang)
+            _Q_PARSER_CACHE[language] = parser
+            return parser
+        except Exception:
+            pass
+
+    try:
+        from tree_sitter_languages import get_parser
+
+        parser = get_parser(language)
+        _Q_PARSER_CACHE[language] = parser
+        return parser
+    except Exception:
+        pass
+
+    return None
 
 
 # ─── 工具函数 ───────────────────────────────────────────────────
@@ -193,10 +247,8 @@ class QualityAgent(BaseAgent):
 
     @staticmethod
     async def _analyze_python(files: list[str]) -> dict:
-        try:
-            from tree_sitter_languages import get_parser
-            parser = get_parser("python")
-        except Exception:
+        parser = _q_load_parser("python")
+        if not parser:
             return {"error": "tree-sitter-python not available"}
 
         def _do() -> dict:
@@ -299,10 +351,8 @@ class QualityAgent(BaseAgent):
     @staticmethod
     async def _analyze_python_inmemory(contents: dict[str, str]) -> dict:
         """分析内存中的 Python 文件内容（GitHub API 模式）。"""
-        try:
-            from tree_sitter_languages import get_parser
-            parser = get_parser("python")
-        except Exception:
+        parser = _q_load_parser("python")
+        if not parser:
             return {"error": "tree-sitter-python not available"}
 
         def _do() -> dict:
@@ -360,10 +410,8 @@ class QualityAgent(BaseAgent):
     @staticmethod
     async def _analyze_typescript_inmemory(contents: dict[str, str]) -> dict:
         """分析内存中的 TypeScript 文件内容（GitHub API 模式）。"""
-        try:
-            from tree_sitter_languages import get_parser
-            parser = get_parser("typescript")
-        except Exception:
+        parser = _q_load_parser("typescript")
+        if not parser:
             return {"error": "tree-sitter-typescript not available"}
 
         def _do() -> dict:
@@ -489,10 +537,8 @@ class QualityAgent(BaseAgent):
 
     @staticmethod
     async def _analyze_typescript(files: list[str]) -> dict:
-        try:
-            from tree_sitter_languages import get_parser
-            parser = get_parser("typescript")
-        except Exception:
+        parser = _q_load_parser("typescript")
+        if not parser:
             return {"error": "tree-sitter-typescript not available"}
 
         def _do() -> dict:

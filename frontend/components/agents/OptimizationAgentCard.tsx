@@ -26,8 +26,8 @@ const PRIORITY_STYLES: Record<string, { bg: string; text: string }> = {
 export const OptimizationAgentCard = () => {
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const finishedAgents = useAppStore((s) => s.finishedAgents);
-  const suggestionEvent = useAppStore((s) => s.agentEvents["suggestion"]);
-  const suggestionDone = finishedAgents.includes("suggestion");
+  const suggestionEvent = useAppStore((s) => s.agentEvents["optimization"]);
+  const suggestionDone = finishedAgents.includes("optimization");
 
   const raw = suggestionEvent?.data as SuggestionData | undefined;
   const suggestions = raw?.suggestions ?? [];

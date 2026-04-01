@@ -25,7 +25,8 @@ export async function analyzeRepo(
   userId: string,
   onEvent?: (data: unknown) => void
 ) {
-  const body: { repoUrl: string; branch?: string } = { repoUrl };
+  // 注意：后端 AnalyzeRequest 使用 snake_case，所以字段名必须是 repo_url
+  const body: { repo_url: string; branch?: string } = { repo_url: repoUrl };
   if (branch) body.branch = branch;
 
   const res = await fetch(`/api/analyze`, {

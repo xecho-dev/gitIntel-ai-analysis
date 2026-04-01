@@ -53,8 +53,15 @@ class SharedState(TypedDict, total=False):
     # ─── Stage 4: 代码质量分析 ─────────────────────────────────
     quality_result: Optional[dict]  # {health_score, test_coverage, complexity, maintainability, python_metrics, typescript_metrics, ...}
 
-    # ─── Stage 5: 优化建议生成 ─────────────────────────────────
+    # ─── Stage 5: 依赖风险分析 ─────────────────────────────────
+    dependency_result: Optional[dict]  # {total, scanned, high, medium, low, risk_level, deps}
+
+    # ─── Stage 6: 架构评估（LLM 驱动）─────────────────────────
+    architecture_result: Optional[dict]  # {complexity, components, techStack, maintainability, architectureStyle, keyPatterns, hotSpots, summary, llmPowered}
+
+    # ─── Stage 7: 优化建议生成 ─────────────────────────────────
     suggestion_result: Optional[dict]  # {suggestions, total, high_priority, medium_priority, low_priority}
+    optimization_result: Optional[dict]  # 同上，别名（optimization agent 使用）
 
     # ─── 最终聚合结果 ───────────────────────────────────────────
     final_result: Optional[dict]  # 全部结果打包，供前端展示

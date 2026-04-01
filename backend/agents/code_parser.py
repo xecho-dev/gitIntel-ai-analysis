@@ -1,6 +1,7 @@
 """CodeParserAgent — 使用 tree-sitter 对仓库进行 AST 分析，提取结构化代码信息。"""
 import asyncio
 import os
+import tree_sitter
 from collections import defaultdict
 from typing import AsyncGenerator
 
@@ -10,7 +11,7 @@ from .base_agent import AgentEvent, BaseAgent, _make_event
 _EXT_TO_LANG: dict[str, str] = {
     ".py": "python",
     ".ts": "typescript",
-    ".tsx": "typescript",
+    ".tsx": "tsx",
     ".js": "javascript",
     ".jsx": "javascript",
     ".go": "go",
@@ -31,6 +32,33 @@ _EXT_TO_LANG: dict[str, str] = {
     ".zig": "zig",
     ".dart": "dart",
 }
+
+# 明确忽略的非源码扩展名（文件存在但不是有效源码）
+_IGNORE_EXT: frozenset[str] = frozenset({
+    ".ipynb",  # Jupyter Notebook — JSON 结构，tree-sitter 会无效遍历
+    ".md", ".mdx",
+    ".txt", ".rst",
+    ".json", ".jsonc",
+    ".yml", ".yaml", ".toml",
+    ".xml", ".html", ".css", ".scss", ".sass", ".less",
+    ".svg", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".bmp",
+    ".pdf", ".zip", ".tar", ".gz", ".rar",
+    ".lock",  # package-lock.json, yarn.lock 等锁文件
+    ".sh", ".bash", ".zsh",  # shell 脚本（可选，排除避免噪音）
+    ".env", ".gitignore", ".dockerignore", ".editorconfig",
+    ".gitmodules", ".gitattributes",
+    ".csv", ".tsv",
+    ".ico",
+})
+
+
+def _is_parseable_source(path: str) -> bool:
+    """判断文件路径是否对应可解析的源码（排除常见非源码文件）。"""
+    import os
+    ext = os.path.splitext(path)[1].lower()
+    if ext in _IGNORE_EXT:
+        return False
+    return True
 
 # ── 跨语言的语义边界节点类型 ─────────────────────────────────────────
 STRUCTURE_TYPES = {
@@ -59,13 +87,68 @@ IMPORT_TYPES = {
 }
 
 
+# 每个语言对应独立包中的 language factory
+# 格式: (模块名, 属性名)
+_LANG_FACTORY: dict[str, tuple[str, str]] = {
+    "python": ("tree_sitter_python", "language"),
+    "javascript": ("tree_sitter_javascript", "language"),
+    "typescript": ("tree_sitter_typescript", "language_typescript"),
+    "tsx": ("tree_sitter_typescript", "language_tsx"),
+    "go": ("tree_sitter_go", "language"),
+    "rust": ("tree_sitter_rust", "language"),
+    "java": ("tree_sitter_java", "language"),
+    "c": ("tree_sitter_c", "language"),
+    "cpp": ("tree_sitter_cpp", "language"),
+    "ruby": ("tree_sitter_ruby", "language"),
+    "swift": ("tree_sitter_swift", "language"),
+    "kotlin": ("tree_sitter_kotlin", "language"),
+    "scala": ("tree_sitter_scala", "language"),
+    "php": ("tree_sitter_php", "language"),
+    "dart": ("tree_sitter_dart", "language"),
+    "zig": ("tree_sitter_zig", "language"),
+    "csharp": ("tree_sitter_csharp", "language"),
+}
+
+# Parser 缓存（同一个 language 只创建一次）
+_PARSER_CACHE: dict[str, object] = {}
+
+
 def _load_ts_parser(language: str):
-    """懒加载 tree-sitter 语言解析器。"""
+    """懒加载 tree-sitter 解析器，优先用独立语言包（绕过 tree_sitter_languages ABI 问题）。
+
+    tree-sitter 0.24+ 的 language 包中每个 `language_*` 属性都是返回 tree_sitter.Language 实例的函数。
+    """
+    if language in _PARSER_CACHE:
+        return _PARSER_CACHE[language]
+
+    result = None
+
+    # 方式一：独立语言包（推荐）
+    if language in _LANG_FACTORY:
+        mod_name, attr_name = _LANG_FACTORY[language]
+        try:
+            mod = __import__(mod_name, fromlist=[attr_name])
+            lang_fn = getattr(mod, attr_name)
+            capsule = lang_fn() if callable(lang_fn) else lang_fn
+            ts_lang = tree_sitter.Language(capsule)
+            parser = tree_sitter.Parser(ts_lang)
+            _PARSER_CACHE[language] = parser
+            return parser
+        except Exception:
+            pass
+
+    # 方式二：tree_sitter_languages（fallback，可能因 ABI 不兼容而失败）
     try:
         from tree_sitter_languages import get_parser
-        return get_parser(language)
-    except ImportError:
-        return None
+
+        # get_parser 返回 tree_sitter.Parser，直接使用
+        parser = get_parser(language)
+        _PARSER_CACHE[language] = parser
+        return parser
+    except Exception:
+        pass
+
+    return None
 
 
 class CodeParserAgent(BaseAgent):
@@ -184,6 +267,9 @@ class CodeParserAgent(BaseAgent):
             files: [{"path": str, "content": str}, ...]
             max_chunk_lines: 语义分块的最大行数限制
         """
+        import logging
+        _logger = logging.getLogger("gitintel")
+
         def _do() -> dict:
             lang_stats: dict[str, dict] = defaultdict(lambda: {
                 "files": 0, "functions": 0, "classes": 0,
@@ -193,13 +279,21 @@ class CodeParserAgent(BaseAgent):
             total_classes = 0
             largest_files: list[dict] = []
             chunked_files: dict[str, list[dict]] = {}
+            skipped: list[str] = []
 
             for item in files:
                 fpath = item["path"]
+
+                # 扩展名过滤：跳过非源码文件
+                if not _is_parseable_source(fpath):
+                    skipped.append(fpath)
+                    continue
+
                 content = item["content"]
                 ext = os.path.splitext(fpath)[1]
                 lang = _EXT_TO_LANG.get(ext)
                 if not lang:
+                    skipped.append(fpath)
                     continue
 
                 try:
@@ -236,9 +330,16 @@ class CodeParserAgent(BaseAgent):
             largest_files = largest_files[:10]
 
             total_chunks = sum(len(v) for v in chunked_files.values())
+            _logger.debug(
+                f"[code_parser] 完成：{len(files)} 个文件，"
+                f"解析 {sum(s['files'] for s in lang_stats.values())} 个源码文件，"
+                f"跳过 {len(skipped)} 个非源码: {skipped[:5]}"
+            )
 
             return {
                 "total_files": len(files),
+                "parsed_files": sum(s["files"] for s in lang_stats.values()),
+                "skipped_files": skipped,
                 "total_functions": total_functions,
                 "total_classes": total_classes,
                 "language_stats": dict(lang_stats),
@@ -257,6 +358,9 @@ class CodeParserAgent(BaseAgent):
             files: 文件路径列表
             max_chunk_lines: 语义分块的最大行数限制
         """
+        import logging
+        _logger = logging.getLogger("gitintel")
+
         def _do() -> dict:
             lang_stats: dict[str, dict] = defaultdict(lambda: {
                 "files": 0, "functions": 0, "classes": 0,
@@ -266,11 +370,18 @@ class CodeParserAgent(BaseAgent):
             total_classes = 0
             largest_files: list[dict] = []
             chunked_files: dict[str, list[dict]] = {}
+            skipped: list[str] = []
 
             for fpath in files:
+                # 扩展名过滤
+                if not _is_parseable_source(fpath):
+                    skipped.append(fpath)
+                    continue
+
                 ext = os.path.splitext(fpath)[1]
                 lang = _EXT_TO_LANG.get(ext)
                 if not lang:
+                    skipped.append(fpath)
                     continue
 
                 try:
@@ -313,9 +424,16 @@ class CodeParserAgent(BaseAgent):
             largest_files = largest_files[:10]
 
             total_chunks = sum(len(v) for v in chunked_files.values())
+            _logger.debug(
+                f"[code_parser] 完成：{len(files)} 个文件，"
+                f"解析 {sum(s['files'] for s in lang_stats.values())} 个源码文件，"
+                f"跳过 {len(skipped)} 个非源码: {skipped[:5]}"
+            )
 
             return {
                 "total_files": len(files),
+                "parsed_files": sum(s["files"] for s in lang_stats.values()),
+                "skipped_files": skipped,
                 "total_functions": total_functions,
                 "total_classes": total_classes,
                 "language_stats": dict(lang_stats),

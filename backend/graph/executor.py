@@ -95,20 +95,31 @@ def run_agent_sync(
     try:
         return asyncio.run(agent.run(repo_id, branch, **kwargs))
     except Exception as e:
-        return {"error": str(e), "agent": agent.name}
+        agent_name = getattr(agent, "name", "unknown")
+        return {"error": str(e), "agent": agent_name}
 
 
 # ─── State 参数提取 ────────────────────────────────────────────────
 
 def parse_repo_url(url: str) -> tuple[str, str] | None:
-    """解析 GitHub URL，返回 (owner, repo)。"""
+    """解析 GitHub URL，返回 (owner, repo)。
+
+    支持格式:
+      https://github.com/owner/repo
+      https://github.com/owner/repo.git
+      git@github.com:owner/repo.git
+      owner/repo
+    """
     import re
+
+    # 处理 .git 后缀
+    url = re.sub(r"\.git$", "", url)
 
     m = re.match(r"https?://github\.com/([^/]+)/([^/.]+)", url)
     if m:
         return m.group(1), m.group(2)
 
-    m = re.match(r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$", url)
+    m = re.match(r"git@github\.com:([^/]+)/([^/]+)$", url)
     if m:
         return m.group(1), m.group(2)
 

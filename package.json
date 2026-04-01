@@ -9,7 +9,7 @@
     "test:backend": "cd backend && .venv/bin/python3 -m pytest -v",
     "test:frontend": "pnpm --filter frontend test",
     "dev:frontend": "pnpm --filter frontend dev",
-    "dev:backend": "cd backend && .venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:backend": "cd backend && .venv/bin/python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
     "build:frontend": "pnpm --filter frontend build",
     "build:backend": "cd backend && .venv/bin/python3 -m pip install -r requirements.txt"
   },

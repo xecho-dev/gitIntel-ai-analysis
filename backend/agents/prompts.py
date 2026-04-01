@@ -74,8 +74,8 @@ REPO_LOADER_SYSTEM = """{system_context}
 4. 关注价值：重点关注可能揭示项目架构、设计模式、业务逻辑的文件
 5. 适度贪婪：宁可多加载有价值的小文件，也不要错过重要的核心文件
 
-【输出格式】（严格 JSON）
-{{"need_more": true/false, "reason": "判断原因（50字以内）", "additional_paths": ["path1", "path2", ...]}}
+【输出格式】（严格 JSON，必须是合法的 JSON 对象，不要用 markdown 包裹）
+{{{{"need_more": true/false, "reason": "判断原因（50字以内）", "additional_paths": ["path1", "path2", ...]}}}}
 """
 
 REPO_LOADER_INITIAL_HUMAN = """仓库: {repo_path}
@@ -90,8 +90,8 @@ REPO_LOADER_INITIAL_HUMAN = """仓库: {repo_path}
 - 值得加载（P1）：重要源码
 - 可跳过（P2）：其他文件
 
-返回格式：
-{{"p0_paths": ["path1", ...], "p1_paths": ["path2", ...], "p2_paths": ["path3", ...]}}
+返回格式（必须是合法的 JSON 对象，不要用 markdown 包裹）：
+{{{{"p0_paths": ["path1", ...], "p1_paths": ["path2", ...], "p2_paths": ["path3", ...]}}}}
 """
 
 
@@ -101,8 +101,12 @@ def build_repo_loader_initial_prompt(
     total_files: int,
 ) -> ChatPromptTemplate:
     return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM),
-        ("human", REPO_LOADER_INITIAL_HUMAN),
+        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
+        ("human", REPO_LOADER_INITIAL_HUMAN.format(
+            repo_path=repo_path,
+            tree_list=tree_list,
+            total_files=total_files,
+        )),
     ])
 
 
@@ -121,8 +125,8 @@ REPO_LOADER_DECISION_HUMAN = """仓库: {repo_path}
 如需要，返回最多 {max_extra} 个文件路径（必须是上述列表中的路径）。
 如不需要，need_more 设为 false。
 
-返回格式（严格 JSON）:
-{{"need_more": true/false, "reason": "判断原因", "additional_paths": ["path1", ...]}}
+返回格式（必须是合法的 JSON 对象，不要用 markdown 包裹）：
+{{{{"need_more": true/false, "reason": "判断原因", "additional_paths": ["path1", ...]}}}}
 """
 
 
@@ -138,7 +142,7 @@ def build_repo_loader_decision_prompt(
     summaries_parts = [f"【{k}】: {v[:200]}" for k, v in list(content_summaries.items())[:20]]
     summaries_str = "\n\n".join(summaries_parts)
     return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM),
+        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
         ("human", REPO_LOADER_DECISION_HUMAN.format(
             repo_path=repo_path,
             loaded_count=len(loaded_paths),
@@ -171,7 +175,7 @@ P1_DECISION_HUMAN = """仓库: {repo_path}
 - 如果需要更全面的代码覆盖，建议加载 P1
 
 返回格式（严格 JSON）:
-{{"need_more": true/false, "reason": "判断原因（100字以内）"}}
+{{{{"need_more": true/false, "reason": "判断原因（100字以内）"}}}}
 """
 
 
@@ -185,7 +189,7 @@ def build_p1_decision_prompt(
 ) -> ChatPromptTemplate:
     p1_list = "\n".join(f"- {p}" for p in p1_files[:30])
     return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM),
+        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
         ("human", P1_DECISION_HUMAN.format(
             repo_path=repo_path,
             p0_summary=p0_summary,
@@ -219,7 +223,7 @@ P2_DECISION_HUMAN = """仓库: {repo_path}
 - 避免重复分析已加载文件的功能
 
 返回格式（严格 JSON）:
-{{"need_more": true/false, "reason": "判断原因（100字以内）", "additional_paths": ["path1", ...]}}
+{{{{"need_more": true/false, "reason": "判断原因（100字以内）", "additional_paths": ["path1", ...]}}}}
 """
 
 
@@ -232,7 +236,7 @@ def build_p2_decision_prompt(
 ) -> ChatPromptTemplate:
     p2_list = "\n".join(f"- {f['path']} (~{f.get('size', 0)} bytes)" for f in p2_files[:50])
     return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM),
+        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
         ("human", P2_DECISION_HUMAN.format(
             repo_path=repo_path,
             code_summary=code_summary,

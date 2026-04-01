@@ -41,7 +41,7 @@ interface AppState {
 
 const initialState = {
   isAnalyzing: false,
-  repoUrl: "",
+  repoUrl: "https://github.com/xecho-dev/test.git",
   agentEvents: {},
   finishedAgents: [],
   finalResult: null,

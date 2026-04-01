@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -6,7 +7,19 @@ from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-load_dotenv()
+load_dotenv(override=True)  # 明确指定 backend 目录下的 .env
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+# 设置 uvicorn 日志级别
+uvicorn_logger = logging.getLogger("uvicorn")
+uvicorn_logger.setLevel(logging.INFO)
+gitintel_logger = logging.getLogger("gitintel")
+gitintel_logger.setLevel(logging.DEBUG)
 
 from agents import BaseAgent, AgentEvent
 from graph.analysis_graph import stream_analysis_sse
@@ -72,11 +85,22 @@ async def health():
 @app.post("/api/analyze")
 async def analyze(req: AnalyzeRequest, request: Request):
     """分析仓库 - SSE 流式响应（需要登录）"""
+    import logging
+    logger = logging.getLogger("gitintel")
+
+    logger.info(f"[/api/analyze] 收到请求: repo_url={req.repo_url}, branch={req.branch}")
+
     user = require_auth(request)
+    logger.info(f"[/api/analyze] 认证通过: user_id={user.get('sub') or user.get('id')}")
 
     async def event_stream():
-        async for event in stream_analysis_sse(req.repo_url, req.branch):
-            yield event
+        try:
+            async for event in stream_analysis_sse(req.repo_url, req.branch):
+                yield event
+        except Exception as e:
+            logger.error(f"[/api/analyze] stream 异常: {type(e).__name__}: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         event_stream(),

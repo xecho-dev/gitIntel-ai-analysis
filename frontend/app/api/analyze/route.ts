@@ -11,9 +11,11 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { repoUrl, branch } = body;
+  // BFF 接收两种格式：repoUrl (前端直接调用) 或 repo_url (从 api.ts 代理)
+  const repoUrl = body.repoUrl ?? body.repo_url;
+  const branch = body.branch;
 
-    const upstream = await fetch(`${API_BASE}/api/analyze`, {
+  const upstream = await fetch(`${API_BASE}/api/analyze`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -34,23 +36,39 @@ export async function POST(request: NextRequest) {
   }
 
   // 收集 SSE 事件，等 stream 结束后一次性保存结果
-  const encoder = new TextEncoder();
-  const collectedEvents: Record<string, unknown>[] = [];
-  let hasError = false;
-
   const stream = new ReadableStream({
     async start(controller) {
-      const reader = upstream.body!.getReader();
+      const encoder = new TextEncoder();
       const decoder = new TextDecoder();
+      const collectedEvents: Record<string, unknown>[] = [];
+      let hasError = false;
       let buffer = "";
+      const reader = upstream.body!.getReader();
+
+      const processLine = (line: string): boolean => {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") {
+            controller.enqueue(new Uint8Array());
+            return true;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            collectedEvents.push(parsed);
+            controller.enqueue(encoder.encode(line + "\n"));
+          } catch {
+            controller.enqueue(encoder.encode(line + "\n"));
+          }
+        }
+        return false;
+      };
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            // 处理剩余 buffer
             if (buffer) {
-              processLine(buffer, controller, decoder, collectedEvents);
+              processLine(buffer);
             }
             break;
           }
@@ -60,8 +78,7 @@ export async function POST(request: NextRequest) {
           buffer = lines.pop() ?? "";
 
           for (const line of lines) {
-            if (processLine(line, controller, decoder, collectedEvents)) {
-              // stream ended
+            if (processLine(line)) {
               hasError = true;
               break;
             }
@@ -110,27 +127,4 @@ export async function POST(request: NextRequest) {
       "X-Accel-Buffering": "no",
     },
   });
-}
-
-function processLine(
-  line: string,
-  controller: ReadableStreamDefaultController,
-  decoder: TextDecoder,
-  collectedEvents: Record<string, unknown>[]
-): boolean {
-  if (line.startsWith("data: ")) {
-    const data = line.slice(6).trim();
-    if (data === "[DONE]") {
-      controller.enqueue(new Uint8Array());
-      return true;
-    }
-    try {
-      const parsed = JSON.parse(data);
-      collectedEvents.push(parsed);
-      controller.enqueue(encoder.encode(line + "\n"));
-    } catch {
-      controller.enqueue(encoder.encode(line + "\n"));
-    }
-  }
-  return false;
 }
