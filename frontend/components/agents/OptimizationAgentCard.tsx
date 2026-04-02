@@ -126,7 +126,12 @@ export const OptimizationAgentCard = () => {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="flex flex-col items-center justify-center h-32 text-slate-500 text-xs gap-2"
           >
-            <Zap size={24} className="opacity-50" />
+            <motion.div
+              animate={isScanning ? { opacity: [0.5, 1, 0.5] } : { opacity: 0.5 }}
+              transition={isScanning ? { repeat: Infinity, duration: 0.8, ease: "easeInOut" } : {}}
+            >
+              <Zap size={24} className="opacity-50" />
+            </motion.div>
             <span>{isScanning ? "正在生成优化建议..." : "等待分析开始..."}</span>
           </motion.div>
         )}

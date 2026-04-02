@@ -23,3 +23,4 @@ tree-sitter-ruby>=0.23.0
 # tree-sitter-languages 作为 fallback（存在已知 ABI 兼容性问题，详见 _load_ts_parser）
 tree-sitter-languages>=1.10.0
 aiofiles>=24.0.0
+reportlab>=4.0

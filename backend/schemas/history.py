@@ -11,12 +11,6 @@ class SaveAnalysisRequest(BaseModel):
     result_data: dict
 
 
-class GetHistoryRequest(BaseModel):
-    page: int = 1
-    page_size: int = 20
-    search: Optional[str] = None
-
-
 # --- 响应模型 ---
 
 class HistoryItem(BaseModel):

@@ -3,7 +3,7 @@ import asyncio
 import os
 import tree_sitter
 from collections import defaultdict
-from typing import AsyncGenerator
+from collections import defaultdict
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
 
@@ -155,86 +155,6 @@ class CodeParserAgent(BaseAgent):
     """遍历仓库源码文件，执行 AST 解析，提取结构化指标。"""
 
     name = "code_parser"
-
-    async def stream(
-        self,
-        repo_path: str,
-        branch: str = "main",
-        file_contents: dict[str, str] | None = None,
-    ) -> AsyncGenerator[AgentEvent, None]:
-        """对仓库执行 AST 分析，yield 进度事件。
-
-        Args:
-            repo_path: 仓库标识（owner/repo）。
-            branch: 分支名（仅参考）。
-            file_contents: 可选，GitHub API 直接返回的文件内容字典；
-                           若不提供则从 repo_path 目录读取（本地开发兼容）。
-        """
-        yield _make_event(
-            self.name, "status",
-            "正在扫描源码文件…", 10, None
-        )
-
-        files = await self._walk_source_files(repo_path)
-        if not files:
-            yield _make_event(
-                self.name, "error",
-                "未找到可分析的源码文件", 0, None
-            )
-            return
-
-        yield _make_event(
-            self.name, "progress",
-            f"共扫描 {len(files)} 个文件，开始 AST 解析…", 30, None
-        )
-
-        if file_contents is not None:
-            # ── GitHub API 模式：直接使用内存中的文件内容 ─────────────
-            files = [
-                {"path": path, "content": content}
-                for path, content in file_contents.items()
-            ]
-            if not files:
-                yield _make_event(self.name, "error", "未获取到任何文件内容", 0, None)
-                return
-            yield _make_event(
-                self.name, "progress",
-                f"共 {len(files)} 个文件，开始 AST 解析…", 30, None
-            )
-            try:
-                stats = await self._analyze_inmemory_files(files)
-            except Exception as exc:
-                yield _make_event(
-                    self.name, "error", f"AST 解析失败: {exc}", 0, {"exception": str(exc)}
-                )
-                return
-        else:
-            # ── 本地开发模式：从磁盘读取 ─────────────────────────────────
-            files = await self._walk_source_files(repo_path)
-            if not files:
-                yield _make_event(self.name, "error", "未找到可分析的源码文件", 0, None)
-                return
-            yield _make_event(
-                self.name, "progress",
-                f"共扫描 {len(files)} 个文件，开始 AST 解析…", 30, None
-            )
-            try:
-                stats = await self._analyze_files(files)
-            except Exception as exc:
-                yield _make_event(
-                    self.name, "error", f"AST 解析失败: {exc}", 0, {"exception": str(exc)}
-                )
-                return
-
-        yield _make_event(
-            self.name, "progress",
-            "AST 分析完成，正在聚合统计…", 80, None
-        )
-
-        yield _make_event(
-            self.name, "result", "代码结构解析完成",
-            100, stats
-        )
 
     # ─── 内部实现 ───────────────────────────────────────────────
 
@@ -594,60 +514,6 @@ class CodeParserAgent(BaseAgent):
             return None
 
         return find_name(tree)
-
-    @staticmethod
-    def _split_large_chunk(chunk: dict, max_lines: int) -> list[dict]:
-        """将超大块拆分为更小的子块，在自然断点（空行、注释）处拆分。"""
-        lines = chunk["content"].split("\n")
-        sub_chunks: list[dict] = []
-        sub_id = 0
-        current_lines: list[str] = []
-        current_start = chunk["start_line"]
-
-        for i, line in enumerate(lines):
-            current_lines.append(line)
-            line_num = chunk["start_line"] + i
-
-            # 在自然断点处拆分
-            should_split = (
-                len(current_lines) >= max_lines and (
-                    line.strip() == "" or  # 空行
-                    line.strip().startswith("#") or  # 注释
-                    line.strip().startswith("//") or  # 单行注释
-                    line.strip().startswith("/*") or  # 块注释开始
-                    line.strip().startswith("*/") or  # 块注释结束
-                    line.strip().startswith('"""') or  # Python docstring
-                    line.strip().startswith("'''") or
-                    line.strip().startswith("}") or  # 代码块结束
-                    (line.strip() and not line[0].isspace())  # 回到顶层缩进
-                )
-            )
-
-            if should_split and len(current_lines) > max_lines // 2:
-                sub_chunks.append({
-                    "chunk_id": 0,  # 临时，稍后重新编号
-                    "start_line": current_start,
-                    "end_line": line_num,
-                    "content": "\n".join(current_lines[:-1]),
-                    "function_name": chunk.get("function_name"),
-                    "node_type": chunk.get("node_type", "split"),
-                })
-                sub_id += 1
-                current_lines = [line]
-                current_start = line_num + 1
-
-        # 处理剩余内容
-        if current_lines:
-            sub_chunks.append({
-                "chunk_id": 0,
-                "start_line": current_start,
-                "end_line": chunk["end_line"],
-                "content": "\n".join(current_lines),
-                "function_name": chunk.get("function_name"),
-                "node_type": chunk.get("node_type", "split"),
-            })
-
-        return sub_chunks
 
     @staticmethod
     def _parse_file(source: bytes, lang: str) -> tuple[int, int, int]:

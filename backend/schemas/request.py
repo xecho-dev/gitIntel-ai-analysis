@@ -6,5 +6,7 @@ class AnalyzeRequest(BaseModel):
     branch: str = "main"
 
 
-class HealthRequest(BaseModel):
-    pass
+class ExportPdfRequest(BaseModel):
+    repo_url: str
+    branch: str = "main"
+    result_data: dict

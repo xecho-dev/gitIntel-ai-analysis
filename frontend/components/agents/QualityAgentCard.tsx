@@ -170,7 +170,12 @@ export const QualityAgentCard = () => {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="flex flex-col items-center justify-center h-full text-slate-500 text-xs gap-2"
             >
+            <motion.div
+              animate={isScanning ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+              transition={isScanning ? { repeat: Infinity, duration: 1.2, ease: "easeInOut" } : {}}
+            >
               <BarChart3 size={24} className="opacity-50" />
+            </motion.div>
               <span>{isScanning ? "正在生成质量评分..." : "等待分析开始..."}</span>
             </motion.div>
           )}

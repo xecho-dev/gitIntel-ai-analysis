@@ -247,7 +247,7 @@ export const ArchitectureAgentCard = () => {
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           ref={scrollRef}
-          className="bg-[#0a0e14] rounded p-4 font-mono text-[11px] h-48 overflow-y-auto border border-white/5 space-y-1"
+          className="bg-[#0a0e14] rounded p-4 font-mono text-[11px] h-48 overflow-y-auto border border-white/5 space-y-1 scrollbar-hide"
           style={{ paddingBottom: "2.5rem" }}
         >
           {linesRef.current.map((line, i) => (

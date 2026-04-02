@@ -1,3 +1,6 @@
+from services.pdf_service import build_pdf_bytes
+
+import io
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -24,7 +27,7 @@ gitintel_logger.setLevel(logging.DEBUG)
 from agents import BaseAgent, AgentEvent
 from graph.analysis_graph import stream_analysis_sse
 from middleware.auth import require_auth
-from schemas.request import AnalyzeRequest, HealthRequest
+from schemas.request import AnalyzeRequest, ExportPdfRequest
 from schemas.response import HealthResponse
 from schemas.history import (
     SaveAnalysisRequest,
@@ -40,7 +43,7 @@ from services.database import (
     get_user_profile,
     get_user_uuid,
 )
-from supabase_client import get_supabase, get_supabase_admin
+from supabase_client import get_supabase_admin
 
 
 @asynccontextmanager
@@ -217,6 +220,32 @@ async def api_upsert_profile(req: UpsertUserRequest, request: Request):
         raise HTTPException(status_code=503, detail=str(e))
 
     return upsert_user(sb, auth_user_id, req.model_dump())
+
+
+# ─── PDF 导出 API ──────────────────────────────────────────────
+
+@app.post("/api/export/pdf")
+async def api_export_pdf(req: ExportPdfRequest, request: Request):
+    """将分析结果导出为 PDF 报告（需要登录）"""
+    payload = require_auth(request)
+    if not (payload.get("sub") or payload.get("id")):
+        raise HTTPException(status_code=401, detail="无法识别用户身份")
+
+    pdf_bytes = build_pdf_bytes({
+        "repo_url": req.repo_url,
+        "branch": req.branch,
+        **req.result_data,
+    })
+
+    import re
+    repo_name = re.sub(r"[^a-zA-Z0-9_-]", "_", req.repo_url.split("/")[-1].replace(".git", ""))
+    filename = f"gitintel_{repo_name}_{req.branch}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 if __name__ == "__main__":

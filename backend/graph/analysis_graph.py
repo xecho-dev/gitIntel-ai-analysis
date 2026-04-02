@@ -766,13 +766,17 @@ def _build_graph() -> StateGraph:
 
     # ── 添加节点 ──────────────────────────────────────────────────
     graph.add_node("fetch_tree_classify", node_fetch_tree_classify)
+
     graph.add_node("load_p0", node_load_p0)
     graph.add_node("code_parser_p0", node_code_parser_p0)
+
     graph.add_node("decide_p1", node_decide_p1)
     graph.add_node("load_p1", node_load_p1)
     graph.add_node("code_parser_p1", node_code_parser_p1)
+
     graph.add_node("load_p2_decide", node_load_p2_decide)
     graph.add_node("load_more_p2", node_load_more_p2)
+
     graph.add_node("code_parser_final", node_code_parser_final)
     graph.add_node("tech_stack", node_tech_stack)
     graph.add_node("quality", node_quality)

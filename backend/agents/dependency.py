@@ -146,18 +146,12 @@ class DependencyAgent(BaseAgent):
 
     @staticmethod
     async def _parse_all_deps(files: list[dict]) -> list[dict]:
-        """解析所有依赖文件，返回依赖项列表（同时支持磁盘和内存模式）。"""
+        """解析所有依赖文件，返回依赖项列表。"""
         all_deps: list[dict] = []
 
         for info in files:
             try:
-                # 内存模式：content 已直接传入
-                if "content" in info:
-                    deps = DependencyAgent._parse_content(
-                        info["content"], info.get("type", "unknown")
-                    )
-                else:
-                    deps = DependencyAgent._parse_file(info["path"], info.get("type", "unknown"))
+                deps = DependencyAgent._parse_file(info["path"], info.get("type", "unknown"))
                 all_deps.extend(deps)
             except Exception:
                 pass
@@ -245,95 +239,6 @@ class DependencyAgent(BaseAgent):
 
         elif dep_type in ("maven", "gradle"):
             # 简化解析：提取 group:artifact:version 格式
-            for line in content.splitlines():
-                m = re.search(r"<groupId>(.+?)</groupId>.*?<artifactId>(.+?)</artifactId>.*?<version>(.+?)</version>", line + content, re.DOTALL)
-                if m:
-                    deps.append({
-                        "name": f"{m.group(2)}",
-                        "version": m.group(3),
-                        "group": m.group(1),
-                        "type": "dependencies",
-                        "manager": dep_type,
-                    })
-
-        return deps
-
-    @staticmethod
-    def _parse_content(content: str, dep_type: str) -> list[dict]:
-        """解析依赖文件内容字符串（供内存模式使用）。
-        
-        _parse_file 读取磁盘文件，本方法直接解析已加载的内容字符串，
-        两者返回格式完全一致。
-        """
-        deps: list[dict] = []
-
-        if dep_type == "npm":
-            try:
-                data = json.loads(content)
-                for section in ["dependencies", "devDependencies", "peerDependencies"]:
-                    for name, ver in data.get(section, {}).items():
-                        deps.append({
-                            "name": name, "version": ver,
-                            "type": section, "manager": "npm",
-                        })
-            except (json.JSONDecodeError, KeyError):
-                pass
-
-        elif dep_type == "pip":
-            for line in content.splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or line.startswith("-"):
-                    continue
-                m = re.match(r"^([a-zA-Z0-9_\-\.]+)(?:\[.*?\])?(?:==|>=|<=|~=|!=|>|<).*$", line)
-                if m:
-                    name = m.group(1)
-                    ver = re.split(r"[=<>!~]", line)[-1].strip()
-                    deps.append({"name": name, "version": ver, "type": "dependencies", "manager": "pip"})
-
-        elif dep_type == "pipenv":
-            section = ""
-            for line in content.splitlines():
-                line = line.strip()
-                if line.startswith("[") and line.endswith("]"):
-                    section = line[1:-1]
-                    continue
-                if section in ("packages", "dev-packages") and "=" in line:
-                    name, ver = line.split("=", 1)
-                    deps.append({"name": name.strip(), "version": ver.strip(), "type": section, "manager": "pipenv"})
-
-        elif dep_type == "go":
-            for line in content.splitlines():
-                line = line.strip()
-                if line.startswith("require ("):
-                    continue
-                m = re.match(r"^\s*([a-zA-Z0-9_\-\./]+)\s+v?([0-9]", line)
-                if m:
-                    deps.append({"name": m.group(1), "version": m.group(2), "type": "require", "manager": "go"})
-
-        elif dep_type == "cargo":
-            in_deps = False
-            for line in content.splitlines():
-                line_stripped = line.strip()
-                if line_stripped == "[dependencies]" or line_stripped.startswith("[dependencies."):
-                    in_deps = True
-                    continue
-                if line_stripped.startswith("["):
-                    in_deps = False
-                if in_deps:
-                    m = re.match(r"^([a-zA-Z0-9_\-\.]+)\s*=\s*[\"']?(.+?)[\"']?\s*(?:,)?$", line_stripped)
-                    if m:
-                        deps.append({"name": m.group(1), "version": m.group(2), "type": "dependencies", "manager": "cargo"})
-
-        elif dep_type == "composer":
-            try:
-                data = json.loads(content)
-                for section in ["require", "require-dev"]:
-                    for name, ver in data.get(section, {}).items():
-                        deps.append({"name": name, "version": ver, "type": section, "manager": "composer"})
-            except (json.JSONDecodeError, KeyError):
-                pass
-
-        elif dep_type in ("maven", "gradle"):
             for line in content.splitlines():
                 m = re.search(r"<groupId>(.+?)</groupId>.*?<artifactId>(.+?)</artifactId>.*?<version>(.+?)</version>", line + content, re.DOTALL)
                 if m:

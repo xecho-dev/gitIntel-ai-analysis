@@ -125,25 +125,25 @@ export const DependencyAgentCard = () => {
         {showResult ? (
           <div className="space-y-3">
             {/* 进度条 */}
-            <div className="h-2 w-full bg-[#1a1a1a] rounded-full overflow-hidden">
+            {/* <div className="h-2 w-full bg-[#1a1a1a] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
                   high > 0 ? "bg-rose-500" : medium > 0 ? "bg-yellow-500" : total === 0 ? "bg-slate-600" : "bg-emerald-500"
                 }`}
                 style={{ width: total > 0 ? "100%" : "100%" }}
               />
-            </div>
+            </div> */}
 
             {total === 0 && !isScanning ? (
-              <div className="text-center py-3">
-                <RefreshCw size={20} className="mx-auto text-slate-600 mb-1" />
+              <div className="flex flex-col items-center gap-1.5 py-3">
+                <Package size={20} className="text-slate-600" />
                 <p className="text-[10px] text-slate-500">未检测到依赖配置文件</p>
-                <p className="text-[9px] text-slate-600 mt-0.5">requirements.txt / package.json 等</p>
+                <p className="text-[9px] text-slate-600">requirements.txt / package.json 等</p>
               </div>
             ) : total === 0 && isScanning ? (
-              <div className="text-center py-3">
+              <div className="flex flex-col items-center justify-center h-32 text-slate-500 text-xs gap-2">
                 <RefreshCw size={20} className="mx-auto text-slate-500 animate-spin mb-1" />
-                <p className="text-[10px] text-slate-500">正在扫描依赖...</p>
+                <span>正在扫描依赖...</span>
               </div>
             ) : (
               <>

@@ -2,19 +2,45 @@
 RepoLoaderAgent — 智能代码仓库加载 Agent，基于 LangChain + 多轮 LLM 决策。
 
 设计原则（Agent 思维）:
-  1. 阶段一：获取仓库结构（目录树）—— 一次 API，不下载内容
-  2. 阶段二：LLM 决策初始分类 —— 让大模型决定 P0/P1/P2
-  3. 阶段三：加载 P0 核心文件（高优先级）
-  4. 阶段四：加载 P1 重要文件
-  5. 阶段五：LLM 深度决策 —— 基于已加载内容，决定是否需要更多
-  6. 阶段六：按需迭代加载（最多 3 轮，每轮都调用 LLM 决策）
-  7. 阶段七：语言检测（识别仓库使用的编程语言）
-
-注意：代码语义分块已移至 CodeParserAgent，利用 tree-sitter AST 在函数/类边界拆分，
-保持语义完整性。详情见 _semantic_chunk_file() 方法。
+阶段一: 获取 SHA + 文件树
+        ↓
+阶段二: LLM 初始分类（P0/P1/P2）
+        ↓
+阶段三: 加载 P0 核心文件
+        ↓
+阶段四: 加载 P1 重要文件
+        ↓
+阶段五: LLM 深度决策（第1轮）
+        ↓
+阶段六: 按需加载 P2 文件
+        ↓ ←←←←←←←←←←←←←←←←←
+        │     ↑                  │
+        │   决策                  │
+        │     ↓                  │
+        └── 最多 3 轮迭代         │
+        ↓                        │
+阶段七: 语言检测                  │
+        ↓                        │
+阶段八: 返回结果 ────────────────┘
 
 每个阶段都 yield AgentEvent，支持 SSE 实时推送。
 支持从 SharedState 断点恢复（LangGraph checkpoint）。
+
+
+LangGraph 工作流（analysis_graph.py）
+        │
+        ├── node_fetch_tree_classify
+        │       ├── RepoLoaderAgent().phase_fetch_tree()
+        │       └── RepoLoaderAgent().phase_llm_classify()
+        │
+        ├── node_load_p0
+        │       └── RepoLoaderAgent().phase_load_priority()
+        │
+        ├── node_decide_p1
+        │       └── RepoLoaderAgent().phase_ai_decide_p1()
+        │
+        └── node_load_p2_decide
+                └── RepoLoaderAgent().phase_ai_decide_p2()
 """
 import asyncio
 import base64
@@ -650,71 +676,6 @@ class RepoLoaderAgent(BaseAgent):
         need_more = bool(result.get("need_more", False))
         paths: list[str] = result.get("additional_paths", [])[:30]
         return need_more, paths
-
-    # ── 规则分类（降级策略）────────────────────────────────────────
-
-    @staticmethod
-    def _rule_classify(blobs: list[dict]) -> list[dict]:
-        """当 LLM 不可用时，使用规则对文件做 P0/P1/P2 分类。"""
-
-        IGNORE_DIRS = frozenset({
-            "node_modules", ".git", "__pycache__", ".venv",
-            "venv", "dist", "build", ".next", ".nuxt",
-            "target", ".pytest_cache", ".mypy_cache",
-            ".ruff_cache", "site-packages",
-            ".github", ".vscode", ".idea",
-            ".cache", ".turbo", ".sst",
-        })
-        SOURCE_EXTENSIONS = frozenset({
-            ".py", ".ts", ".tsx", ".js", ".jsx",
-            ".go", ".rs", ".rb", ".java", ".c", ".cpp",
-            ".cc", ".h", ".hpp", ".cs", ".swift", ".kt",
-            ".kts", ".scala", ".php", ".zig", ".dart",
-            ".json", ".yaml", ".yml", ".toml",
-            ".md", ".txt", ".sh", ".dockerfile",
-            ".vue", ".svelte", ".css", ".scss", ".less",
-            ".html", ".xml", ".sql",
-        })
-        IGNORE_EXTENSIONS = frozenset({
-            ".lock", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico",
-            ".webp", ".svg", ".tiff", ".tif",
-            ".mp4", ".mp3", ".mov", ".avi", ".webm", ".flv",
-            ".pdf", ".zip", ".tar", ".gz", ".rar", ".7z",
-            ".ttf", ".otf", ".woff", ".woff2", ".eot",
-            ".exe", ".dll", ".so", ".dylib",
-            ".DS_Store",
-        })
-
-        def should_ignore(path: str) -> bool:
-            if any(d in path for d in IGNORE_DIRS):
-                return True
-            for i, ch in enumerate(path):
-                if ch == ".":
-                    ext = path[i:].lower()
-                    if ext in IGNORE_EXTENSIONS:
-                        return True
-            return False
-
-        def classify_one(b: dict) -> dict | None:
-            path = b["path"]
-            if should_ignore(path):
-                return None
-
-            is_source = any(path.endswith(ext) for ext in SOURCE_EXTENSIONS)
-            is_p0_name = path in RepoLoaderAgent.DEFAULT_P0_FILES
-            is_entry = any(re.match(p, path) for p in RepoLoaderAgent.ENTRY_PATTERNS)
-
-            if is_p0_name or is_entry:
-                priority = 0
-            elif is_source:
-                priority = 1
-            else:
-                priority = 1
-
-            return {"path": path, "priority": priority, "size": b.get("size", 0)}
-
-        results = [_ for _ in (classify_one(b) for b in blobs) if _ is not None]
-        return results  # type: ignore[return-value]
 
     # ── 文件加载 ────────────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { Download } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -27,11 +28,18 @@ interface ArchitectureData {
 export const AnalysisPreview = () => {
   const eventsVersion = useAppStore((s) => s.eventsVersion);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
+  const finalResult = useAppStore((s) => s.finalResult);
   const finishedAgents = useAppStore((s) => s.finishedAgents);
+  const repoUrl = useAppStore((s) => s.repoUrl);
+  const allDone = finalResult !== null;
+  const agentEvents = useAppStore((s) => s.agentEvents);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const archEvent = useAppStore((s) => s.agentEvents["architecture"]);
-  const qualityEvent = useAppStore((s) => s.agentEvents["quality"]);
-  const codeParserEvent = useAppStore((s) => s.agentEvents["code_parser_final"]);
+  const archEvent = agentEvents["architecture"];
+  const qualityEvent = agentEvents["quality"];
+  const dependencyEvent = agentEvents["dependency"];
+  const optimizationEvent = agentEvents["optimization"];
+  const codeParserEvent = agentEvents["code_parser_final"];
 
   const archData = archEvent?.data as ArchitectureData | undefined;
   const qualityData = qualityEvent?.data as QualityData | undefined;
@@ -58,6 +66,34 @@ export const AnalysisPreview = () => {
   })();
 
   const archStyle = archData?.architectureStyle;
+
+  const handleExportPdf = async () => {
+    if (isExporting || !finalResult) return;
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/export/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo_url: repoUrl,
+          result_data: finalResult,
+        }),
+      });
+
+      if (!res.ok) throw new Error("导出失败");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gitintel-${repoUrl.split("/").pop()?.replace(".git", "")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <GlassCard className="p-6">
@@ -146,6 +182,26 @@ export const AnalysisPreview = () => {
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 导出 PDF — 必须等 4 个 agent 全部完成 */}
+      {allDone && (
+        <div className="mt-4">
+          <button
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="w-full py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg flex items-center justify-center gap-2 text-[11px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isExporting ? (
+              <span className="animate-pulse">正在生成 PDF...</span>
+            ) : (
+              <>
+                <Download size={14} />
+                导出 PDF 报告
+              </>
+            )}
+          </button>
         </div>
       )}
     </GlassCard>
