@@ -30,7 +30,7 @@ export default function AccountPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const sessionProfile = session?.user as
-    | (UserProfile & { login?: string })
+    | (UserProfile & { login?: string; image?: string | null })
     | undefined;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
