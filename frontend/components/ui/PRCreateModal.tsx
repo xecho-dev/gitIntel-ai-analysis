@@ -44,6 +44,7 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
   const [errorMsg, setErrorMsg] = useState("");
   const [prResult, setPrResult] = useState<{ url: string; number: number; title: string; is_fork: boolean; fork_url: string } | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
+  const [editedValues, setEditedValues] = useState<string[]>([]);
 
   // 弹窗打开时自动触发生成
   useEffect(() => {
@@ -61,6 +62,7 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
     setFixes([]);
     setPrResult(null);
     setCommitMessage("");
+    setEditedValues([]);
 
     try {
       const res = await fetch("/api/pr/generate", {
@@ -89,10 +91,11 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
       const data = await res.json();
       if (data.success && data.fixes?.length > 0) {
         setFixes(data.fixes);
+        setEditedValues(data.fixes.map((f) => f.updated));
         setModalState("preview");
       } else {
         // 如果没有生成修改，创建一个默认修改
-        setFixes([
+        const defaultFixes: CodeFix[] = [
           {
             file: suggestion.file || "src/suggested_fix.ts",
             type: "replace",
@@ -101,7 +104,9 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
             description: suggestion.description || "",
             reason: suggestion.reason || "基于优化建议的代码修改",
           },
-        ]);
+        ];
+        setFixes(defaultFixes);
+        setEditedValues(defaultFixes.map((f) => f.updated));
         setModalState("preview");
       }
     } catch (err) {
@@ -116,6 +121,11 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
     setModalState("creating");
     setErrorMsg("");
 
+    const finalFixes = fixes.map((fix, idx) => ({
+      ...fix,
+      updated: editedValues[idx] ?? fix.updated,
+    }));
+
     // 与输入框 placeholder 一致：未输入时用建议首行；用于 commit 与 PR 标题（GitHub 列表显示的是 PR 标题）
     const resolvedCommit =
       commitMessage.trim() || suggestion?.reason?.split("\n")[0] || undefined;
@@ -127,7 +137,7 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
         body: JSON.stringify({
           repo_url: repoUrl,
           branch: branch,
-          fixes: fixes,
+          fixes: finalFixes,
           commit_message: resolvedCommit,
           pr_title: resolvedCommit,
         }),
@@ -151,7 +161,7 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
       setErrorMsg(err instanceof Error ? err.message : "创建 PR 失败");
       setModalState("error");
     }
-  }, [repoUrl, branch, fixes, commitMessage, suggestion]);
+  }, [repoUrl, branch, fixes, editedValues, commitMessage, suggestion]);
 
   const getLanguage = (file: string): string => {
     if (file.endsWith(".py")) return "python";
@@ -415,9 +425,27 @@ export const PRCreateModal: React.FC<PRCreateModalProps> = ({
                           language={getLanguage(fix.file)}
                           theme="vs-dark"
                           original={fix.original || "// 无原代码"}
-                          modified={fix.updated || "// 无修改"}
+                          modified={editedValues[idx] ?? fix.updated}
+                          onMount={(editor) => {
+                            // 左侧（original）设为只读
+                            const originalEditor = editor.getOriginalEditor();
+                            originalEditor.updateOptions({ readOnly: true });
+                            // 监听右侧内容变化，同步到 editedValues
+                            let skipFirst = true;
+                            editor.getModifiedEditor().onDidChangeModelContent(() => {
+                              if (skipFirst) {
+                                skipFirst = false;
+                                return;
+                              }
+                              setEditedValues((prev) => {
+                                const next = [...prev];
+                                next[idx] = editor.getModifiedEditor().getValue();
+                                return next;
+                              });
+                            });
+                          }}
                           options={{
-                            readOnly: true,
+                            readOnly: false,
                             minimap: { enabled: false },
                             scrollBeyondLastLine: false,
                             fontSize: 12,
