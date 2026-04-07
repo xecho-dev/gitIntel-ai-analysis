@@ -21,12 +21,11 @@ declare module "next-auth" {
   }
 }
 
-const githubClientId =
-  process.env.AUTH_GITHUB_ID ?? process.env.GITHUB_CLIENT_ID;
-const githubClientSecret =
-  process.env.AUTH_GITHUB_SECRET ?? process.env.GITHUB_CLIENT_SECRET;
+const githubClientId =  process.env.AUTH_GITHUB_ID;
+const githubClientSecret =  process.env.AUTH_GITHUB_SECRET;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     githubClientId && githubClientSecret
       ? GitHub({ clientId: githubClientId, clientSecret: githubClientSecret })
