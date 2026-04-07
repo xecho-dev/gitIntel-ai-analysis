@@ -137,9 +137,6 @@ def get_token_from_request(request: Request) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         return auth_header[7:]
-    credentials: HTTPAuthorizationCredentials | None = bearer_scheme(request)
-    if credentials:
-        return credentials.credentials
     return None
 
 
