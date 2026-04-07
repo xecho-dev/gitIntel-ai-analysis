@@ -29,7 +29,7 @@ export const Header = () => {
   const isLoginPage = pathname === "/login";
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: "/login" });
+    signOut({ callbackUrl: "/" });
   };
 
   const goToAccount = () => {

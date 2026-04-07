@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { motion } from "motion/react";
 import { signOut } from "next-auth/react";
 import {
@@ -26,7 +26,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { UserProfile, HistoryStats } from "@/lib/types";
 
-// Extended session user from next-auth (matches lib/auth.ts module augmentation)
 interface SessionUser {
   id?: string;
   name?: string | null;
@@ -43,6 +42,18 @@ interface SessionUser {
   following?: number;
 }
 
+function AccountSkeleton() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      <div className="h-12 w-64 bg-white/5 rounded" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 h-96 bg-white/5 rounded-lg" />
+        <div className="lg:col-span-8 h-96 bg-white/5 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
 export default function AccountPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -52,43 +63,41 @@ export default function AccountPage() {
   const [stats, setStats] = useState<HistoryStats | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [syncedOnce, setSyncedOnce] = useState(false);
 
   const syncProfile = useCallback(async () => {
     if (!sessionProfile?.login) return;
     setProfileLoading(true);
     setProfileError(null);
     try {
-      // Upsert GitHub profile info (sync from session → DB)
-      const upsertRes = await fetch("/api/user/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          login: sessionProfile.login,
-          name: sessionProfile.name,
-          email: sessionProfile.email,
-          avatar_url: sessionProfile.image ?? null,
-          bio: sessionProfile.bio ?? undefined,
-          location: sessionProfile.location ?? undefined,
-          company: sessionProfile.company ?? undefined,
-          blog: sessionProfile.blog ?? undefined,
-        }),
-      });
+  const upsertRes = await fetch("/api/user/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      login: sessionProfile.login,
+      name: sessionProfile.name,
+      email: sessionProfile.email,
+      avatar_url: sessionProfile.image ?? null,
+      bio: sessionProfile.bio ?? undefined,
+      location: sessionProfile.location ?? undefined,
+      company: sessionProfile.company ?? undefined,
+      blog: sessionProfile.blog ?? undefined,
+      public_repos: sessionProfile.public_repos ?? 0,
+      followers: sessionProfile.followers ?? 0,
+      following: sessionProfile.following ?? 0,
+    }),
+  });
 
-      if (upsertRes.ok) {
+  console.log("[account] upsert response:", upsertRes.status, upsertRes.statusText);
+
+  if (upsertRes.ok) {
         const data: UserProfile = await upsertRes.json();
         setProfile(data);
+        setSyncedOnce(true);
       } else {
-        // Fallback: try to GET existing profile
-        const getRes = await fetch("/api/user/profile");
-        if (getRes.ok) {
-          const data: UserProfile = await getRes.json();
-          setProfile(data);
-        } else if (upsertRes.status === 404) {
-          setProfileError("请先在首页完成一次仓库分析");
-        }
+        setProfileError("同步失败，请刷新页面重试");
       }
 
-      // Also fetch stats
       const historyRes = await fetch("/api/history?page=1&page_size=1");
       if (historyRes.ok) {
         const historyData = await historyRes.json();
@@ -101,11 +110,20 @@ export default function AccountPage() {
     }
   }, [sessionProfile]);
 
+  // 监听登录状态：一旦 session 加载完成且有 login，立刻触发一次同步
   useEffect(() => {
-    if (status === "authenticated") {
+    console.log("[account] useEffect triggered:", {
+      status,
+      login: sessionProfile?.login,
+      syncedOnce,
+      profileLoading,
+      userId: sessionProfile?.sub,
+    });
+    if (status === "authenticated" && sessionProfile?.login && !syncedOnce && !profileLoading) {
+      console.log("[account] calling syncProfile...");
       syncProfile();
     }
-  }, [status, syncProfile]);
+  }, [status, sessionProfile, syncedOnce, profileLoading, syncProfile]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "未知";
@@ -116,25 +134,16 @@ export default function AccountPage() {
     });
   };
 
-  // Resolve avatar: use real profile data if available, fallback to session
   const avatarUrl =
     profile?.avatar_url ??
     sessionProfile?.image ??
     `https://github.com/${sessionProfile?.login}.png`;
 
   if (status === "loading" || profileLoading) {
-    return (
-      <div className="space-y-8 animate-pulse">
-        <div className="h-12 w-64 bg-white/5 rounded" />
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 h-96 bg-white/5 rounded-lg" />
-          <div className="lg:col-span-8 h-96 bg-white/5 rounded-lg" />
-        </div>
-      </div>
-    );
+    return <AccountSkeleton />;
   }
 
-  if (!session || !sessionProfile) {
+  if (status === "unauthenticated" || !sessionProfile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
         <AlertTriangle size={48} className="text-amber-400" />
@@ -177,12 +186,8 @@ export default function AccountPage() {
       className="space-y-12"
     >
       <div>
-        <h1 className="text-4xl font-black tracking-tight mb-2">
-          账户与订阅
-        </h1>
-        <p className="text-slate-400">
-          管理您的个人资料、订阅计划和系统配置
-        </p>
+        <h1 className="text-4xl font-black tracking-tight mb-2">账户与订阅</h1>
+        <p className="text-slate-400">管理您的个人资料、订阅计划和系统配置</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -198,11 +203,7 @@ export default function AccountPage() {
               />
             </div>
             <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-400 rounded-full border-4 border-[#10141a] flex items-center justify-center">
-              <Check
-                size={12}
-                className="text-[#002112]"
-                strokeWidth={3}
-              />
+              <Check size={12} className="text-[#002112]" strokeWidth={3} />
             </div>
           </div>
           <h2 className="text-2xl font-bold mb-1">
@@ -240,9 +241,7 @@ export default function AccountPage() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">加入日期</span>
-              <span className="font-medium">
-                {formatDate(displayProfile.created_at)}
-              </span>
+              <span className="font-medium">{formatDate(displayProfile.created_at)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">账户角色</span>
@@ -307,18 +306,13 @@ export default function AccountPage() {
               <div>
                 <div className="flex justify-between text-sm mb-2 font-mono">
                   <span>AI 扫描额度 (本月)</span>
-                  <span>
-                    {stats?.total_scans ?? 0} / 200
-                  </span>
+                  <span>{stats?.total_scans ?? 0} / 200</span>
                 </div>
                 <div className="h-2 w-full bg-[#31353c] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-blue-400 to-purple-400"
                     style={{
-                      width: `${Math.min(
-                        100,
-                        ((stats?.total_scans ?? 0) / 200) * 100
-                      )}%`,
+                      width: `${Math.min(100, ((stats?.total_scans ?? 0) / 200) * 100)}%`,
                     }}
                   />
                 </div>
@@ -328,27 +322,21 @@ export default function AccountPage() {
                   <p className="text-xs text-slate-500 mb-1">存储空间</p>
                   <p className="text-lg font-bold font-mono">
                     {((stats?.total_scans ?? 0) * 0.05).toFixed(1)} GB{" "}
-                    <span className="text-xs font-normal text-slate-600">
-                      / 10GB
-                    </span>
+                    <span className="text-xs font-normal text-slate-600">/ 10GB</span>
                   </p>
                 </div>
                 <div className="bg-[#0a0e14] p-4 rounded-sm border border-white/5">
                   <p className="text-xs text-slate-500 mb-1">分析次数</p>
                   <p className="text-lg font-bold font-mono">
                     {stats?.total_scans ?? 0}{" "}
-                    <span className="text-xs font-normal text-slate-600">
-                      / 不限
-                    </span>
+                    <span className="text-xs font-normal text-slate-600">/ 不限</span>
                   </p>
                 </div>
                 <div className="bg-[#0a0e14] p-4 rounded-sm border border-white/5">
                   <p className="text-xs text-slate-500 mb-1">平均健康分</p>
                   <p className="text-lg font-bold font-mono">
                     {stats?.avg_health_score ?? 0}
-                    <span className="text-xs font-normal text-slate-600">
-                      / 100
-                    </span>
+                    <span className="text-xs font-normal text-slate-600">/ 100</span>
                   </p>
                 </div>
               </div>
@@ -362,9 +350,7 @@ export default function AccountPage() {
               </div>
               <div className="flex-1">
                 <h4 className="font-bold mb-1">管理支付方式</h4>
-                <p className="text-xs text-slate-500">
-                  修改您的信用卡或 PayPal 信息
-                </p>
+                <p className="text-xs text-slate-500">修改您的信用卡或 PayPal 信息</p>
               </div>
               <ChevronRight
                 className="text-slate-600 group-hover:text-blue-400 transition-colors"
@@ -392,9 +378,7 @@ export default function AccountPage() {
         <GlassCard className="p-8 flex flex-col border-l-2 border-blue-400">
           <div className="flex items-center gap-2 mb-6 text-blue-400">
             <Settings size={18} />
-            <h3 className="font-bold uppercase tracking-wider text-sm">
-              基本设置
-            </h3>
+            <h3 className="font-bold uppercase tracking-wider text-sm">基本设置</h3>
           </div>
           <div className="space-y-6 flex-1">
             <div>
@@ -431,19 +415,13 @@ export default function AccountPage() {
         <GlassCard className="p-8 flex flex-col border-l-2 border-emerald-400">
           <div className="flex items-center gap-2 mb-6 text-emerald-400">
             <Key size={18} />
-            <h3 className="font-bold uppercase tracking-wider text-sm">
-              API 令牌
-            </h3>
+            <h3 className="font-bold uppercase tracking-wider text-sm">API 令牌</h3>
           </div>
           <div className="space-y-4 flex-1">
             <div className="p-3 bg-[#0a0e14] border border-white/5 rounded-sm">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-mono text-slate-500">
-                  PROD_KEY_01
-                </span>
-                <span className="text-[10px] text-emerald-400 font-bold">
-                  已激活
-                </span>
+                <span className="text-[10px] font-mono text-slate-500">PROD_KEY_01</span>
+                <span className="text-[10px] text-emerald-400 font-bold">已激活</span>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <code className="text-xs text-slate-300 font-mono">
@@ -467,9 +445,7 @@ export default function AccountPage() {
         <GlassCard className="p-8 flex flex-col border-l-2 border-purple-400">
           <div className="flex items-center gap-2 mb-6 text-purple-400">
             <ArrowUpRight size={18} />
-            <h3 className="font-bold uppercase tracking-wider text-sm">
-              方案管理
-            </h3>
+            <h3 className="font-bold uppercase tracking-wider text-sm">方案管理</h3>
           </div>
           <div className="flex-1 space-y-4">
             <div className="flex items-center gap-4 group cursor-pointer p-2 -mx-2 hover:bg-white/5 transition-colors rounded-sm">
@@ -481,9 +457,7 @@ export default function AccountPage() {
               </div>
               <div>
                 <p className="text-sm font-bold">升级到企业版</p>
-                <p className="text-[10px] text-slate-500">
-                  无限团队席位与私有化部署
-                </p>
+                <p className="text-[10px] text-slate-500">无限团队席位与私有化部署</p>
               </div>
             </div>
             <div className="flex items-center gap-4 group cursor-pointer p-2 -mx-2 hover:bg-white/5 transition-colors rounded-sm">
@@ -495,9 +469,7 @@ export default function AccountPage() {
               </div>
               <div>
                 <p className="text-sm font-bold">降级到基础版</p>
-                <p className="text-[10px] text-slate-500">
-                  仅保留基础扫描与历史记录
-                </p>
+                <p className="text-[10px] text-slate-500">仅保留基础扫描与历史记录</p>
               </div>
             </div>
           </div>

@@ -77,6 +77,21 @@ def save_analysis(
     result_data: dict,
 ) -> SaveAnalysisResponse:
     """保存一次分析结果，返回新记录的 id。"""
+    # 先找 user uuid（users.id 是 UUID，而 analysis_history.user_id 需要 UUID）
+    user_row = (
+        sb.table("users")
+        .select("id")
+        .eq("auth_user_id", auth_user_id)
+        .maybe_single()
+        .execute()
+    )
+    if user_row is None:
+        raise ValueError(f"User not found for auth_user_id: {auth_user_id}")
+    row = user_row.data
+    if not row or not row.get("id"):
+        raise ValueError(f"User not found for auth_user_id: {auth_user_id}")
+    user_uuid = row["id"]
+
     metrics = _derive_history_metrics(result_data)
 
     # 从 repo_url 提取 repo_name（"owner/repo"）
@@ -84,7 +99,7 @@ def save_analysis(
 
     sb.table("analysis_history").insert(
         {
-            "user_id": auth_user_id,
+            "user_id": user_uuid,
             "repo_url": repo_url,
             "repo_name": repo_name,
             "branch": branch,
@@ -101,7 +116,7 @@ def save_analysis(
     fetched = (
         sb.table("analysis_history")
         .select("id, created_at")
-        .eq("user_id", auth_user_id)
+        .eq("user_id", user_uuid)
         .order("created_at", desc=True)
         .limit(1)
         .maybe_single()
@@ -123,7 +138,7 @@ def get_history(
     """分页查询用户的分析历史。"""
     offset = (page - 1) * page_size
 
-    # 先找 user uuid
+    # 先找 user uuid（users.id 是 UUID，而 analysis_history.user_id 需要 UUID）
     user_row = (
         sb.table("users")
         .select("id")
@@ -131,7 +146,7 @@ def get_history(
         .maybe_single()
         .execute()
     )
-    if not user_row:
+    if user_row is None:
         return HistoryListResponse(
             items=[],
             total=0,
@@ -139,7 +154,16 @@ def get_history(
             page_size=page_size,
             stats=HistoryStats(total_scans=0, avg_health_score=0, high_risk_count=0, medium_risk_count=0),
         )
-    user_uuid = user_row.data["id"]
+    row = user_row.data
+    if not row or not row.get("id"):
+        return HistoryListResponse(
+            items=[],
+            total=0,
+            page=page,
+            page_size=page_size,
+            stats=HistoryStats(total_scans=0, avg_health_score=0, high_risk_count=0, medium_risk_count=0),
+        )
+    user_uuid = row["id"]
 
     # 查询历史
     query = (
@@ -219,9 +243,12 @@ def delete_analysis(sb: Client, auth_user_id: str, history_id: str) -> bool:
         .maybe_single()
         .execute()
     )
-    if not user_row:
+    if user_row is None:
         return False
-    user_uuid = user_row.data["id"]
+    row = user_row.data
+    if not row or not row.get("id"):
+        return False
+    user_uuid = row["id"]
 
     sb.table("analysis_history").delete().eq("id", history_id).eq("user_id", user_uuid).execute()
     return True
@@ -274,9 +301,11 @@ def get_user_profile(sb: Client, auth_user_id: str) -> Optional[UserProfile]:
         .maybe_single()
         .execute()
     )
-    if not data:
+    if data is None:
         return None
     r = data.data
+    if not r or not isinstance(r, dict):
+        return None
     return UserProfile(
         id=r["id"],
         auth_user_id=r["auth_user_id"],
@@ -299,11 +328,16 @@ def get_user_profile(sb: Client, auth_user_id: str) -> Optional[UserProfile]:
 
 def get_user_uuid(sb: Client, auth_user_id: str) -> Optional[str]:
     """根据 auth_user_id 查找用户的 uuid。"""
-    data = (
+    resp = (
         sb.table("users")
         .select("id")
         .eq("auth_user_id", auth_user_id)
         .maybe_single()
         .execute()
     )
-    return data.data["id"] if data else None
+    if resp is None:
+        return None
+    row = resp.data
+    if not row or not isinstance(row, dict):
+        return None
+    return row.get("id")

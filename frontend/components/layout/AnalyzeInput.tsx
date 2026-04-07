@@ -1,30 +1,38 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Search, Zap, Loader2 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { analyzeRepo } from "@/lib/api";
 
 export const AnalyzeInput = ({ userId }: { userId: string }) => {
+  const router = useRouter();
+  const { data: session } = useSession();
   const [localRepoUrl, setLocalRepoUrl] = useState("https://github.com/xecho-dev/test.git");
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const error = useAppStore((s) => s.error);
 
   const handleAnalyze = useCallback(async () => {
-      const store = useAppStore.getState();
-      if (!localRepoUrl.trim()) {
-        store.setError("请输入仓库地址");
-        return;
-      }
-      const repoUrl = localRepoUrl;
+    // 未登录重定向到登录页
+    if (!session?.user) {
+      router.push("/login");
+      return;
+    }
 
-      // 清空上一次的分析结果
-      store.reset();
-      store.setError(null);
-      store.setIsAnalyzing(true);
-      store.setRepoUrl(repoUrl);
+    const store = useAppStore.getState();
+    if (!localRepoUrl.trim()) {
+      store.setError("请输入仓库地址");
+      return;
+    }
+    const repoUrl = localRepoUrl;
 
-
+    // 清空上一次的分析结果
+    store.reset();
+    store.setError(null);
+    store.setIsAnalyzing(true);
+    store.setRepoUrl(repoUrl);
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,7 +57,7 @@ export const AnalyzeInput = ({ userId }: { userId: string }) => {
       store.setIsAnalyzing(false);
       store.setActiveAgent(null);
     }
-  }, [localRepoUrl, userId]);
+  }, [localRepoUrl, userId, session, router]);
 
   return (
     <div className="max-w-3xl mx-auto mt-8 space-y-2">

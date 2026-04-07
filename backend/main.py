@@ -1,11 +1,13 @@
 from services.pdf_service import build_pdf_bytes
 
 import io
+import json
 import os
 import logging
 from contextlib import asynccontextmanager
 
 from pydantic import BaseModel
+from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -91,23 +93,78 @@ async def health():
 
 @app.post("/api/analyze")
 async def analyze(req: AnalyzeRequest, request: Request):
-    """分析仓库 - SSE 流式响应（需要登录）"""
+    """分析仓库 - SSE 流式响应（需要登录）。分析完成后自动保存到数据库。"""
     import logging
     logger = logging.getLogger("gitintel")
 
     logger.info(f"[/api/analyze] 收到请求: repo_url={req.repo_url}, branch={req.branch}")
 
     user = require_auth(request)
-    logger.info(f"[/api/analyze] 认证通过: user_id={user.get('sub') or user.get('id')}")
+    auth_user_id = user.get("sub") or user.get("id") or ""
+    logger.info(f"[/api/analyze] 认证通过: auth_user_id={auth_user_id}")
 
     async def event_stream():
+        collected_events: list[dict] = []
+
+        def collect(event_str: str) -> str:
+            """解析并收集 result 类型的事件"""
+            if event_str.startswith("data: "):
+                data = event_str[6:].strip()
+                if data and data != "[DONE]":
+                    try:
+                        parsed = json.loads(data)
+                        if isinstance(parsed, dict) and parsed.get("type") == "result" and parsed.get("agent"):
+                            collected_events.append(parsed)
+                    except Exception:
+                        pass
+            return event_str
+
         try:
             async for event in stream_analysis_sse(req.repo_url, req.branch):
-                yield event
+                yield collect(event)
         except Exception as e:
             logger.error(f"[/api/analyze] stream 异常: {type(e).__name__}: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
             yield "data: [DONE]\n\n"
+
+        # SSE 结束，收集完毕，保存到数据库
+        if not collected_events:
+            logger.warning(f"[/api/analyze] 无 result 事件，跳过保存")
+            return
+
+        # 聚合 result_data
+        result_data: dict[str, Any] = {}
+        for evt in collected_events:
+            agent = evt.get("agent", "")
+            data = evt.get("data")
+            if agent and data:
+                result_data[agent] = data
+
+        if not result_data:
+            logger.warning(f"[/api/analyze] result_data 为空，跳过保存")
+            return
+
+        logger.info(f"[/api/analyze] 分析完成，准备保存 history，agents={list(result_data.keys())}")
+
+        try:
+            sb = get_supabase_admin()
+        except RuntimeError as e:
+            logger.error(f"[/api/analyze] Supabase 连接失败: {e}")
+            return
+
+        # save_analysis 第一个参数必须是 NextAuth 的 auth_user_id（sub），不是 users 表的主键 id
+        if not get_user_uuid(sb, auth_user_id):
+            logger.warning(
+                f"[/api/analyze] users 表中无 auth_user_id={auth_user_id}，跳过保存。"
+                "请先访问账户页完成 GitHub 资料同步。"
+            )
+            return
+
+        try:
+            saved = save_analysis(sb, auth_user_id, req.repo_url, req.branch, result_data)
+            logger.info(f"[/api/analyze] 历史记录保存成功: id={saved.id}")
+        except Exception as e:
+            logger.error(f"[/api/analyze] 保存历史记录失败: {type(e).__name__}: {e}")
 
     return StreamingResponse(
         event_stream(),
@@ -156,12 +213,13 @@ async def api_save_analysis(req: SaveAnalysisRequest, request: Request):
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # 确保用户 uuid 存在
-    user_uuid = get_user_uuid(sb, auth_user_id)
-    if not user_uuid:
-        raise HTTPException(status_code=404, detail="用户不存在，请先同步用户信息")
+    if not get_user_uuid(sb, auth_user_id):
+        raise HTTPException(
+            status_code=404,
+            detail="用户资料未同步，请先在账户中心完成 GitHub 资料同步后再保存。",
+        )
 
-    result = save_analysis(sb, user_uuid, req.repo_url, req.branch, req.result_data)
+    result = save_analysis(sb, auth_user_id, req.repo_url, req.branch, req.result_data)
     return {"id": result.id, "created_at": result.created_at}
 
 
