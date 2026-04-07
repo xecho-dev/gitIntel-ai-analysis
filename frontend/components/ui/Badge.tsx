@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-type BadgeVariant = "primary" | "secondary" | "tertiary" | "error" | "outline";
+type BadgeVariant = "primary" | "secondary" | "tertiary" | "destructive" | "outline";
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -12,7 +12,7 @@ const variants: Record<BadgeVariant, string> = {
   primary: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   secondary: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   tertiary: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  error: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+  destructive: "bg-rose-500/10 text-rose-400 border-rose-500/20",
   outline: "border-white/10 text-slate-400",
 };
 

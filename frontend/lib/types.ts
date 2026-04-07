@@ -26,44 +26,86 @@ export interface AgentEvent {
 
 // --- 分析结果类型 ---
 
+// ArchitectureAgent 输出
 export interface ArchitectureResult {
   complexity: "Low" | "Medium" | "High";
   components: number;
   techStack: string[];
   maintainability: string;
+  architectureStyle?: string;
+  keyPatterns?: string[];
+  hotSpots?: string[];
+  summary?: string;
+  llmPowered?: boolean;
 }
 
+// QualityAgent 输出
 export interface QualityResult {
   healthScore: number;
   testCoverage: number;
-  complexity: "Low" | "Normal" | "High";
+  complexity: "Low" | "Medium" | "High";
+  maintainability?: string;
+  duplication?: {
+    score: number;
+    duplication_level: "Low" | "Medium" | "High";
+  };
+  pythonMetrics?: {
+    totalFunctions: number;
+    overComplexityCount: number;
+    avgComplexity: number;
+  };
+  // LLM 五维评分
+  maintScore?: number;
+  compScore?: number;
+  dupScore?: number;
+  testScore?: number;
+  coupScore?: number;
+  llmPowered?: boolean;
 }
 
+// DependencyAgent 输出
 export interface DependencyResult {
   total: number;
   scanned: number;
   high: number;
   medium: number;
   low: number;
+  riskLevel: "low" | "medium" | "high" | "unknown";
+  deps?: Array<{
+    name: string;
+    version?: string;
+    risk?: string;
+    riskLevel?: string;
+  }>;
 }
 
 export interface Suggestion {
   id: number;
-  type: "performance" | "refactor" | "security";
+  type: "performance" | "refactor" | "security" | "general";
   title: string;
   description: string;
   priority: "high" | "medium" | "low";
+  category?: string;
+  source?: string;
 }
 
 export interface OptimizationResult {
   suggestions: Suggestion[];
+  total: number;
+  high_priority?: number;
+  medium_priority?: number;
+  low_priority?: number;
 }
 
 export interface AnalysisResult {
-  architecture: ArchitectureResult;
+  repoLoader?: Record<string, unknown>;
+  codeParser?: Record<string, unknown>;
+  techStack?: Record<string, unknown>;
   quality: QualityResult;
   dependency: DependencyResult;
-  optimization: OptimizationResult;
+  architecture: ArchitectureResult;
+  suggestion: OptimizationResult;
+  suggestions?: Suggestion[];
 }
 
 // --- 历史记录类型 ---

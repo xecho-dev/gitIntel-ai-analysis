@@ -5,6 +5,37 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 10141a;
+    --foreground: dfe2eb;
+    --card: 10141a;
+    --card-foreground: dfe2eb;
+    --popover: 10141a;
+    --popover-foreground: dfe2eb;
+    --primary: 59 130 246;
+    --primary-foreground: 255 255 255;
+    --secondary: 16 185 129;
+    --secondary-foreground: 255 255 255;
+    --muted: 4a5568;
+    --muted-foreground: 9 ca3af;
+    --accent: 16 185 129;
+    --accent-foreground: 255 255 255;
+    --destructive: 244 63 94;
+    --destructive-foreground: 255 255 255;
+    --border: 42a2f3a;
+    --input: 42a2f3a;
+    --ring: 59 130 246;
+    --radius: 0.5rem;
+    --chart-1: 59 130 246;
+    --chart-2: 16 185 129;
+    --chart-3: 168 85 247;
+    --chart-4: 244 63 94;
+    --chart-5: 251 191 36;
+  }
+
+  * {
+    @apply border-border;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);

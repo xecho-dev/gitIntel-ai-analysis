@@ -13,11 +13,17 @@ import {
   Code2,
   Trash2,
   Loader2,
+  GitBranch,
+  ExternalLink,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
-import type { HistoryItem, HistoryStats, HistoryListResponse } from "@/lib/types";
+import type { HistoryItem, HistoryStats, HistoryListResponse, AnalysisResult } from "@/lib/types";
 
 const PAGE_SIZE = 20;
 
@@ -51,6 +57,227 @@ function healthLabel(score: number | null): string {
   return `危 (${score}%)`;
 }
 
+// ─── Detail Modal ───────────────────────────────────────────────
+
+interface DetailModalProps {
+  item: HistoryItem;
+  onClose: () => void;
+}
+
+function DetailModal({ item, onClose }: DetailModalProps) {
+  const result = item.result_data;
+  const repoUrl = item.repo_url;
+  const branch = item.branch;
+
+  return (
+    <Modal open onClose={onClose} title={`分析详情 · ${item.repo_name}`}>
+      <div className="space-y-6">
+        {/* Repo Info */}
+        <div className="flex items-center gap-3 p-4 rounded-lg bg-[#0a0e14] border border-white/5">
+          <Code2 className="text-blue-400" size={20} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-[#dfe2eb] truncate">{item.repo_name}</p>
+            <p className="text-xs text-slate-500 truncate">{repoUrl}</p>
+          </div>
+          {branch && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-[#31353c] text-xs text-slate-300 border border-white/5">
+              <GitBranch size={12} />
+              {branch}
+            </div>
+          )}
+          <a
+            href={repoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            title="在 GitHub 查看"
+          >
+            <ExternalLink size={14} />
+          </a>
+        </div>
+
+        {/* Scores Summary */}
+        <div className="grid grid-cols-3 gap-3">
+          <ScoreCard
+            label="架构健康度"
+            value={item.health_score}
+            suffix="%"
+            icon={<TrendingUp size={14} />}
+            color={item.health_score !== null && item.health_score >= 85 ? "emerald" : item.health_score !== null && item.health_score >= 60 ? "slate" : "rose"}
+          />
+          <ScoreCard label="风险等级" value={item.risk_level ?? "—"} icon={<ShieldAlert size={14} />} />
+          <ScoreCard label="分析时间" value={formatDate(item.created_at)} />
+        </div>
+
+        {/* No Result Data */}
+        {!result && (
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <History size={40} className="text-slate-600" />
+            <p className="text-slate-400">该记录未保存完整分析结果</p>
+          </div>
+        )}
+
+        {/* Architecture */}
+        {result?.architecture && (
+          <DetailSection title="架构分析">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <DetailRow label="复杂度" value={result.architecture.complexity} />
+              <DetailRow label="组件数量" value={result.architecture.components} />
+              <DetailRow label="架构风格" value={result.architecture.architectureStyle} />
+              <DetailRow label="可维护性" value={result.architecture.maintainability} />
+            </div>
+            {result.architecture.techStack?.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-slate-500 mb-2">技术栈</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {result.architecture.techStack.map((t) => (
+                    <Badge key={t} variant="primary">{t}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {result.architecture.summary && (
+              <p className="mt-3 text-xs text-slate-400 leading-relaxed">{result.architecture.summary}</p>
+            )}
+          </DetailSection>
+        )}
+
+        {/* Quality */}
+        {result?.quality && (
+          <DetailSection title="代码质量">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <DetailRow label="健康分" value={result.quality.healthScore} suffix=" / 100" />
+              <DetailRow label="测试覆盖率" value={result.quality.testCoverage} suffix="%" />
+              <DetailRow label="复杂度" value={result.quality.complexity} />
+              <DetailRow label="可维护性" value={result.quality.maintainability} />
+            </div>
+          </DetailSection>
+        )}
+
+        {/* Dependency */}
+        {result?.dependency && (
+          <DetailSection title="依赖风险">
+            <div className="flex items-center gap-6 text-sm">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-rose-400">{result.dependency.high}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">高风险</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-purple-400">{result.dependency.medium}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">中风险</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-emerald-400">{result.dependency.low}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">低风险</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-slate-300">{result.dependency.total}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">总依赖</p>
+              </div>
+            </div>
+            {result.dependency.deps?.slice(0, 5).map((dep: { name: string; version?: string; risk?: string; riskLevel?: string }) => (
+              <div key={dep.name} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                <span className="text-xs font-mono text-slate-300">{dep.name}</span>
+                <div className="flex items-center gap-2">
+                  {dep.risk && (
+                    <Badge variant={dep.riskLevel === "high" ? "destructive" : dep.riskLevel === "medium" ? "secondary" : "outline"}>
+                      {dep.risk}
+                    </Badge>
+                  )}
+                  {dep.version && <span className="text-xs text-slate-500">{dep.version}</span>}
+                </div>
+              </div>
+            ))}
+          </DetailSection>
+        )}
+
+        {/* Suggestions */}
+        {(() => {
+          const suggestions = result?.suggestion?.suggestions ?? result?.suggestions ?? [];
+          if (suggestions.length === 0) return null;
+          return (
+            <DetailSection title="优化建议">
+              <div className="space-y-3">
+                {suggestions.map((s: { id: number; priority: string; title: string; description: string; category?: string; source?: string }) => (
+                <div key={s.id} className="p-3 rounded-lg bg-[#0a0e14] border border-white/5">
+                  <div className="flex items-start gap-2">
+                    <div className="mt-0.5">
+                      {s.priority === "high" ? (
+                        <XCircle size={14} className="text-rose-400" />
+                      ) : s.priority === "medium" ? (
+                        <AlertTriangle size={14} className="text-purple-400" />
+                      ) : (
+                        <CheckCircle size={14} className="text-emerald-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-[#dfe2eb]">{s.title}</p>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">{s.description}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant={s.priority === "high" ? "destructive" : s.priority === "medium" ? "secondary" : "outline"} className="text-[10px]">
+                          {s.priority}
+                        </Badge>
+                        {s.category && <span className="text-[10px] text-slate-500">{s.category}</span>}
+                        {s.source && <span className="text-[10px] text-slate-500">{s.source}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </DetailSection>
+          );
+        })()}
+      </div>
+    </Modal>
+  );
+}
+
+function ScoreCard({ label, value, suffix = "", icon, color = "blue" }: {
+  label: string;
+  value: string | number | null;
+  suffix?: string;
+  icon?: React.ReactNode;
+  color?: "blue" | "emerald" | "rose" | "purple" | "slate";
+}) {
+  const colorMap: Record<string, string> = {
+    blue: "text-blue-400",
+    emerald: "text-emerald-400",
+    rose: "text-rose-400",
+    purple: "text-purple-400",
+    slate: "text-slate-300",
+  };
+  return (
+    <div className="flex flex-col gap-1 p-3 rounded-lg bg-[#0a0e14] border border-white/5">
+      <span className="text-[10px] text-slate-500 uppercase tracking-widest">{label}</span>
+      <div className="flex items-center gap-1.5">
+        {icon && <span className={colorMap[color]}>{icon}</span>}
+        <span className={`text-lg font-bold ${colorMap[color]}`}>
+          {value ?? "—"}{suffix && value !== "—" ? suffix : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 border-b border-white/5 pb-2">{title}</h4>
+      {children}
+    </div>
+  );
+}
+
+function DetailRow({ label, value, suffix }: { label: string; value: string | number | null | undefined; suffix?: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-sm font-medium text-[#dfe2eb]">{value ?? "—"}{suffix ?? ""}</span>
+    </div>
+  );
+}
+
 export default function HistoryPage() {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState<HistoryStats | null>(null);
@@ -60,6 +287,8 @@ export default function HistoryPage() {
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<HistoryItem | null>(null);
+  const [detailItem, setDetailItem] = useState<HistoryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchHistory = useCallback(
@@ -90,7 +319,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetchHistory(1, search);
-  }, [fetchHistory, search]);
+  }, [search]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,9 +327,11 @@ export default function HistoryPage() {
     setPage(1);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("确定要删除这条记录吗？")) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
     setDeletingId(id);
+    setDeleteTarget(null);
     try {
       const res = await fetch(`/api/history/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("删除失败");
@@ -346,11 +577,14 @@ export default function HistoryPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <button className="px-4 py-2 bg-[#31353c] hover:bg-blue-500/20 hover:text-blue-400 transition-all text-xs font-bold uppercase tracking-widest rounded-sm border border-white/5">
+                  <button
+                    onClick={() => setDetailItem(item)}
+                    className="px-4 py-2 bg-[#31353c] hover:bg-blue-500/20 hover:text-blue-400 transition-all text-xs font-bold uppercase tracking-widest rounded-sm border border-white/5"
+                  >
                     查看详情
                   </button>
                   <button
-                    onClick={() => handleDelete(item.id)}
+                    onClick={() => setDeleteTarget(item)}
                     disabled={deletingId === item.id}
                     className="p-2 bg-[#31353c] hover:bg-rose-500/20 hover:text-rose-400 transition-all text-[#dfe2eb] rounded-sm border border-white/5 disabled:opacity-50"
                     title="删除"
@@ -420,6 +654,49 @@ export default function HistoryPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <Modal
+          open
+          onClose={() => setDeleteTarget(null)}
+          title="删除分析记录"
+          description={`确定要删除 "${deleteTarget.repo_name}" 的分析记录吗？此操作不可撤销。`}
+        >
+          <div className="flex flex-col gap-6">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-rose-500/10 border border-rose-500/20">
+              <AlertTriangle className="text-rose-400 shrink-0 mt-0.5" size={18} />
+              <div>
+                <p className="text-sm text-rose-300">此操作不可撤销</p>
+                <p className="text-xs text-rose-400/60 mt-1">
+                  删除后，与该记录关联的分析数据将永久消失。
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-5 py-2 rounded-sm border border-white/10 text-slate-300 hover:bg-white/5 transition-all text-sm font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={!!deletingId}
+                className="px-5 py-2 rounded-sm bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:bg-rose-500/30 transition-all text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+              >
+                {deletingId ? <Loader2 size={14} className="animate-spin" /> : null}
+                确认删除
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Detail Modal */}
+      {detailItem && (
+        <DetailModal item={detailItem} onClose={() => setDetailItem(null)} />
       )}
     </motion.div>
   );
