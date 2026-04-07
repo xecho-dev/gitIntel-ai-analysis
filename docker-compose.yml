@@ -27,7 +27,6 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      # NextAuth v5 运行时变量（服务端读取，不 bake 进 bundle）
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
     networks:
