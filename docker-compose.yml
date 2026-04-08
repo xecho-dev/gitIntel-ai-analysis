@@ -49,9 +49,7 @@ services:
       - "8000:8000"
     # 读取 backend/.env 中的变量（包含 API keys）
     env_file:
-      - path: ./backend/.env
-        # 如果 backend/.env 不存在则忽略，不报错
-        required: false
+      - ./backend/.env
     environment:
       # 运行时额外变量（可覆盖或补充 .env）
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
