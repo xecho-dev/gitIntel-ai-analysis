@@ -38,7 +38,10 @@ class DependencyAgent(BaseAgent):
                 for p, c in file_contents.items()
                 if self._is_dep_file(p)
             ]
-            _logger.info(f"[DependencyAgent] 内存模式: {len(dep_files)} 个依赖文件 (from {len(file_contents)} total)")
+            dep_names = [os.path.basename(p) for p in file_contents]
+            _logger.info(f"[DependencyAgent] 内存模式: {len(file_contents)} 个文件传入，已过滤到 {len(dep_files)} 个依赖文件")
+            _logger.debug(f"[DependencyAgent] 所有文件 basename: {dep_names}")
+            _logger.debug(f"[DependencyAgent] 通过 _is_dep_file 的文件: {[d['name'] for d in dep_files]}")
         else:
             dep_files = await self._find_dep_files(repo_path)
             _logger.info(f"[DependencyAgent] 本地模式: {len(dep_files)} 个依赖文件")
@@ -92,22 +95,34 @@ class DependencyAgent(BaseAgent):
         name = os.path.basename(path)
         types = {
             "package.json": "npm", "package-lock.json": "npm",
-            "requirements.txt": "pip", "Pipfile": "pipenv",
-            "pyproject.toml": "poetry", "go.mod": "go",
+            "pnpm-lock.yaml": "npm", "yarn.lock": "npm",
+            "requirements.txt": "pip", "requirements-dev.txt": "pip",
+            "Pipfile": "pipenv", "pyproject.toml": "poetry",
+            "poetry.lock": "poetry", "go.mod": "go", "go.sum": "go",
             "Cargo.toml": "cargo", "Gemfile": "bundler",
             "composer.json": "composer", "pom.xml": "maven",
-            "build.gradle": "gradle",
+            "build.gradle": "gradle", "bun.lockb": "bun",
         }
         return types.get(name, "unknown")
 
     @staticmethod
+    @staticmethod
     def _is_dep_file(path: str) -> bool:
-        """判断路径是否指向依赖配置文件。"""
+        """判断路径是否指向依赖配置文件（排除 lock 文件和第三方依赖目录）。"""
         name = os.path.basename(path)
+        # lock 文件不解析（太大），只解析 manifest 文件
+        if name in {
+            "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+            "poetry.lock", "go.sum", "bun.lockb",
+        }:
+            return False
         return name in {
-            "package.json", "requirements.txt", "requirements-dev.txt",
-            "Pipfile", "pyproject.toml", "go.mod", "Cargo.toml",
-            "Gemfile", "composer.json", "pom.xml", "build.gradle",
+            "package.json",
+            "requirements.txt", "requirements-dev.txt",
+            "Pipfile", "pyproject.toml",
+            "go.mod", "Cargo.toml",
+            "Gemfile", "composer.json",
+            "pom.xml", "build.gradle",
         }
 
     @staticmethod
@@ -115,15 +130,22 @@ class DependencyAgent(BaseAgent):
         """返回 {name, path} 列表，列出所有依赖配置文件。"""
         DEP_FILES = {
             "package.json": "npm",
+            "pnpm-lock.yaml": "npm",
+            "yarn.lock": "npm",
+            "package-lock.json": "npm",
             "requirements.txt": "pip",
+            "requirements-dev.txt": "pip",
             "Pipfile": "pipenv",
             "pyproject.toml": "poetry",
+            "poetry.lock": "poetry",
             "go.mod": "go",
+            "go.sum": "go",
             "Cargo.toml": "cargo",
             "Gemfile": "bundler",
             "composer.json": "composer",
             "pom.xml": "maven",
             "build.gradle": "gradle",
+            "bun.lockb": "bun",
         }
 
         def _do() -> list[dict]:
@@ -146,29 +168,30 @@ class DependencyAgent(BaseAgent):
 
     @staticmethod
     async def _parse_all_deps(files: list[dict]) -> list[dict]:
-        """解析所有依赖文件，返回依赖项列表。"""
+        """解析所有依赖文件，返回依赖项列表。files 中的 content 为 GitHub 传来的文件内容。"""
         all_deps: list[dict] = []
 
         for info in files:
             try:
-                deps = DependencyAgent._parse_file(info["path"], info.get("type", "unknown"))
+                deps = DependencyAgent._parse_content(
+                    info.get("content", ""),
+                    info.get("type", "unknown"),
+                    info.get("name", os.path.basename(info.get("path", ""))),
+                )
                 all_deps.extend(deps)
-            except Exception:
-                pass
+                _logger.debug(f"[DependencyAgent] 解析 {info.get('name')}: 获得 {len(deps)} 个依赖")
+            except Exception as e:
+                _logger.warning(f"[DependencyAgent] 解析 {info.get('name')} 失败: {e}")
 
         return all_deps
 
     @staticmethod
-    def _parse_file(path: str, dep_type: str) -> list[dict]:
-        """解析单个依赖文件。"""
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-        except UnicodeDecodeError:
-            with open(path, "r", encoding="latin-1") as f:
-                content = f.read()
-
+    def _parse_content(content: str, dep_type: str, file_name: str) -> list[dict]:
+        """解析依赖文件内容，返回依赖项列表。"""
         deps: list[dict] = []
+
+        if not content:
+            return deps
 
         if dep_type == "npm":
             try:
@@ -194,6 +217,23 @@ class DependencyAgent(BaseAgent):
                     ver = re.split(r"[=<>!~]", line)[-1].strip()
                     deps.append({"name": name, "version": ver, "type": "dependencies", "manager": "pip"})
 
+        elif dep_type == "poetry":
+            try:
+                data = json.loads(content)
+                for section in ["dependencies", "dev-dependencies"]:
+                    raw = data.get("tool", {}).get("poetry", {}).get(section, {})
+                    for name, spec in raw.items():
+                        ver = spec if isinstance(spec, str) else (spec.get("version", "*") if isinstance(spec, dict) else "*")
+                        deps.append({"name": name, "version": ver, "type": section, "manager": "poetry"})
+            except (json.JSONDecodeError, KeyError, TypeError):
+                # TOML 格式兜底
+                for line in content.splitlines():
+                    line = line.strip()
+                    if line.startswith("[") and "dependencies" in line.lower():
+                        continue
+                    m = re.match(r"^([a-zA-Z0-9_\-\.]+)\s*=\s*[\"\']([^\"\']+)[\"\']", line)
+                    if m:
+                        deps.append({"name": m.group(1), "version": m.group(2), "type": "dependencies", "manager": "poetry"})
         elif dep_type == "pipenv":
             section = ""
             for line in content.splitlines():

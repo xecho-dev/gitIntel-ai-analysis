@@ -80,14 +80,18 @@ REPO_LOADER_SYSTEM = """{system_context}
 
 REPO_LOADER_INITIAL_HUMAN = """仓库: {repo_path}
 
-请分析以下文件树，决策每个文件的优先级（最多返回 100 个文件路径）：
+【依赖配置文件识别规则】（以下 manifest 文件必须全部纳入 P0；lock 文件由系统自动排除）：
+package.json, requirements.txt, requirements-dev.txt, Pipfile, pyproject.toml,
+go.mod, Cargo.toml, Gemfile, composer.json, pom.xml, build.gradle
+
+请分析以下文件树，决策每个文件的优先级：
 
 文件树（共 {total_files} 个文件/目录）:
 {tree_list}
 
 请将文件分为：
-- 必须加载（P0）：入口文件、配置文件、核心源码
-- 值得加载（P1）：重要源码
+- 必须加载（P0）：上述依赖配置文件 + 入口文件 + 核心业务逻辑源码
+- 值得加载（P1）：重要源码文件
 - 可跳过（P2）：其他文件
 
 返回格式（必须是合法的 JSON 对象，不要用 markdown 包裹）：

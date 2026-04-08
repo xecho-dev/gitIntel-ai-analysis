@@ -1242,38 +1242,17 @@ async def _stream_analysis_impl(
             })
 
     # ── Step 7: 加载依赖配置文件（供 DependencyAgent 使用）──────────
-    # 只加载项目根目录或 src/ 下的依赖文件，排除 node_modules/ 等第三方依赖目录
-    dep_file_names = {
-        "package.json", "requirements.txt", "requirements-dev.txt",
-        "Pipfile", "pyproject.toml", "go.mod", "Cargo.toml",
-        "Gemfile", "composer.json", "pom.xml", "build.gradle",
-    }
-    EXCLUDED_DEP_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv",
-                          "dist", "build", ".next", ".nuxt", "target", "site-packages"}
-    dep_files_to_load = [
-        f for f in (classified or [])
-        if os.path.basename(f.get("path", "")) in dep_file_names
-        and not any(part in EXCLUDED_DEP_DIRS for part in f.get("path", "").split(os.sep))
-    ]
-    dep_file_contents: dict[str, str] = {}
-    if dep_files_to_load:
-        logger.info(f"[dependency_preload] 找到 {len(dep_files_to_load)} 个依赖文件")
-        try:
-            dep_file_contents = await _run_with_timeout(
-                loader.phase_load_priority(owner, repo, sha, dep_files_to_load),
-                timeout=PHASE_TIMEOUT,
-                error_msg="依赖文件加载超时"
-            )
-            logger.info(f"[dependency_preload] 加载完成: {list(dep_file_contents.keys())}")
-        except Exception as e:
-            logger.error(f"[dependency_preload] 加载失败: {e}")
+    # 依赖文件的加载由 DependencyAgent 自己通过 _is_dep_file() 过滤。
+    # 此处将所有已加载文件（p0 + p1 + 条件加载的 p2）直接合并传给 DependencyAgent，
+    # 确保不因硬编码文件名而遗漏任何依赖配置文件（如 pnpm-lock.yaml、yarn.lock 等）。
+    dep_all_contents = {**p0_contents, **p1_contents, **p2_contents}
 
     # ── Step 8: tech_stack + quality + dependency 并行执行 ─────────
     tech_agent = TechStackAgent()
     quality_agent = QualityAgent()
     dependency_agent = DependencyAgent()
 
-    logger.info(f"[parallel_agents] 启动 tech_stack + quality + dependency，文件数={len(all_loaded)}, 依赖文件数={len(dep_file_contents)}")
+    logger.info(f"[parallel_agents] 启动 tech_stack + quality + dependency，文件数={len(all_loaded)}, 依赖文件数={len(dep_all_contents)}")
     yield format_sse_event({
         "type": "status",
         "agent": "tech_stack",
@@ -1296,8 +1275,6 @@ async def _stream_analysis_impl(
         "data": None,
     })
 
-    # 并行执行三个 Agent；dependency 需要包含显式加载的依赖配置文件
-    dep_all_contents = {**all_loaded, **dep_file_contents}
     tech_task = tech_agent.run(repo, branch, file_contents=all_loaded)
     quality_task = quality_agent.run(repo, branch, file_contents=all_loaded)
     dependency_task = dependency_agent.run(repo, branch, file_contents=dep_all_contents)
