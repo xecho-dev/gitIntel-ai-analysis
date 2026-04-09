@@ -23,7 +23,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
-import type { HistoryItem, HistoryStats, HistoryListResponse, AnalysisResult } from "@/lib/types";
+import type { HistoryItem, HistoryStats, HistoryListResponse } from "@/lib/types";
 
 const PAGE_SIZE = 20;
 
@@ -317,9 +317,12 @@ export default function HistoryPage() {
     []
   );
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     fetchHistory(1, search);
+    // 故意只监听 search，初始化和分页在 useCallback 中处理
   }, [search]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
