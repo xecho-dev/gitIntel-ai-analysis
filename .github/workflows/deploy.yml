@@ -203,7 +203,7 @@ jobs:
 
           # 复制 docker-compose.yml（如果不存在则创建）
           if [ ! -f docker-compose.yml ]; then
-            cat > docker-compose.yml << 'COMPOSE'
+            cat > docker-compose.yml << 'DOCKERCOMPOSE'
             services:
               frontend:
                 image: ${FRONTEND_IMAGE}
@@ -247,7 +247,7 @@ jobs:
             networks:
               gitintel-net:
                 driver: bridge
-            COMPOSE
+            DOCKERCOMPOSE
           fi
 
           # 登录镜像仓库
