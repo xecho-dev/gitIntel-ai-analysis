@@ -177,7 +177,7 @@ jobs:
       # --- 执行远程部署脚本 ---
       - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'DEPLOY_SCRIPT'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << DEPLOY_SCRIPT
           set -e
 
           echo "========== 开始部署 GitIntel =========="
