@@ -19,7 +19,7 @@
 
 | 配置项 | 要求 |
 |--------|------|
-| 操作系统 | Ubuntu 22.04 LTS / Debian 12 及以上 |
+| 操作系统 | Alibaba Cloud Linux 3 / RHEL 8+ / CentOS 8+ / Ubuntu 22.04 |
 | CPU | 2 核以上 |
 | 内存 | 4GB 以上（推荐 8GB） |
 | 磁盘 | 20GB 以上 |
@@ -83,18 +83,18 @@ sudo ./init-server.sh
 如果想手动安装，可以逐条执行以下命令：
 
 ```bash
-# 安装 Docker
+# 安装 Docker（使用阿里云镜像加速）
 curl -fsSL https://get.docker.com | sh
 
 # 安装 Docker Compose
-apt-get install docker-compose-plugin
+yum install -y docker-compose-plugin
 
 # 启动 Docker
 systemctl start docker
 systemctl enable docker
 
 # 安装 Nginx
-apt-get install -y nginx
+yum install -y nginx
 systemctl enable nginx
 ```
 
@@ -373,8 +373,11 @@ chown -R deploy:deploy /home/deploy
 ### 2. 配置 HTTPS
 
 ```bash
+# 安装 EPEL 仓库（如果还没有）
+yum install -y epel-release
+
 # 安装 certbot
-apt-get install certbot python3-certbot-nginx
+yum install -y certbot python3-certbot-nginx
 
 # 申请证书（需要域名解析到服务器）
 certbot --nginx -d your-domain.com -d www.your-domain.com
