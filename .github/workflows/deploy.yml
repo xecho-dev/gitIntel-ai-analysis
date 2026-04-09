@@ -28,6 +28,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # 手动触发 CD（需要先在 GitHub 仓库 Settings > Variables 中设置 DEPLOY_TO_SERVER = true）
+  workflow_dispatch:
+    inputs:
+      deploy_to_server:
+        description: "部署到服务器（需先配置 SERVER_SSH_KEY secret）"
+        required: false
+        default: "false"
 
 env:
   REGISTRY: ghcr.io
@@ -116,6 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     environment: production
+    # 仅在 GitHub variable DEPLOY_TO_SERVER=true 时触发
+    if: ${{ github.event.inputs.deploy_to_server == 'true' || (github.event_name == 'push' && vars.DEPLOY_TO_SERVER == 'true') }}
 
     steps:
       - name: Checkout deploy scripts
@@ -286,6 +295,8 @@ jobs:
     name: Health Check
     runs-on: ubuntu-latest
     needs: deploy
+    # deploy 跳过时此 job 自动取消（无法对未部署的服务器做健康检查）
+    if: ${{ needs.deploy.result != 'skipped' }}
 
     steps:
       - name: Wait for deployment

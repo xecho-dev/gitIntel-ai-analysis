@@ -20,6 +20,7 @@ dependencies = [
     "tree-sitter-python>=0.23.0,<0.25",
     "tree-sitter-languages>=1.10.0,<1.11",
     "aiofiles>=24.0.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,13 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agents", "graph", "schemas", "services"]
+
+[tool.hatch.build.targets.wheel.artifact]
+# 让 hatch 找到 backend 目录下的 Python 包
+by-source-layout = true
 
 [build-system]
 requires = ["hatchling"]
