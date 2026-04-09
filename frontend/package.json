@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings 0",
     "test": "pnpm exec jest",
     "test:watch": "pnpm exec jest --watch",
     "test:coverage": "pnpm exec jest --coverage"
