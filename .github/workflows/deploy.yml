@@ -204,50 +204,50 @@ jobs:
           # 复制 docker-compose.yml（如果不存在则创建）
           if [ ! -f docker-compose.yml ]; then
             cat > docker-compose.yml << 'DOCKERCOMPOSE'
-services:
-  frontend:
-    image: ${FRONTEND_IMAGE}
-    container_name: gitintel-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      AUTH_TRUST_HOST: "true"
-    env_file:
-      - .env
-    networks:
-      - gitintel-net
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+          services:
+            frontend:
+              image: ${FRONTEND_IMAGE}
+              container_name: gitintel-frontend
+              restart: unless-stopped
+              ports:
+                - "3000:3000"
+              environment:
+                NODE_ENV: production
+                AUTH_TRUST_HOST: "true"
+              env_file:
+                - .env
+              networks:
+                - gitintel-net
+              healthcheck:
+                test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
 
-  backend:
-    image: ${BACKEND_IMAGE}
-    container_name: gitintel-backend
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      FRONTEND_URL: ${FRONTEND_URL}
-    networks:
-      - gitintel-net
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+            backend:
+              image: ${BACKEND_IMAGE}
+              container_name: gitintel-backend
+              restart: unless-stopped
+              ports:
+                - "8000:8000"
+              env_file:
+                - .env
+              environment:
+                FRONTEND_URL: ${FRONTEND_URL}
+              networks:
+                - gitintel-net
+              healthcheck:
+                test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 30s
 
-networks:
-  gitintel-net:
-    driver: bridge
-DOCKERCOMPOSE
+          networks:
+            gitintel-net:
+              driver: bridge
+          DOCKERCOMPOSE
           fi
 
           # 登录镜像仓库
