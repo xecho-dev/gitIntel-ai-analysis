@@ -193,14 +193,14 @@ jobs:
 
           ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << 'ENDSSH'
           set -e
-          REGISTRY_TOKEN='"'"'$REGISTRY_TOKEN'"'"'
-          REGISTRY_USERNAME='$REGISTRY_USERNAME'
-          REGISTRY='$REGISTRY'
-          FRONTEND_URL='$FRONTEND_URL'
-          DEPLOY_PATH='$DEPLOY_PATH'
-          FRONTEND_IMAGE='$FRONTEND_IMAGE'
-          BACKEND_IMAGE='$BACKEND_IMAGE'
-          COMMIT_SHORT='$COMMIT_SHORT'
+          REGISTRY_TOKEN=$REGISTRY_TOKEN
+          REGISTRY_USERNAME=$REGISTRY_USERNAME
+          REGISTRY=$REGISTRY
+          FRONTEND_URL=$FRONTEND_URL
+          DEPLOY_PATH=$DEPLOY_PATH
+          FRONTEND_IMAGE=$FRONTEND_IMAGE
+          BACKEND_IMAGE=$BACKEND_IMAGE
+          COMMIT_SHORT=$COMMIT_SHORT
 
           echo "========== 开始部署 GitIntel =========="
           echo "时间: $DEPLOY_TIME"
