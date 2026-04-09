@@ -8,7 +8,9 @@
  * 从 NextAuth session 中提取用户身份标识
  * 优先用 session.user.id（标准字段），fallback 到 sub（兼容自定义字段）
  */
-export function getUserId(session: { user?: { id?: string; sub?: string } }): string {
+export function getUserId(
+  session: { user?: { id?: string; sub?: string; [key: string]: unknown } }
+): string {
   return session.user?.id ?? session.user?.sub ?? "";
 }
 

@@ -1,5 +1,5 @@
 [project]
-name = "@gitintel/backend"
+name = "gitintel-backend"
 version = "0.1.0"
 description = "GitIntel Agent Layer - FastAPI + LangGraph"
 requires-python = ">=3.11"

@@ -41,6 +41,10 @@ jobs:
     name: Build Docker Images
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
     outputs:
       frontend_image: ${{ steps.meta-frontend.outputs.tags }}
       backend_image: ${{ steps.meta-backend.outputs.tags }}

@@ -4,12 +4,12 @@ import { getUserId } from "@/lib/api";
 // We test the sync functions and mock the fetch-based functions
 describe("getUserId", () => {
   it("extracts user id from session object", () => {
-    const session = { user: { id: "user-123", name: "Test" } };
+    const session = { user: { id: "user-123" } };
     expect(getUserId(session)).toBe("user-123");
   });
 
   it("falls back to sub field if id is missing", () => {
-    const session = { user: { sub: "sub-456", name: "Test" } };
+    const session = { user: { sub: "sub-456" } };
     expect(getUserId(session)).toBe("sub-456");
   });
 
@@ -19,7 +19,7 @@ describe("getUserId", () => {
   });
 
   it("returns empty string when neither id nor sub is available", () => {
-    const session = { user: { name: "Test" } };
+    const session = { user: {} };
     expect(getUserId(session)).toBe("");
   });
 
