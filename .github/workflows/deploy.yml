@@ -189,8 +189,9 @@ jobs:
           SERVER_USER="${{ secrets.SERVER_USER }}"
           SERVER_HOST="${{ secrets.SERVER_HOST }}"
           COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
+          DEPLOY_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
 
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << 'EOF'
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << EOF
           set -e
           REGISTRY_TOKEN='"$REGISTRY_TOKEN"'
           REGISTRY_USERNAME='"$REGISTRY_USERNAME"'
@@ -202,19 +203,19 @@ jobs:
           COMMIT_SHORT='"$COMMIT_SHORT"'
 
           echo "========== 开始部署 GitIntel =========="
-          echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "时间: $DEPLOY_TIME"
           echo "Commit: $COMMIT_SHORT"
 
-          sudo mkdir -p $DEPLOY_PATH
-          sudo chown -R $(whoami):$(whoami) $DEPLOY_PATH
-          cd $DEPLOY_PATH
+          sudo mkdir -p \$DEPLOY_PATH
+          sudo chown -R \$(whoami):\$(whoami) \$DEPLOY_PATH
+          cd \$DEPLOY_PATH
           mv /tmp/gitintel.env .env
 
           if [ ! -f docker-compose.yml ]; then
             cat > docker-compose.yml << 'DOCKERCOMPOSE'
           services:
             frontend:
-              image: ${FRONTEND_IMAGE}
+              image: \${FRONTEND_IMAGE}
               container_name: gitintel-frontend
               restart: unless-stopped
               ports:
@@ -234,7 +235,7 @@ jobs:
                 start_period: 40s
 
             backend:
-              image: ${BACKEND_IMAGE}
+              image: \${BACKEND_IMAGE}
               container_name: gitintel-backend
               restart: unless-stopped
               ports:
@@ -242,7 +243,7 @@ jobs:
               env_file:
                 - .env
               environment:
-                FRONTEND_URL: ${FRONTEND_URL}
+                FRONTEND_URL: \${FRONTEND_URL}
               networks:
                 - gitintel-net
               healthcheck:
@@ -258,7 +259,7 @@ jobs:
           DOCKERCOMPOSE
           fi
 
-          echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin
+          echo "\$REGISTRY_TOKEN" | docker login \$REGISTRY -u \$REGISTRY_USERNAME --password-stdin
           echo "正在拉取镜像..."
           docker-compose pull
           echo "正在重启服务..."
@@ -269,14 +270,14 @@ jobs:
           echo "========== 容器状态 =========="
           docker-compose ps
 
-          FRONTEND_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' gitintel-frontend 2>/dev/null || echo "unknown")
-          BACKEND_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' gitintel-backend 2>/dev/null || echo "unknown")
+          FRONTEND_HEALTH=\$(docker inspect --format='{{.State.Health.Status}}' gitintel-frontend 2>/dev/null || echo "unknown")
+          BACKEND_HEALTH=\$(docker inspect --format='{{.State.Health.Status}}' gitintel-backend 2>/dev/null || echo "unknown")
 
           echo ""
-          echo "Frontend 健康状态: $FRONTEND_HEALTH"
-          echo "Backend 健康状态: $BACKEND_HEALTH"
+          echo "Frontend 健康状态: \$FRONTEND_HEALTH"
+          echo "Backend 健康状态: \$BACKEND_HEALTH"
 
-          if [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$BACKEND_HEALTH" = "healthy" ]; then
+          if [ "\$FRONTEND_HEALTH" = "healthy" ] && [ "\$BACKEND_HEALTH" = "healthy" ]; then
             echo ""
             echo "✅ 部署成功！"
           else
