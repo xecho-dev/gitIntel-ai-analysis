@@ -189,9 +189,8 @@ jobs:
           SERVER_USER="${{ secrets.SERVER_USER }}"
           SERVER_HOST="${{ secrets.SERVER_HOST }}"
           COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
-          DEPLOY_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
 
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << 'ENDSSH'
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << ENDSSH
           set -e
           REGISTRY_TOKEN=$REGISTRY_TOKEN
           REGISTRY_USERNAME=$REGISTRY_USERNAME
@@ -203,8 +202,8 @@ jobs:
           COMMIT_SHORT=$COMMIT_SHORT
 
           echo "========== 开始部署 GitIntel =========="
-          echo "时间: $DEPLOY_TIME"
-          echo "Commit: $COMMIT_SHORT"
+          echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "Commit: \$COMMIT_SHORT"
 
           sudo mkdir -p \$DEPLOY_PATH
           sudo chown -R \$(whoami):\$(whoami) \$DEPLOY_PATH
