@@ -79,7 +79,7 @@ jobs:
           push: true
           file: ./Dockerfile.frontend
           tags: ${{ steps.meta-frontend.outputs.tags }}
-          cache-from: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/frontend:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/frontend:buildcache
           build-args: |
             NEXT_PUBLIC_API_URL=${{ secrets.FRONTEND_URL }}/api
@@ -105,7 +105,7 @@ jobs:
           push: true
           file: ./Dockerfile.backend
           tags: ${{ steps.meta-backend.outputs.tags }}
-          cache-from: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/backend:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/backend:buildcache
 
   # ==================== 部署到服务器 ====================
