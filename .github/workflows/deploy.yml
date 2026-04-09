@@ -185,7 +185,7 @@ jobs:
           echo "Commit: ${{ needs.build.outputs.commit_short }}"
 
           # 导出镜像名称（供 docker-compose.yml 使用）
-          REPO_LOWER="${GITHUB_REPOSITORY,,}"
+          REPO_LOWER="${{ github.repository,, }}"
           export FRONTEND_IMAGE="${{ env.REGISTRY }}/$REPO_LOWER/frontend:latest"
           export BACKEND_IMAGE="${{ env.REGISTRY }}/$REPO_LOWER/backend:latest"
           export FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
