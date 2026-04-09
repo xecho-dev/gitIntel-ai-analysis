@@ -92,8 +92,8 @@ fi
 if ! command -v certbot &> /dev/null; then
     log_info "安装 Certbot..."
 
-    # 安装 EPEL 仓库（Certbot 依赖）
-    if ! rpm -q epel-release &> /dev/null; then
+    # Alibaba Cloud Linux 3 自带 epel-aliyuncs-release（阿里定制版 EPEL），无需再装 epel-release
+    if ! rpm -q epel-release &> /dev/null && ! rpm -q epel-aliyuncs-release &> /dev/null; then
         yum install -y -q epel-release
     fi
 
