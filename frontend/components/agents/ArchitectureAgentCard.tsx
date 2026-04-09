@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Code2, Layers, GitBranch, AlertTriangle } from "lucide-react";
+import { Code2, GitBranch, AlertTriangle } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -54,6 +54,7 @@ export const ArchitectureAgentCard = () => {
   const linesRef = useRef<{ text: string; color: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!isAnalyzing) {
       linesRef.current = [];
@@ -95,6 +96,7 @@ export const ArchitectureAgentCard = () => {
       }
     });
   }, [isAnalyzing, eventsVersion]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const statusLabel = isScanning
     ? activeAgent === "architecture" ? "ANALYZING" : "SCANNING"

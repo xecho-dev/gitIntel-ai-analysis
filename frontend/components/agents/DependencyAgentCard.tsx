@@ -57,7 +57,6 @@ function RiskBadge({ level }: { level: string }) {
 }
 
 export const DependencyAgentCard = () => {
-  const eventsVersion = useAppStore((s) => s.eventsVersion);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const activeAgent = useAppStore((s) => s.activeAgent);
   const finishedAgents = useAppStore((s) => s.finishedAgents);

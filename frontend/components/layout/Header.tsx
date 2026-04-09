@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -8,11 +8,8 @@ import {
   LayoutDashboard,
   History,
   UserCircle,
-  Bell,
-  Settings,
   LogOut,
   Github,
-  GitCommit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

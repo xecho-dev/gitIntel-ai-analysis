@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import { QualityAgentCard } from "@/components/agents/QualityAgentCard";
 import { useAppStore } from "@/store/useAppStore";

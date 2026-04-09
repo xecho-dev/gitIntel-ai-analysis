@@ -26,7 +26,6 @@ interface ArchitectureData {
 }
 
 export const AnalysisPreview = () => {
-  const eventsVersion = useAppStore((s) => s.eventsVersion);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const finalResult = useAppStore((s) => s.finalResult);
   const finishedAgents = useAppStore((s) => s.finishedAgents);
@@ -37,8 +36,6 @@ export const AnalysisPreview = () => {
 
   const archEvent = agentEvents["architecture"];
   const qualityEvent = agentEvents["quality"];
-  const dependencyEvent = agentEvents["dependency"];
-  const optimizationEvent = agentEvents["optimization"];
   const codeParserEvent = agentEvents["code_parser_final"];
 
   const archData = archEvent?.data as ArchitectureData | undefined;

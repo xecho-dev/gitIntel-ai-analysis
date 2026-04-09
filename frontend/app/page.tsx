@@ -7,7 +7,6 @@ import { ArchitectureAgentCard } from "@/components/agents/ArchitectureAgentCard
 import { QualityAgentCard } from "@/components/agents/QualityAgentCard";
 import { DependencyAgentCard } from "@/components/agents/DependencyAgentCard";
 import { OptimizationAgentCard } from "@/components/agents/OptimizationAgentCard";
-import { PricingSidebar } from "@/components/layout/PricingSidebar";
 import { AnalysisPreview } from "@/components/layout/AnalysisPreview";
 
 export default function HomePage() {

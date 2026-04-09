@@ -35,7 +35,6 @@ const PRIORITY_STYLES: Record<string, { bg: string; text: string }> = {
 export const OptimizationAgentCard = () => {
   const [showPRModal, setShowPRModal] = useState(false);
   const [currentSuggestion, setCurrentSuggestion] = useState<CodeFix | null>(null);
-  const eventsVersion = useAppStore((s) => s.eventsVersion);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const activeAgent = useAppStore((s) => s.activeAgent);
   const finishedAgents = useAppStore((s) => s.finishedAgents);

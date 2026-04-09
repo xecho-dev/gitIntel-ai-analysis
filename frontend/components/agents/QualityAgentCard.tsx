@@ -45,7 +45,6 @@ interface QualityData {
 }
 
 export const QualityAgentCard = () => {
-  const eventsVersion = useAppStore((s) => s.eventsVersion);
   const finishedAgents = useAppStore((s) => s.finishedAgents);
   const activeAgent = useAppStore((s) => s.activeAgent);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
@@ -57,7 +56,6 @@ export const QualityAgentCard = () => {
   const raw = qualityEvent?.data as QualityData | undefined;
   const complexity = raw?.complexity ?? "—";
   const maintainability = raw?.maintainability ?? "—";
-  const duplication = raw?.duplication;
   const pyMetrics = raw?.python_metrics;
   const tsMetrics = raw?.typescript_metrics;
 
@@ -84,10 +82,6 @@ export const QualityAgentCard = () => {
     (maxIdx, v, i, arr) => (v.value > arr[maxIdx].value ? i : maxIdx),
     0
   );
-
-  const CELL_COLORS = [
-    "#00e297", "#00e297", "#00e297", "#00e297", "#00e297",
-  ];
 
   const statusLabel = isScanning
     ? "ANALYZING"
