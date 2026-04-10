@@ -41,7 +41,7 @@ from schemas.history import (
     AdminUserListResponse,
     AdminHistoryListResponse,
 )
-    from services.database import (
+from services.database import (
     save_analysis,
     get_history,
     delete_analysis,

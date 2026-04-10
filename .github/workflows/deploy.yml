@@ -320,7 +320,7 @@ jobs:
 
       - name: Check frontend health
         run: |
-          FRONTEND_URL="http://${{ secrets.SERVER_HOST }}:3000"
+          FRONTEND_URL="http://${{ secrets.SERVER_HOST }}:80"
           echo "检查 Frontend: $FRONTEND_URL"
 
           for i in 1 2 3 4 5; do
