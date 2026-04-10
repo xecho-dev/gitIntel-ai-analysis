@@ -15,7 +15,7 @@
 #   SERVER_HOST          - 服务器 IP（如 47.80.59.132）
 #   SERVER_USER          - 服务器用户名（如 root 或 deploy）
 #   SERVER_SSH_KEY      - SSH 私钥（用于连接服务器）
-#   FRONTEND_URL         - 前端实际访问地址（用于 CORS 配置）
+#   FRONTEND_URL         - 前端实际访问地址（必须包含协议，如 https://your-domain.com）
 #   OPENAI_API_KEY       - OpenAI API 密钥
 #   SUPABASE_URL         - Supabase 项目 URL
 #   SUPABASE_ANON_KEY    - Supabase 匿名密钥
@@ -23,6 +23,7 @@
 #   AUTH_SECRET          - NextAuth JWT 签名密钥
 #   AUTH_GITHUB_ID       - GitHub OAuth App Client ID
 #   AUTH_GITHUB_SECRET   - GitHub OAuth App Client Secret
+#   AUTH_URL             - 前端访问地址（同 FRONTEND_URL，用于 OAuth 回调）
 # ============================================================
 
 name: Deploy
@@ -101,6 +102,7 @@ jobs:
             AUTH_GITHUB_ID=${{ secrets.AUTH_GITHUB_ID }}
             AUTH_GITHUB_SECRET=${{ secrets.AUTH_GITHUB_SECRET }}
             AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            AUTH_URL=${{ secrets.FRONTEND_URL }}
 
       # --- 后端镜像构建 ---
       - name: Extract metadata (backend)
@@ -170,6 +172,7 @@ jobs:
 
           # NextAuth 密钥
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+          AUTH_URL=${{ secrets.FRONTEND_URL }}
 
           # GitHub OAuth 配置（前端构建时已嵌入，此处保留用于兼容）
           AUTH_GITHUB_ID=${{ secrets.AUTH_GITHUB_ID }}
@@ -200,6 +203,7 @@ jobs:
           AUTH_GITHUB_ID="${{ secrets.AUTH_GITHUB_ID }}"
           AUTH_GITHUB_SECRET="${{ secrets.AUTH_GITHUB_SECRET }}"
           AUTH_SECRET="${{ secrets.AUTH_SECRET }}"
+          AUTH_URL="${{ secrets.FRONTEND_URL }}"
           DEPLOY_PATH="/opt/gitintel"
           COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
 
@@ -225,6 +229,7 @@ jobs:
               environment:
                 NODE_ENV: production
                 AUTH_TRUST_HOST: "true"
+                AUTH_URL: AUTH_URL_PLACEHOLDER
                 AUTH_GITHUB_ID: AUTH_GITHUB_ID_PLACEHOLDER
                 AUTH_GITHUB_SECRET: AUTH_GITHUB_SECRET_PLACEHOLDER
                 AUTH_SECRET: AUTH_SECRET_PLACEHOLDER
@@ -266,6 +271,7 @@ jobs:
           sed -i "s|FRONTEND_IMAGE_PLACEHOLDER|$FRONTEND_IMAGE|g" docker-compose.yml
           sed -i "s|BACKEND_IMAGE_PLACEHOLDER|$BACKEND_IMAGE|g" docker-compose.yml
           sed -i "s|FRONTEND_URL_PLACEHOLDER|$FRONTEND_URL|g" docker-compose.yml
+          sed -i "s|AUTH_URL_PLACEHOLDER|$AUTH_URL|g" docker-compose.yml
           sed -i "s|AUTH_GITHUB_ID_PLACEHOLDER|$AUTH_GITHUB_ID|g" docker-compose.yml
           sed -i "s|AUTH_GITHUB_SECRET_PLACEHOLDER|$AUTH_GITHUB_SECRET|g" docker-compose.yml
           sed -i "s|AUTH_SECRET_PLACEHOLDER|$AUTH_SECRET|g" docker-compose.yml
