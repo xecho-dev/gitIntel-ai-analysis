@@ -149,6 +149,7 @@ jobs:
           # Supabase 配置
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
 
           # OpenAI 配置
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
@@ -159,6 +160,9 @@ jobs:
 
           # 前端访问地址（用于后端 CORS 白名单）
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+
+          # NextAuth 密钥
+          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
 
           # GitHub Container Registry 配置（用于服务器拉取镜像）
           REGISTRY=${{ env.REGISTRY }}
