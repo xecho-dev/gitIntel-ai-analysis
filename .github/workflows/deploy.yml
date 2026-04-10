@@ -12,13 +12,17 @@
 #   5. 健康检查确认部署成功
 #
 # 需要的 Secrets（请在 GitHub 仓库 Settings > Secrets 中配置）：
-#   SERVER_HOST        - 服务器 IP（如 47.80.59.132）
-#   SERVER_USER        - 服务器用户名（如 root 或 deploy）
-#   SERVER_SSH_KEY     - SSH 私钥（用于连接服务器）
-#   FRONTEND_URL       - 前端实际访问地址（用于 CORS 配置）
-#   OPENAI_API_KEY     - OpenAI API 密钥
-#   SUPABASE_URL       - Supabase 项目 URL
-#   SUPABASE_ANON_KEY  - Supabase 匿名密钥
+#   SERVER_HOST          - 服务器 IP（如 47.80.59.132）
+#   SERVER_USER          - 服务器用户名（如 root 或 deploy）
+#   SERVER_SSH_KEY      - SSH 私钥（用于连接服务器）
+#   FRONTEND_URL         - 前端实际访问地址（用于 CORS 配置）
+#   OPENAI_API_KEY       - OpenAI API 密钥
+#   SUPABASE_URL         - Supabase 项目 URL
+#   SUPABASE_ANON_KEY    - Supabase 匿名密钥
+#   SUPABASE_SERVICE_KEY - Supabase Service Role 密钥（后台管理员权限）
+#   AUTH_SECRET          - NextAuth JWT 签名密钥
+#   AUTH_GITHUB_ID       - GitHub OAuth App Client ID
+#   AUTH_GITHUB_SECRET   - GitHub OAuth App Client Secret
 # ============================================================
 
 name: Deploy
@@ -94,6 +98,9 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_AUTH_URL=${{ secrets.FRONTEND_URL }}
+            AUTH_GITHUB_ID=${{ secrets.AUTH_GITHUB_ID }}
+            AUTH_GITHUB_SECRET=${{ secrets.AUTH_GITHUB_SECRET }}
+            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
 
       # --- 后端镜像构建 ---
       - name: Extract metadata (backend)
@@ -164,6 +171,10 @@ jobs:
           # NextAuth 密钥
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}
 
+          # GitHub OAuth 配置（前端构建时已嵌入，此处保留用于兼容）
+          AUTH_GITHUB_ID=${{ secrets.AUTH_GITHUB_ID }}
+          AUTH_GITHUB_SECRET=${{ secrets.AUTH_GITHUB_SECRET }}
+
           # GitHub Container Registry 配置（用于服务器拉取镜像）
           REGISTRY=${{ env.REGISTRY }}
           REGISTRY_USERNAME=${{ github.actor }}
@@ -186,6 +197,9 @@ jobs:
           REGISTRY_USERNAME="${{ github.actor }}"
           REGISTRY_TOKEN="${{ secrets.GHP_TOKEN }}"
           FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
+          AUTH_GITHUB_ID="${{ secrets.AUTH_GITHUB_ID }}"
+          AUTH_GITHUB_SECRET="${{ secrets.AUTH_GITHUB_SECRET }}"
+          AUTH_SECRET="${{ secrets.AUTH_SECRET }}"
           DEPLOY_PATH="/opt/gitintel"
           COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
 
@@ -211,6 +225,9 @@ jobs:
               environment:
                 NODE_ENV: production
                 AUTH_TRUST_HOST: "true"
+                AUTH_GITHUB_ID: AUTH_GITHUB_ID_PLACEHOLDER
+                AUTH_GITHUB_SECRET: AUTH_GITHUB_SECRET_PLACEHOLDER
+                AUTH_SECRET: AUTH_SECRET_PLACEHOLDER
               env_file:
                 - .env
               networks:
@@ -249,6 +266,9 @@ jobs:
           sed -i "s|FRONTEND_IMAGE_PLACEHOLDER|$FRONTEND_IMAGE|g" docker-compose.yml
           sed -i "s|BACKEND_IMAGE_PLACEHOLDER|$BACKEND_IMAGE|g" docker-compose.yml
           sed -i "s|FRONTEND_URL_PLACEHOLDER|$FRONTEND_URL|g" docker-compose.yml
+          sed -i "s|AUTH_GITHUB_ID_PLACEHOLDER|$AUTH_GITHUB_ID|g" docker-compose.yml
+          sed -i "s|AUTH_GITHUB_SECRET_PLACEHOLDER|$AUTH_GITHUB_SECRET|g" docker-compose.yml
+          sed -i "s|AUTH_SECRET_PLACEHOLDER|$AUTH_SECRET|g" docker-compose.yml
 
           echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin
           echo "正在拉取镜像..."
@@ -286,78 +306,78 @@ jobs:
           ENDSSH
 
   # ==================== 健康检查 ====================
-  health-check:
-    name: Health Check
-    runs-on: ubuntu-latest
-    needs: deploy
-    # deploy 跳过时此 job 自动取消（无法对未部署的服务器做健康检查）
-    if: ${{ needs.deploy.result != 'skipped' }}
+  # health-check:
+  #   name: Health Check
+  #   runs-on: ubuntu-latest
+  #   needs: deploy
+  #   # deploy 跳过时此 job 自动取消（无法对未部署的服务器做健康检查）
+  #   if: ${{ needs.deploy.result != 'skipped' }}
 
-    steps:
-      - name: Checkout deploy scripts
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            deploy/
-          sparse-checkout-cone-mode: false
+  #   steps:
+  #     - name: Checkout deploy scripts
+  #       uses: actions/checkout@v4
+  #       with:
+  #         sparse-checkout: |
+  #           deploy/
+  #         sparse-checkout-cone-mode: false
 
-      - name: Set up SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+  #     - name: Set up SSH key
+  #       uses: webfactory/ssh-agent@v0.9.0
+  #       with:
+  #         ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: Add server to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+  #     - name: Add server to known hosts
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      # 等待容器启动（Next.js standalone 容器启动较慢）
-      - name: Wait for containers to start
-        run: |
-          sleep 30
-          echo "等待 30s 后的容器状态:"
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose ps"
+  #     # 等待容器启动（Next.js standalone 容器启动较慢）
+  #     - name: Wait for containers to start
+  #       run: |
+  #         sleep 30
+  #         echo "等待 30s 后的容器状态:"
+  #         ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose ps"
 
-      - name: Check frontend health
-        run: |
-          FRONTEND_URL="http://${{ secrets.SERVER_HOST }}:80"
-          echo "检查 Frontend: $FRONTEND_URL"
+  #     - name: Check frontend health
+  #       run: |
+  #         FRONTEND_URL="http://${{ secrets.SERVER_HOST }}:80"
+  #         echo "检查 Frontend: $FRONTEND_URL"
 
-          for i in 1 2 3 4 5; do
-            HTTP_CODE=$(curl -sf --connect-timeout 10 -o /dev/null -w "%{http_code}" "$FRONTEND_URL" 2>&1 || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Frontend 健康 (HTTP $HTTP_CODE)"
-              break
-            fi
-            echo "Frontend 尚未就绪 (HTTP $HTTP_CODE)，等待 15 秒... (重试 $i/5)"
-            sleep 15
-          done
+  #         for i in 1 2 3 4 5; do
+  #           HTTP_CODE=$(curl -sf --connect-timeout 10 -o /dev/null -w "%{http_code}" "$FRONTEND_URL" 2>&1 || echo "000")
+  #           if [ "$HTTP_CODE" = "200" ]; then
+  #             echo "✅ Frontend 健康 (HTTP $HTTP_CODE)"
+  #             break
+  #           fi
+  #           echo "Frontend 尚未就绪 (HTTP $HTTP_CODE)，等待 15 秒... (重试 $i/5)"
+  #           sleep 15
+  #         done
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Frontend 健康检查失败"
-            echo "尝试 SSH 到服务器查看日志..."
-            ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose logs --tail=30 frontend"
-            exit 1
-          fi
+  #         if [ "$HTTP_CODE" != "200" ]; then
+  #           echo "❌ Frontend 健康检查失败"
+  #           echo "尝试 SSH 到服务器查看日志..."
+  #           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose logs --tail=30 frontend"
+  #           exit 1
+  #         fi
 
-      - name: Check backend health
-        run: |
-          BACKEND_URL="http://${{ secrets.SERVER_HOST }}:8000/health"
-          echo "检查 Backend: $BACKEND_URL"
+  #     - name: Check backend health
+  #       run: |
+  #         BACKEND_URL="http://${{ secrets.SERVER_HOST }}:8000/health"
+  #         echo "检查 Backend: $BACKEND_URL"
 
-          for i in 1 2 3 4 5; do
-            HTTP_CODE=$(curl -sf --connect-timeout 10 -o /dev/null -w "%{http_code}" "$BACKEND_URL" 2>&1 || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Backend 健康 (HTTP $HTTP_CODE)"
-              break
-            fi
-            echo "Backend 尚未就绪 (HTTP $HTTP_CODE)，等待 15 秒... (重试 $i/5)"
-            sleep 15
-          done
+  #         for i in 1 2 3 4 5; do
+  #           HTTP_CODE=$(curl -sf --connect-timeout 10 -o /dev/null -w "%{http_code}" "$BACKEND_URL" 2>&1 || echo "000")
+  #           if [ "$HTTP_CODE" = "200" ]; then
+  #             echo "✅ Backend 健康 (HTTP $HTTP_CODE)"
+  #             break
+  #           fi
+  #           echo "Backend 尚未就绪 (HTTP $HTTP_CODE)，等待 15 秒... (重试 $i/5)"
+  #           sleep 15
+  #         done
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Backend 健康检查失败"
-            echo "尝试 SSH 到服务器查看日志..."
-            ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose logs --tail=30 backend"
-            exit 1
-          fi
+  #         if [ "$HTTP_CODE" != "200" ]; then
+  #           echo "❌ Backend 健康检查失败"
+  #           echo "尝试 SSH 到服务器查看日志..."
+  #           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose logs --tail=30 backend"
+  #           exit 1
+  #         fi

@@ -17,9 +17,8 @@ RUN corepack enable && corepack prepare pnpm@9.0.4 --activate \
 # 复制源码
 COPY frontend/ ./
 
-# ── 构建时必须注入的公开变量（NEXT_PUBLIC_ 前缀）────────────
-#   NEXT_PUBLIC_API_URL: Agent 层地址（Docker 网络内用 backend:8000）
-#   NEXT_PUBLIC_SUPABASE_URL / ANON_KEY: Supabase 配置
+# ── 构建时必须注入的变量 ─────────────────────────────────────
+# Next.js 公开变量（NEXT_PUBLIC_ 前缀）
 ARG NEXT_PUBLIC_API_URL=http://backend:8000
 ARG NEXT_PUBLIC_SUPABASE_URL=
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=
@@ -29,6 +28,15 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_AUTH_URL=$NEXT_PUBLIC_AUTH_URL
+
+# NextAuth 认证变量（构建时需要，用于 GitHub OAuth 登录）
+ARG AUTH_GITHUB_ID=
+ARG AUTH_GITHUB_SECRET=
+ARG AUTH_SECRET=
+
+ENV AUTH_GITHUB_ID=$AUTH_GITHUB_ID
+ENV AUTH_GITHUB_SECRET=$AUTH_GITHUB_SECRET
+ENV AUTH_SECRET=$AUTH_SECRET
 
 # 构建 Next.js（standalone 模式产出最小镜像）
 RUN pnpm build
