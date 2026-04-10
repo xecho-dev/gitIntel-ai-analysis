@@ -294,31 +294,53 @@ jobs:
     if: ${{ needs.deploy.result != 'skipped' }}
 
     steps:
-      - name: Wait for deployment
-        run: sleep 60
+      # 等待容器启动（Next.js standalone 容器启动较慢）
+      - name: Wait for containers to start
+        run: |
+          sleep 30
+          echo "等待 30s 后的容器状态:"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose ps"
 
       - name: Check frontend health
         run: |
-          for i in 1 2 3; do
-            if curl -sf --connect-timeout 10 http://${{ secrets.SERVER_HOST }}:3000/ > /dev/null 2>&1; then
-              echo "✅ Frontend 健康"
-              exit 0
+          FRONTEND_URL="http://${{ secrets.SERVER_HOST }}:3000"
+          echo "检查 Frontend: $FRONTEND_URL"
+
+          for i in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -sf --connect-timeout 10 -o /dev/null -w "%{http_code}" "$FRONTEND_URL" 2>&1 || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Frontend 健康 (HTTP $HTTP_CODE)"
+              break
             fi
-            echo "Frontend 尚未就绪，等待 10 秒... (重试 $i/3)"
-            sleep 10
+            echo "Frontend 尚未就绪 (HTTP $HTTP_CODE)，等待 15 秒... (重试 $i/5)"
+            sleep 15
           done
-          echo "❌ Frontend 健康检查失败"
-          exit 1
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Frontend 健康检查失败"
+            echo "尝试 SSH 到服务器查看日志..."
+            ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose logs --tail=30 frontend"
+            exit 1
+          fi
 
       - name: Check backend health
         run: |
-          for i in 1 2 3; do
-            if curl -sf --connect-timeout 10 http://${{ secrets.SERVER_HOST }}:8000/health > /dev/null 2>&1; then
-              echo "✅ Backend 健康"
-              exit 0
+          BACKEND_URL="http://${{ secrets.SERVER_HOST }}:8000/health"
+          echo "检查 Backend: $BACKEND_URL"
+
+          for i in 1 2 3 4 5; do
+            HTTP_CODE=$(curl -sf --connect-timeout 10 -o /dev/null -w "%{http_code}" "$BACKEND_URL" 2>&1 || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Backend 健康 (HTTP $HTTP_CODE)"
+              break
             fi
-            echo "Backend 尚未就绪，等待 10 秒... (重试 $i/3)"
-            sleep 10
+            echo "Backend 尚未就绪 (HTTP $HTTP_CODE)，等待 15 秒... (重试 $i/5)"
+            sleep 15
           done
-          echo "❌ Backend 健康检查失败"
-          exit 1
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Backend 健康检查失败"
+            echo "尝试 SSH 到服务器查看日志..."
+            ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ${{ env.DEPLOY_PATH }} && docker-compose logs --tail=30 backend"
+            exit 1
+          fi
