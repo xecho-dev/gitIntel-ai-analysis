@@ -210,8 +210,8 @@ jobs:
           cd \$DEPLOY_PATH
           mv /tmp/gitintel.env .env
 
-          if [ ! -f docker-compose.yml ]; then
-            cat > docker-compose.yml << 'DOCKERCOMPOSE'
+          rm -f docker-compose.yml
+          cat > docker-compose.yml << 'DOCKERCOMPOSE'
           services:
             frontend:
               image: \${FRONTEND_IMAGE}
@@ -256,7 +256,6 @@ jobs:
             gitintel-net:
               driver: bridge
           DOCKERCOMPOSE
-          fi
 
           echo "\$REGISTRY_TOKEN" | docker login \$REGISTRY -u \$REGISTRY_USERNAME --password-stdin
           echo "正在拉取镜像..."
