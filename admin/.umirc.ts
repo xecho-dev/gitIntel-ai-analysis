@@ -1,4 +1,5 @@
 import { defineConfig } from 'umi';
+import { resolve } from 'path';
 
 export default defineConfig({
   npmClient: 'pnpm',
@@ -6,7 +7,7 @@ export default defineConfig({
   routes: [
     {
       path: '/',
-      component: '@/layouts',
+      component: '@/layouts/AdminLayout',
       routes: [
         { path: '/', redirect: '/dashboard' },
         { path: '/dashboard', component: '@/pages/dashboard' },
@@ -18,34 +19,15 @@ export default defineConfig({
   ],
 
   alias: {
-    '@': '@/',
+    '@': resolve(__dirname, 'src'),
   },
+
+  styles: ['@/src/tailwind.css'],
 
   proxy: {
     '/api': {
       target: 'http://localhost:8000',
       changeOrigin: true,
     },
-  },
-
-  tailwindcss: {},
-
-  cssLoader: {},
-
-  Define: {
-    'process.env.API_BASE_URL': 'http://localhost:8000',
-  },
-
-  model: {},
-  initialState: {},
-
-  request: {},
-
-  antd: {
-    dark: true,
-  },
-
-  theme: {
-    '@primary-color': '#acc7ff',
   },
 });

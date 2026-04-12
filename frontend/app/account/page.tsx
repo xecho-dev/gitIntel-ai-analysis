@@ -25,16 +25,6 @@ import { Badge } from "@/components/ui/Badge";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { UserProfile, HistoryStats } from "@/lib/types";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "账户管理 - GitIntel",
-  description: "管理您的 GitIntel 账户、个人资料、订阅计划和 API 设置。",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
 
 interface SessionUser {
   id?: string;

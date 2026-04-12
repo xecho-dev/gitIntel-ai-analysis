@@ -24,16 +24,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import type { HistoryItem, HistoryStats, HistoryListResponse } from "@/lib/types";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "分析历史 - GitIntel",
-  description: "查看和管理您过去的 GitHub 仓库分析记录，了解代码健康度演变趋势。",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
 
 const PAGE_SIZE = 20;
 

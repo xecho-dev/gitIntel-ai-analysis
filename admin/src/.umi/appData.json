@@ -1,0 +1,2183 @@
+{
+  "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+  "pkg": {
+    "name": "@gitintel/admin",
+    "private": true,
+    "version": "1.0.0",
+    "scripts": {
+      "dev": "umi dev",
+      "build": "umi build",
+      "postinstall": "umi setup",
+      "setup": "umi setup",
+      "start": "npm run start",
+      "lint": "eslint src"
+    },
+    "dependencies": {
+      "@ant-design/icons": "^5.5.1",
+      "@ant-design/pro-components": "^2.8.3",
+      "@gitintel/types": "workspace:*",
+      "antd": "^5.22.2",
+      "axios": "^1.7.9",
+      "dayjs": "^1.11.13",
+      "lodash-es": "^4.17.21",
+      "react": "^18.3.1",
+      "react-dom": "^18.3.1",
+      "recharts": "^2.14.1",
+      "umi": "^4.3.5"
+    },
+    "devDependencies": {
+      "@ant-design/cssinjs": "^1.22.2",
+      "@types/lodash-es": "^4.17.12",
+      "@types/node": "^22.10.2",
+      "@types/react": "^18.3.12",
+      "@types/react-dom": "^18.3.1",
+      "@umijs/lint": "^4.3.5",
+      "@umijs/plugins": "^4.6.42",
+      "eslint": "^8.57.0",
+      "tailwindcss": "^4.2.2",
+      "typescript": "~5.6.3"
+    }
+  },
+  "pkgPath": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/package.json",
+  "plugins": {
+    "@umijs/core/dist/service/servicePlugin": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "preset",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+core@4.6.42/node_modules/@umijs/core/dist/service/servicePlugin.js",
+      "id": "@umijs/core/dist/service/servicePlugin",
+      "key": "servicePlugin",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "preset",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/index.js",
+      "id": "@umijs/preset-umi",
+      "key": "umi",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 5
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/registerMethods": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/registerMethods.js",
+      "id": "@umijs/preset-umi/dist/registerMethods",
+      "key": "registerMethods",
+      "config": {},
+      "time": {
+        "hooks": {
+          "onStart": [
+            1
+          ]
+        },
+        "register": 2
+      },
+      "enableBy": "register"
+    },
+    "@umijs/did-you-know": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+did-you-know@1.0.4/node_modules/@umijs/did-you-know/dist/plugin.js",
+      "id": "@umijs/did-you-know",
+      "key": "umijsDidYouKnow",
+      "config": {},
+      "time": {
+        "hooks": {
+          "onStart": [
+            1
+          ]
+        },
+        "register": 2
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/404/404": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/404/404.js",
+      "id": "@umijs/preset-umi/dist/features/404/404",
+      "key": "404",
+      "config": {},
+      "time": {
+        "hooks": {
+          "modifyRoutes": [
+            0
+          ]
+        },
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/aiDev/aiDev": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/aiDev/aiDev.js",
+      "id": "@umijs/preset-umi/dist/features/aiDev/aiDev",
+      "key": "aiDev",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/appData/appData": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/appData/appData.js",
+      "id": "@umijs/preset-umi/dist/features/appData/appData",
+      "key": "appData",
+      "config": {},
+      "time": {
+        "hooks": {
+          "modifyAppData": [
+            6
+          ]
+        },
+        "register": 17
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/appData/umiInfo": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/appData/umiInfo.js",
+      "id": "@umijs/preset-umi/dist/features/appData/umiInfo",
+      "key": "umiInfo",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/check/check": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/check/check.js",
+      "id": "@umijs/preset-umi/dist/features/check/check",
+      "key": "check",
+      "config": {},
+      "time": {
+        "hooks": {
+          "onCheckConfig": [
+            0
+          ],
+          "onCheck": [
+            1
+          ]
+        },
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/check/babel722": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/check/babel722.js",
+      "id": "@umijs/preset-umi/dist/features/check/babel722",
+      "key": "babel722",
+      "config": {},
+      "time": {
+        "hooks": {
+          "onCheck": [
+            0
+          ]
+        },
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/codeSplitting/codeSplitting": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/codeSplitting/codeSplitting.js",
+      "id": "@umijs/preset-umi/dist/features/codeSplitting/codeSplitting",
+      "key": "codeSplitting",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/configPlugins/configPlugins": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/configPlugins/configPlugins.js",
+      "id": "@umijs/preset-umi/dist/features/configPlugins/configPlugins",
+      "key": "configPlugins",
+      "config": {},
+      "time": {
+        "hooks": {
+          "modifyConfig": [
+            0
+          ]
+        },
+        "register": 10
+      },
+      "enableBy": "register"
+    },
+    "virtual: config-title": {
+      "id": "virtual: config-title",
+      "key": "title",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-styles": {
+      "id": "virtual: config-styles",
+      "key": "styles",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-scripts": {
+      "id": "virtual: config-scripts",
+      "key": "scripts",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-routes": {
+      "id": "virtual: config-routes",
+      "key": "routes",
+      "config": {
+        "onChange": "regenerateTmpFiles"
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-routeLoader": {
+      "id": "virtual: config-routeLoader",
+      "key": "routeLoader",
+      "config": {
+        "default": {
+          "moduleType": "esm"
+        }
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-reactRouter5Compat": {
+      "id": "virtual: config-reactRouter5Compat",
+      "key": "reactRouter5Compat",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-presets": {
+      "id": "virtual: config-presets",
+      "key": "presets",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-plugins": {
+      "id": "virtual: config-plugins",
+      "key": "plugins",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-npmClient": {
+      "id": "virtual: config-npmClient",
+      "key": "npmClient",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-mountElementId": {
+      "id": "virtual: config-mountElementId",
+      "key": "mountElementId",
+      "config": {
+        "default": "root"
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-metas": {
+      "id": "virtual: config-metas",
+      "key": "metas",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-links": {
+      "id": "virtual: config-links",
+      "key": "links",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-historyWithQuery": {
+      "id": "virtual: config-historyWithQuery",
+      "key": "historyWithQuery",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-history": {
+      "id": "virtual: config-history",
+      "key": "history",
+      "config": {
+        "default": {
+          "type": "browser"
+        }
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-headScripts": {
+      "id": "virtual: config-headScripts",
+      "key": "headScripts",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-esbuildMinifyIIFE": {
+      "id": "virtual: config-esbuildMinifyIIFE",
+      "key": "esbuildMinifyIIFE",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-conventionRoutes": {
+      "id": "virtual: config-conventionRoutes",
+      "key": "conventionRoutes",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-conventionLayout": {
+      "id": "virtual: config-conventionLayout",
+      "key": "conventionLayout",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-base": {
+      "id": "virtual: config-base",
+      "key": "base",
+      "config": {
+        "default": "/"
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-analyze": {
+      "id": "virtual: config-analyze",
+      "key": "analyze",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-writeToDisk": {
+      "id": "virtual: config-writeToDisk",
+      "key": "writeToDisk",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-transformRuntime": {
+      "id": "virtual: config-transformRuntime",
+      "key": "transformRuntime",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-theme": {
+      "id": "virtual: config-theme",
+      "key": "theme",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-targets": {
+      "id": "virtual: config-targets",
+      "key": "targets",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-svgr": {
+      "id": "virtual: config-svgr",
+      "key": "svgr",
+      "config": {
+        "default": {}
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-svgo": {
+      "id": "virtual: config-svgo",
+      "key": "svgo",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-stylusLoader": {
+      "id": "virtual: config-stylusLoader",
+      "key": "stylusLoader",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-styleLoader": {
+      "id": "virtual: config-styleLoader",
+      "key": "styleLoader",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-srcTranspilerOptions": {
+      "id": "virtual: config-srcTranspilerOptions",
+      "key": "srcTranspilerOptions",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-srcTranspiler": {
+      "id": "virtual: config-srcTranspiler",
+      "key": "srcTranspiler",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-sassLoader": {
+      "id": "virtual: config-sassLoader",
+      "key": "sassLoader",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-runtimePublicPath": {
+      "id": "virtual: config-runtimePublicPath",
+      "key": "runtimePublicPath",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-purgeCSS": {
+      "id": "virtual: config-purgeCSS",
+      "key": "purgeCSS",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-publicPath": {
+      "id": "virtual: config-publicPath",
+      "key": "publicPath",
+      "config": {
+        "default": "/"
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-proxy": {
+      "id": "virtual: config-proxy",
+      "key": "proxy",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-postcssLoader": {
+      "id": "virtual: config-postcssLoader",
+      "key": "postcssLoader",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-outputPath": {
+      "id": "virtual: config-outputPath",
+      "key": "outputPath",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-normalCSSLoaderModules": {
+      "id": "virtual: config-normalCSSLoaderModules",
+      "key": "normalCSSLoaderModules",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-mfsu": {
+      "id": "virtual: config-mfsu",
+      "key": "mfsu",
+      "config": {
+        "default": {
+          "strategy": "eager"
+        }
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-mdx": {
+      "id": "virtual: config-mdx",
+      "key": "mdx",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-manifest": {
+      "id": "virtual: config-manifest",
+      "key": "manifest",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-lessLoader": {
+      "id": "virtual: config-lessLoader",
+      "key": "lessLoader",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-jsMinifierOptions": {
+      "id": "virtual: config-jsMinifierOptions",
+      "key": "jsMinifierOptions",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-jsMinifier": {
+      "id": "virtual: config-jsMinifier",
+      "key": "jsMinifier",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-inlineLimit": {
+      "id": "virtual: config-inlineLimit",
+      "key": "inlineLimit",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-ignoreMomentLocale": {
+      "id": "virtual: config-ignoreMomentLocale",
+      "key": "ignoreMomentLocale",
+      "config": {
+        "default": true
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-https": {
+      "id": "virtual: config-https",
+      "key": "https",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-hash": {
+      "id": "virtual: config-hash",
+      "key": "hash",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-forkTSChecker": {
+      "id": "virtual: config-forkTSChecker",
+      "key": "forkTSChecker",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-fastRefresh": {
+      "id": "virtual: config-fastRefresh",
+      "key": "fastRefresh",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-extraPostCSSPlugins": {
+      "id": "virtual: config-extraPostCSSPlugins",
+      "key": "extraPostCSSPlugins",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-extraBabelPresets": {
+      "id": "virtual: config-extraBabelPresets",
+      "key": "extraBabelPresets",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-extraBabelPlugins": {
+      "id": "virtual: config-extraBabelPlugins",
+      "key": "extraBabelPlugins",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-extraBabelIncludes": {
+      "id": "virtual: config-extraBabelIncludes",
+      "key": "extraBabelIncludes",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-externals": {
+      "id": "virtual: config-externals",
+      "key": "externals",
+      "config": {
+        "default": {}
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-esm": {
+      "id": "virtual: config-esm",
+      "key": "esm",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-devtool": {
+      "id": "virtual: config-devtool",
+      "key": "devtool",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-depTranspiler": {
+      "id": "virtual: config-depTranspiler",
+      "key": "depTranspiler",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-define": {
+      "id": "virtual: config-define",
+      "key": "define",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-deadCode": {
+      "id": "virtual: config-deadCode",
+      "key": "deadCode",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-cssPublicPath": {
+      "id": "virtual: config-cssPublicPath",
+      "key": "cssPublicPath",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-cssMinifierOptions": {
+      "id": "virtual: config-cssMinifierOptions",
+      "key": "cssMinifierOptions",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-cssMinifier": {
+      "id": "virtual: config-cssMinifier",
+      "key": "cssMinifier",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-cssLoaderModules": {
+      "id": "virtual: config-cssLoaderModules",
+      "key": "cssLoaderModules",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-cssLoader": {
+      "id": "virtual: config-cssLoader",
+      "key": "cssLoader",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-copy": {
+      "id": "virtual: config-copy",
+      "key": "copy",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-checkDepCssModules": {
+      "id": "virtual: config-checkDepCssModules",
+      "key": "checkDepCssModules",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-chainWebpack": {
+      "id": "virtual: config-chainWebpack",
+      "key": "chainWebpack",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-cacheDirectoryPath": {
+      "id": "virtual: config-cacheDirectoryPath",
+      "key": "cacheDirectoryPath",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-babelLoaderCustomize": {
+      "id": "virtual: config-babelLoaderCustomize",
+      "key": "babelLoaderCustomize",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-autoprefixer": {
+      "id": "virtual: config-autoprefixer",
+      "key": "autoprefixer",
+      "config": {},
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-autoCSSModules": {
+      "id": "virtual: config-autoCSSModules",
+      "key": "autoCSSModules",
+      "config": {
+        "default": true
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "virtual: config-alias": {
+      "id": "virtual: config-alias",
+      "key": "alias",
+      "config": {
+        "default": {
+          "umi": "@@/exports",
+          "react": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react",
+          "react-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react-dom",
+          "react-router": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router@6.3.0_react@18.3.1/node_modules/react-router",
+          "react-router-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router-dom@6.3.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/react-router-dom"
+        }
+      },
+      "type": "plugin",
+      "enableBy": "register",
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "@umijs/preset-umi/dist/features/crossorigin/crossorigin": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/crossorigin/crossorigin.js",
+      "id": "@umijs/preset-umi/dist/features/crossorigin/crossorigin",
+      "key": "crossorigin",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand.js",
+      "id": "@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand",
+      "key": "depsOnDemand",
+      "config": {},
+      "time": {
+        "hooks": {
+          "onStart": [
+            0
+          ]
+        },
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/devTool/devTool": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/devTool/devTool.js",
+      "id": "@umijs/preset-umi/dist/features/devTool/devTool",
+      "key": "devTool",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker.js",
+      "id": "@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker",
+      "key": "esbuildHelperChecker",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 58
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/esmi/esmi": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/esmi/esmi.js",
+      "id": "@umijs/preset-umi/dist/features/esmi/esmi",
+      "key": "esmi",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 27
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/exportStatic/exportStatic": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/exportStatic/exportStatic.js",
+      "id": "@umijs/preset-umi/dist/features/exportStatic/exportStatic",
+      "key": "exportStatic",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 17
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/favicons/favicons": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/favicons/favicons.js",
+      "id": "@umijs/preset-umi/dist/features/favicons/favicons",
+      "key": "favicons",
+      "config": {},
+      "time": {
+        "hooks": {
+          "modifyAppData": [
+            0
+          ]
+        },
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/helmet/helmet": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/helmet/helmet.js",
+      "id": "@umijs/preset-umi/dist/features/helmet/helmet",
+      "key": "helmet",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/icons/icons": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/icons/icons.js",
+      "id": "@umijs/preset-umi/dist/features/icons/icons",
+      "key": "icons",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/mock/mock": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mock/mock.js",
+      "id": "@umijs/preset-umi/dist/features/mock/mock",
+      "key": "mock",
+      "config": {},
+      "time": {
+        "hooks": {
+          "onStart": [
+            1
+          ]
+        },
+        "register": 26
+      }
+    },
+    "@umijs/preset-umi/dist/features/mpa/mpa": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mpa/mpa.js",
+      "id": "@umijs/preset-umi/dist/features/mpa/mpa",
+      "key": "mpa",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/okam/okam": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/okam/okam.js",
+      "id": "@umijs/preset-umi/dist/features/okam/okam",
+      "key": "okam",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "@umijs/preset-umi/dist/features/overrides/overrides": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/overrides/overrides.js",
+      "id": "@umijs/preset-umi/dist/features/overrides/overrides",
+      "key": "overrides",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/phantomDependency/phantomDependency": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/phantomDependency/phantomDependency.js",
+      "id": "@umijs/preset-umi/dist/features/phantomDependency/phantomDependency",
+      "key": "phantomDependency",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/polyfill/polyfill": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/polyfill/polyfill.js",
+      "id": "@umijs/preset-umi/dist/features/polyfill/polyfill",
+      "key": "polyfill",
+      "config": {},
+      "time": {
+        "hooks": {
+          "modifyConfig": [
+            1
+          ]
+        },
+        "register": 1
+      }
+    },
+    "@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill.js",
+      "id": "@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill",
+      "key": "publicPathPolyfill",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/prepare/prepare": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/prepare/prepare.js",
+      "id": "@umijs/preset-umi/dist/features/prepare/prepare",
+      "key": "prepare",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/routePrefetch/routePrefetch": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routePrefetch/routePrefetch.js",
+      "id": "@umijs/preset-umi/dist/features/routePrefetch/routePrefetch",
+      "key": "routePrefetch",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/stagewise/stagewise": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/stagewise/stagewise.js",
+      "id": "@umijs/preset-umi/dist/features/stagewise/stagewise",
+      "key": "stagewise",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/terminal/terminal": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/terminal/terminal.js",
+      "id": "@umijs/preset-umi/dist/features/terminal/terminal",
+      "key": "terminal",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/tmpFiles/tmpFiles": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/tmpFiles/tmpFiles.js",
+      "id": "@umijs/preset-umi/dist/features/tmpFiles/tmpFiles",
+      "key": "tmpFiles",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 3
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/clientLoader/clientLoader": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/clientLoader/clientLoader.js",
+      "id": "@umijs/preset-umi/dist/features/clientLoader/clientLoader",
+      "key": "clientLoader",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/routeProps/routeProps": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routeProps/routeProps.js",
+      "id": "@umijs/preset-umi/dist/features/routeProps/routeProps",
+      "key": "routeProps",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      }
+    },
+    "@umijs/preset-umi/dist/features/ssr/ssr": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/ssr/ssr.js",
+      "id": "@umijs/preset-umi/dist/features/ssr/ssr",
+      "key": "ssr",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/tmpFiles/configTypes": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/tmpFiles/configTypes.js",
+      "id": "@umijs/preset-umi/dist/features/tmpFiles/configTypes",
+      "key": "configTypes",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/transform/transform": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/transform/transform.js",
+      "id": "@umijs/preset-umi/dist/features/transform/transform",
+      "key": "transform",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/lowImport/lowImport": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/lowImport/lowImport.js",
+      "id": "@umijs/preset-umi/dist/features/lowImport/lowImport",
+      "key": "lowImport",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/vite/vite": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/vite/vite.js",
+      "id": "@umijs/preset-umi/dist/features/vite/vite",
+      "key": "vite",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/apiRoute/apiRoute": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/apiRoute/apiRoute.js",
+      "id": "@umijs/preset-umi/dist/features/apiRoute/apiRoute",
+      "key": "apiRoute",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 6
+      }
+    },
+    "@umijs/preset-umi/dist/features/monorepo/redirect": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/monorepo/redirect.js",
+      "id": "@umijs/preset-umi/dist/features/monorepo/redirect",
+      "key": "monorepoRedirect",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 14
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/test/test": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/test/test.js",
+      "id": "@umijs/preset-umi/dist/features/test/test",
+      "key": "test",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      }
+    },
+    "@umijs/preset-umi/dist/features/clickToComponent/clickToComponent": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/clickToComponent/clickToComponent.js",
+      "id": "@umijs/preset-umi/dist/features/clickToComponent/clickToComponent",
+      "key": "clickToComponent",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/legacy/legacy": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/legacy/legacy.js",
+      "id": "@umijs/preset-umi/dist/features/legacy/legacy",
+      "key": "legacy",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose.js",
+      "id": "@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose",
+      "key": "classPropertiesLoose",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/webpack/webpack": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/webpack/webpack.js",
+      "id": "@umijs/preset-umi/dist/features/webpack/webpack",
+      "key": "preset-umi:webpack",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      }
+    },
+    "@umijs/preset-umi/dist/features/swc/swc": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/swc/swc.js",
+      "id": "@umijs/preset-umi/dist/features/swc/swc",
+      "key": "swc",
+      "config": {},
+      "time": {
+        "hooks": {
+          "addOnDemandDeps": [
+            0
+          ]
+        },
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/ui/ui": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/ui/ui.js",
+      "id": "@umijs/preset-umi/dist/features/ui/ui",
+      "key": "ui",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      }
+    },
+    "@umijs/preset-umi/dist/features/mako/mako": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mako/mako.js",
+      "id": "@umijs/preset-umi/dist/features/mako/mako",
+      "key": "mako",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/utoopack/utoopack": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/utoopack/utoopack.js",
+      "id": "@umijs/preset-umi/dist/features/utoopack/utoopack",
+      "key": "utoopack",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      }
+    },
+    "@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian.js",
+      "id": "@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian",
+      "key": "hmrGuardian",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      }
+    },
+    "@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad.js",
+      "id": "@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad",
+      "key": "routePreloadOnLoad",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 20
+      }
+    },
+    "@umijs/preset-umi/dist/features/forget/forget": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/forget/forget.js",
+      "id": "@umijs/preset-umi/dist/features/forget/forget",
+      "key": "forget",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "config"
+    },
+    "@umijs/preset-umi/dist/features/bundler/bundler": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/bundler/bundler.js",
+      "id": "@umijs/preset-umi/dist/features/bundler/bundler",
+      "key": "preset-umi:bundler",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/build": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/build.js",
+      "id": "@umijs/preset-umi/dist/commands/build",
+      "key": "build",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 3
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/config/config": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/config/config.js",
+      "id": "@umijs/preset-umi/dist/commands/config/config",
+      "key": "config",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 27
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/dev/dev": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/dev/dev.js",
+      "id": "@umijs/preset-umi/dist/commands/dev/dev",
+      "key": "dev",
+      "config": {},
+      "time": {
+        "hooks": {
+          "modifyAppData": [
+            10
+          ]
+        },
+        "register": 22
+      }
+    },
+    "@umijs/preset-umi/dist/commands/help": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/help.js",
+      "id": "@umijs/preset-umi/dist/commands/help",
+      "key": "help",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/lint": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/lint.js",
+      "id": "@umijs/preset-umi/dist/commands/lint",
+      "key": "lint",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/setup": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/setup.js",
+      "id": "@umijs/preset-umi/dist/commands/setup",
+      "key": "setup",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/deadcode": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/deadcode.js",
+      "id": "@umijs/preset-umi/dist/commands/deadcode",
+      "key": "deadcode",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/version": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/version.js",
+      "id": "@umijs/preset-umi/dist/commands/version",
+      "key": "version",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/page": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/page.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/page",
+      "key": "generator:page",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/prettier": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/prettier.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/prettier",
+      "key": "generator:prettier",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/tsconfig": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/tsconfig.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/tsconfig",
+      "key": "generator:tsconfig",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/jest": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/jest.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/jest",
+      "key": "generator:jest",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/tailwindcss": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/tailwindcss.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/tailwindcss",
+      "key": "generator:tailwindcss",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/dva": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/dva.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/dva",
+      "key": "generator:dva",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/component": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/component.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/component",
+      "key": "generator:component",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/mock": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/mock.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/mock",
+      "key": "generator:mock",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/cypress": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/cypress.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/cypress",
+      "key": "generator:cypress",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 4
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/api": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/api.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/api",
+      "key": "generator:api",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/precommit": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/precommit.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/precommit",
+      "key": "generator:precommit",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/plugin": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/plugin.js",
+      "id": "@umijs/preset-umi/dist/commands/plugin",
+      "key": "command:plugin",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/verify-commit": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/verify-commit.js",
+      "id": "@umijs/preset-umi/dist/commands/verify-commit",
+      "key": "verifyCommit",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/preview": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/preview.js",
+      "id": "@umijs/preset-umi/dist/commands/preview",
+      "key": "preview",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 16
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/mfsu/mfsu": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/mfsu/mfsu.js",
+      "id": "@umijs/preset-umi/dist/commands/mfsu/mfsu",
+      "key": "mfsu-cli",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/plugin-run": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+plugin-run@4.6.42/node_modules/@umijs/plugin-run/dist/index.js",
+      "id": "@umijs/plugin-run",
+      "key": "run",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 2
+      },
+      "enableBy": "register"
+    },
+    "@umijs/core/dist/service/generatePlugin": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+core@4.6.42/node_modules/@umijs/core/dist/service/generatePlugin.js",
+      "id": "@umijs/core/dist/service/generatePlugin",
+      "key": "generatePlugin",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    }
+  },
+  "presets": [],
+  "name": "dev",
+  "args": {
+    "_": []
+  },
+  "userConfig": {
+    "npmClient": "pnpm",
+    "routes": [
+      {
+        "path": "/",
+        "component": "@/layouts/AdminLayout",
+        "routes": [
+          {
+            "path": "/",
+            "redirect": "/dashboard"
+          },
+          {
+            "path": "/dashboard",
+            "component": "@/pages/dashboard"
+          },
+          {
+            "path": "/users",
+            "component": "@/pages/users"
+          },
+          {
+            "path": "/audit",
+            "component": "@/pages/audit"
+          },
+          {
+            "path": "/settings",
+            "component": "@/pages/settings"
+          }
+        ]
+      }
+    ],
+    "alias": {
+      "@": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src"
+    },
+    "styles": [
+      "@/src/tailwind.css"
+    ],
+    "proxy": {
+      "/api": {
+        "target": "http://localhost:8000",
+        "changeOrigin": true
+      }
+    }
+  },
+  "mainConfigFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/.umirc.ts",
+  "config": {
+    "routeLoader": {
+      "moduleType": "esm"
+    },
+    "mountElementId": "root",
+    "history": {
+      "type": "browser"
+    },
+    "base": "/",
+    "svgr": {},
+    "publicPath": "/",
+    "mfsu": {
+      "strategy": "eager"
+    },
+    "ignoreMomentLocale": true,
+    "externals": {},
+    "autoCSSModules": true,
+    "alias": {
+      "umi": "@@/exports",
+      "react": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react",
+      "react-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react-dom",
+      "react-router": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router@6.3.0_react@18.3.1/node_modules/react-router",
+      "react-router-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router-dom@6.3.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/react-router-dom",
+      "@": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src",
+      "@@": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/.umi",
+      "regenerator-runtime": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/regenerator-runtime@0.13.11/node_modules/regenerator-runtime"
+    },
+    "npmClient": "pnpm",
+    "routes": [
+      {
+        "path": "/",
+        "component": "@/layouts/AdminLayout",
+        "routes": [
+          {
+            "path": "/",
+            "redirect": "/dashboard"
+          },
+          {
+            "path": "/dashboard",
+            "component": "@/pages/dashboard"
+          },
+          {
+            "path": "/users",
+            "component": "@/pages/users"
+          },
+          {
+            "path": "/audit",
+            "component": "@/pages/audit"
+          },
+          {
+            "path": "/settings",
+            "component": "@/pages/settings"
+          }
+        ]
+      }
+    ],
+    "styles": [
+      "@/src/tailwind.css"
+    ],
+    "proxy": {
+      "/api": {
+        "target": "http://localhost:8000",
+        "changeOrigin": true
+      }
+    },
+    "targets": {
+      "chrome": 80
+    }
+  },
+  "routes": {
+    "1": {
+      "path": "/",
+      "file": "@/layouts/AdminLayout.tsx",
+      "id": "1",
+      "absPath": "/",
+      "__content": "import React, { useState } from 'react';\nimport { Link, useLocation, Outlet } from 'umi';\nimport { Layout, Menu, Button, Dropdown, Avatar, Space, Typography } from 'antd';\nimport type { MenuProps } from 'antd';\nimport {\n  DashboardOutlined,\n  UserOutlined,\n  AuditOutlined,\n  SettingOutlined,\n  BellOutlined,\n  QuestionCircleOutlined,\n  GithubOutlined,\n  BranchesOutlined,\n} from '@ant-design/icons';\n\nconst { Sider, Content, Header } = Layout;\nconst { Text } = Typography;\n\nconst menuItems = [\n  { key: '/dashboard', icon: <DashboardOutlined />, label: <Link to=\"/dashboard\">全局概览</Link> },\n  { key: '/users', icon: <UserOutlined />, label: <Link to=\"/users\">用户管理</Link> },\n  { key: '/audit', icon: <AuditOutlined />, label: <Link to=\"/audit\">分析审计</Link> },\n  { key: '/settings', icon: <SettingOutlined />, label: <Link to=\"/settings\">系统设置</Link> },\n];\n\nconst userMenuItems: MenuProps['items'] = [\n  { key: 'profile', label: '个人中心' },\n  { key: 'settings', label: '账户设置' },\n  { type: 'divider' },\n  { key: 'logout', label: '退出登录', danger: true },\n];\n\nfunction AdminLayout() {\n  const location = useLocation();\n  const [collapsed, setCollapsed] = useState(false);\n\n  return (\n    <Layout style={{ minHeight: '100vh' }}>\n      <Sider\n        width={240}\n        collapsible\n        collapsed={collapsed}\n        onCollapse={setCollapsed}\n        style={{\n          background: '#001529',\n          boxShadow: '2px 0 8px rgba(0,0,0,0.15)',\n          position: 'fixed',\n          left: 0,\n          top: 0,\n          bottom: 0,\n          zIndex: 100,\n        }}\n      >\n        {/* Logo 区域 */}\n        <div\n          style={{\n            height: 64,\n            display: 'flex',\n            alignItems: 'center',\n            justifyContent: collapsed ? 'center' : 'flex-start',\n            padding: collapsed ? 0 : '0 20px',\n            borderBottom: '1px solid rgba(255,255,255,0.06)',\n            cursor: 'pointer',\n          }}\n        >\n          <div\n            style={{\n              width: 32,\n              height: 32,\n              borderRadius: 6,\n              background: 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)',\n              display: 'flex',\n              alignItems: 'center',\n              justifyContent: 'center',\n              boxShadow: '0 2px 8px rgba(22,119,255,0.4)',\n            }}\n          >\n            <BranchesOutlined style={{ color: '#fff', fontSize: 16 }} />\n          </div>\n          {!collapsed && (\n            <span\n              style={{\n                marginLeft: 12,\n                color: '#fff',\n                fontSize: 16,\n                fontWeight: 600,\n                letterSpacing: '-0.01em',\n              }}\n            >\n              GitIntel\n            </span>\n          )}\n        </div>\n\n        {/* 菜单 */}\n        <Menu\n          mode=\"inline\"\n          selectedKeys={[location.pathname]}\n          defaultSelectedKeys={['/dashboard']}\n          items={menuItems}\n          style={{\n            background: 'transparent',\n            border: 'none',\n            marginTop: 12,\n          }}\n          theme=\"dark\"\n        />\n\n        {/* 底部信息 */}\n        {!collapsed && (\n          <div\n            style={{\n              position: 'absolute',\n              bottom: 0,\n              left: 0,\n              right: 0,\n              padding: '16px 20px',\n              borderTop: '1px solid rgba(255,255,255,0.06)',\n            }}\n          >\n            <Space direction=\"vertical\" size={4}>\n              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>\n                GitIntel Admin v1.0.0\n              </Text>\n              <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>\n                Powered by AI\n              </Text>\n            </Space>\n          </div>\n        )}\n      </Sider>\n\n      <Layout style={{ marginLeft: collapsed ? 80 : 240, transition: 'margin-left 0.2s' }}>\n        {/* 顶部导航栏 */}\n        <Header\n          style={{\n            background: '#fff',\n            padding: '0 24px',\n            display: 'flex',\n            alignItems: 'center',\n            justifyContent: 'flex-end',\n            boxShadow: '0 1px 4px rgba(0,21,41,0.08)',\n            position: 'sticky',\n            top: 0,\n            zIndex: 99,\n            height: 56,\n          }}\n        >\n          <Space size={16}>\n            <Button type=\"text\" icon={<QuestionCircleOutlined />} />\n            <Button type=\"text\" icon={<BellOutlined />} badge={{ count: 3 }} />\n            <Button type=\"text\" icon={<GithubOutlined />} href=\"https://github.com\" target=\"_blank\" />\n            <Dropdown menu={{ items: userMenuItems }} placement=\"bottomRight\">\n              <Space style={{ cursor: 'pointer' }}>\n                <Avatar size={32} style={{ background: '#1677ff' }}>\n                  A\n                </Avatar>\n                <Text strong>Admin</Text>\n              </Space>\n            </Dropdown>\n          </Space>\n        </Header>\n\n        {/* 内容区域 */}\n        <Content\n          style={{\n            padding: 24,\n            background: '#f5f5f5',\n            minHeight: 'calc(100vh - 56px)',\n          }}\n        >\n          <Outlet />\n        </Content>\n      </Layout>\n    </Layout>\n  );\n}\n\nexport default AdminLayout;\nexport { AdminLayout };\n",
+      "__isJSFile": true,
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/layouts/AdminLayout.tsx"
+    },
+    "2": {
+      "path": "/",
+      "redirect": "/dashboard",
+      "parentId": "1",
+      "id": "2",
+      "absPath": "/"
+    },
+    "3": {
+      "path": "/dashboard",
+      "file": "@/pages/dashboard.tsx",
+      "parentId": "1",
+      "id": "3",
+      "absPath": "/dashboard",
+      "__content": "import { useEffect, useState } from 'react';\nimport { Card, Statistic, Row, Col, Table, Tag, Progress, Timeline, Typography, Space } from 'antd';\nimport {\n  BarChartOutlined,\n  CheckCircleOutlined,\n  ClockCircleOutlined,\n  CloseCircleOutlined,\n  RiseOutlined,\n  ArrowUpOutlined,\n} from '@ant-design/icons';\nimport type { ColumnsType } from 'antd/es/table';\n\nconst { Title, Text } = Typography;\n\ninterface Analysis {\n  id: string;\n  repo: string;\n  owner: string;\n  status: 'completed' | 'pending' | 'failed' | 'running';\n  date: string;\n  score: number;\n}\n\nexport default function Dashboard() {\n  const [analyses] = useState<Analysis[]>([\n    { id: '1', repo: 'react', owner: 'facebook', status: 'completed', date: '2026-04-10', score: 92 },\n    { id: '2', repo: 'vscode', owner: 'microsoft', status: 'completed', date: '2026-04-11', score: 88 },\n    { id: '3', repo: 'next.js', owner: 'vercel', status: 'running', date: '2026-04-12', score: 0 },\n    { id: '4', repo: 'tensorflow', owner: 'tensorflow', status: 'pending', date: '2026-04-12', score: 0 },\n    { id: '5', repo: 'rust', owner: 'rust-lang', status: 'completed', date: '2026-04-09', score: 95 },\n    { id: '6', repo: 'golang', owner: 'golang', status: 'failed', date: '2026-04-08', score: 0 },\n  ]);\n\n  const statusMap = {\n    completed: { color: 'success', text: '已完成', icon: <CheckCircleOutlined /> },\n    pending: { color: 'processing', text: '排队中', icon: <ClockCircleOutlined /> },\n    running: { color: 'warning', text: '进行中', icon: <BarChartOutlined /> },\n    failed: { color: 'error', text: '失败', icon: <CloseCircleOutlined /> },\n  };\n\n  const columns: ColumnsType<Analysis> = [\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <Space>\n          <Text strong>{record.owner}/{record.repo}</Text>\n        </Space>\n      ),\n    },\n    {\n      title: '日期',\n      dataIndex: 'date',\n      key: 'date',\n    },\n    {\n      title: '状态',\n      dataIndex: 'status',\n      key: 'status',\n      render: (status: keyof typeof statusMap) => (\n        <Tag color={statusMap[status].color} icon={statusMap[status].icon}>\n          {statusMap[status].text}\n        </Tag>\n      ),\n    },\n    {\n      title: '质量评分',\n      dataIndex: 'score',\n      key: 'score',\n      render: (score: number) =>\n        score > 0 ? (\n          <Progress\n            percent={score}\n            size=\"small\"\n            strokeColor={score >= 90 ? '#52c41a' : score >= 70 ? '#1677ff' : '#faad14'}\n          />\n        ) : (\n          <Text type=\"secondary\">-</Text>\n        ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>仪表盘</Title>\n        <Text type=\"secondary\">查看系统运行状态和数据分析概览</Text>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">总分析数</Text>}\n              value={156}\n              prefix={<BarChartOutlined style={{ color: '#1677ff' }} />}\n              suffix={\n                <Text type=\"success\" style={{ fontSize: 14 }}>\n                  <ArrowUpOutlined /> 12%\n                </Text>\n              }\n            />\n          </Card>\n        </Col>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">已完成</Text>}\n              value={144}\n              prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}\n              valueStyle={{ color: '#52c41a' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">进行中</Text>}\n              value={8}\n              prefix={<ClockCircleOutlined style={{ color: '#faad14' }} />}\n              valueStyle={{ color: '#faad14' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">失败</Text>}\n              value={4}\n              prefix={<CloseCircleOutlined style={{ color: '#ff4d4f' }} />}\n              valueStyle={{ color: '#ff4d4f' }}\n            />\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 图表和分析列表 */}\n      <Row gutter={[16, 16]}>\n        <Col xs={24} lg={16}>\n          <Card\n            title=\"最近分析\"\n            extra={<Text type=\"secondary\">共 {analyses.length} 条记录</Text>}\n            bordered={false}\n          >\n            <Table\n              dataSource={analyses}\n              columns={columns}\n              rowKey=\"id\"\n              pagination={false}\n              size=\"middle\"\n            />\n          </Card>\n        </Col>\n        <Col xs={24} lg={8}>\n          <Card title=\"系统状态\" bordered={false} style={{ marginBottom: 16 }}>\n            <Space direction=\"vertical\" style={{ width: '100%' }} size={16}>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>API 服务</Text>\n                  <Tag color=\"success\">在线</Tag>\n                </Row>\n              </div>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>数据库</Text>\n                  <Tag color=\"success\">正常</Tag>\n                </Row>\n              </div>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>AI 模型</Text>\n                  <Tag color=\"success\">就绪</Tag>\n                </Row>\n              </div>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>队列任务</Text>\n                  <Tag color=\"processing\">3 个运行中</Tag>\n                </Row>\n              </div>\n            </Space>\n          </Card>\n\n          <Card title=\"最近活动\" bordered={false}>\n            <Timeline\n              items={[\n                { color: 'green', children: '分析 facebook/react 完成' },\n                { color: 'green', children: '分析 microsoft/vscode 完成' },\n                { color: 'blue', children: '开始分析 vercel/next.js' },\n                { color: 'gray', children: '系统维护完成' },\n              ]}\n            />\n          </Card>\n        </Col>\n      </Row>\n    </div>\n  );\n}\n",
+      "__isJSFile": true,
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/dashboard.tsx"
+    },
+    "4": {
+      "path": "/users",
+      "file": "@/pages/users.tsx",
+      "parentId": "1",
+      "id": "4",
+      "absPath": "/users",
+      "__content": "import { useState } from 'react';\nimport { Table, Tag, Button, Space, Avatar, Input, Card, Row, Col, Typography } from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  UserAddOutlined,\n  SearchOutlined,\n  EditOutlined,\n  DeleteOutlined,\n  MailOutlined,\n  CheckCircleOutlined,\n  StopOutlined,\n} from '@ant-design/icons';\n\nconst { Title, Text } = Typography;\n\ninterface User {\n  id: string;\n  key: string;\n  name: string;\n  email: string;\n  avatar: string;\n  role: 'admin' | 'user';\n  status: 'active' | 'inactive';\n  lastLogin: string;\n  analyses: number;\n}\n\nexport default function Users() {\n  const [users] = useState<User[]>([\n    { \n      key: '1', \n      id: '1',\n      name: '张三', \n      email: 'zhang@example.com', \n      avatar: 'Z',\n      role: 'admin', \n      status: 'active',\n      lastLogin: '2026-04-12 10:30',\n      analyses: 42,\n    },\n    { \n      key: '2', \n      id: '2',\n      name: '李四', \n      email: 'li@example.com', \n      avatar: 'L',\n      role: 'user', \n      status: 'active',\n      lastLogin: '2026-04-11 15:20',\n      analyses: 28,\n    },\n    { \n      key: '3', \n      id: '3',\n      name: '王五', \n      email: 'wang@example.com', \n      avatar: 'W',\n      role: 'user', \n      status: 'inactive',\n      lastLogin: '2026-04-01 09:00',\n      analyses: 15,\n    },\n    { \n      key: '4', \n      id: '4',\n      name: '赵六', \n      email: 'zhao@example.com', \n      avatar: 'Z',\n      role: 'user', \n      status: 'active',\n      lastLogin: '2026-04-12 08:45',\n      analyses: 63,\n    },\n  ]);\n\n  const columns: ColumnsType<User> = [\n    {\n      title: '用户',\n      key: 'user',\n      render: (_, record) => (\n        <Space>\n          <Avatar style={{ background: record.role === 'admin' ? '#722ed1' : '#1677ff' }}>\n            {record.avatar}\n          </Avatar>\n          <div>\n            <Text strong>{record.name}</Text>\n            <br />\n            <Text type=\"secondary\" style={{ fontSize: 12 }}>\n              <MailOutlined style={{ marginRight: 4 }} />\n              {record.email}\n            </Text>\n          </div>\n        </Space>\n      ),\n    },\n    {\n      title: '角色',\n      dataIndex: 'role',\n      key: 'role',\n      render: (role: string) => (\n        <Tag color={role === 'admin' ? 'purple' : 'blue'} icon={role === 'admin' ? <CheckCircleOutlined /> : undefined}>\n          {role === 'admin' ? '管理员' : '普通用户'}\n        </Tag>\n      ),\n    },\n    {\n      title: '状态',\n      dataIndex: 'status',\n      key: 'status',\n      render: (status: string) => (\n        <Tag color={status === 'active' ? 'success' : 'default'} icon={status === 'active' ? <CheckCircleOutlined /> : <StopOutlined />}>\n          {status === 'active' ? '正常' : '禁用'}\n        </Tag>\n      ),\n    },\n    {\n      title: '分析数',\n      dataIndex: 'analyses',\n      key: 'analyses',\n      render: (num: number) => <Text strong>{num}</Text>,\n    },\n    {\n      title: '最后登录',\n      dataIndex: 'lastLogin',\n      key: 'lastLogin',\n    },\n    {\n      title: '操作',\n      key: 'action',\n      render: () => (\n        <Space size=\"small\">\n          <Button type=\"text\" size=\"small\" icon={<EditOutlined />}>\n            编辑\n          </Button>\n          <Button type=\"text\" size=\"small\" danger icon={<DeleteOutlined />}>\n            删除\n          </Button>\n        </Space>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Row justify=\"space-between\" align=\"middle\">\n          <Col>\n            <Title level={4} style={{ margin: 0 }}>用户管理</Title>\n            <Text type=\"secondary\">管理系��用户和权限</Text>\n          </Col>\n          <Col>\n            <Button type=\"primary\" icon={<UserAddOutlined />}>\n              添加用户\n            </Button>\n          </Col>\n        </Row>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={16} style={{ marginBottom: 24 }}>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总用户数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#1677ff' }}>4</div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">管理员</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#722ed1' }}>1</div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">活跃用户</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#52c41a' }}>3</div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总分析数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa8c16' }}>148</div>\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 用户表格 */}\n      <Card bordered={false}>\n        <div style={{ marginBottom: 16 }}>\n          <Input\n            placeholder=\"搜索用户...\"\n            prefix={<SearchOutlined />}\n            style={{ width: 300 }}\n          />\n        </div>\n        <Table dataSource={users} columns={columns} rowKey=\"key\" size=\"middle\" />\n      </Card>\n    </div>\n  );\n}",
+      "__isJSFile": true,
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/users.tsx"
+    },
+    "5": {
+      "path": "/audit",
+      "file": "@/pages/audit.tsx",
+      "parentId": "1",
+      "id": "5",
+      "absPath": "/audit",
+      "__content": "import { useState } from 'react';\nimport { Table, Tag, Input, Card, Row, Col, Typography, Select, DatePicker, Space, Button, Statistic, Avatar } from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  SearchOutlined,\n  ReloadOutlined,\n  CheckCircleOutlined,\n  CloseCircleOutlined,\n  ClockCircleOutlined,\n  DownloadOutlined,\n} from '@ant-design/icons';\n\nconst { Title, Text } = Typography;\nconst { RangePicker } = DatePicker;\n\ninterface AuditLog {\n  id: string;\n  key: string;\n  user: string;\n  userAvatar: string;\n  action: string;\n  actionType: 'create' | 'read' | 'update' | 'delete';\n  target: string;\n  ip: string;\n  timestamp: string;\n  status: 'success' | 'failed' | 'pending';\n  duration: string;\n}\n\nexport default function Audit() {\n  const [selectedStatus, setSelectedStatus] = useState<string>('all');\n  const [logs] = useState<AuditLog[]>([\n    { \n      key: '1', \n      id: '1',\n      user: 'admin', \n      userAvatar: 'A',\n      action: '创建分析', \n      actionType: 'create',\n      target: 'facebook/react', \n      ip: '192.168.1.100',\n      timestamp: '2026-04-12 10:30:25', \n      status: 'success',\n      duration: '2.3s',\n    },\n    { \n      key: '2', \n      id: '2',\n      user: 'user1', \n      userAvatar: 'U',\n      action: '查看结果', \n      actionType: 'read',\n      target: 'microsoft/vscode', \n      ip: '192.168.1.101',\n      timestamp: '2026-04-12 10:25:10', \n      status: 'success',\n      duration: '0.5s',\n    },\n    { \n      key: '3', \n      id: '3',\n      user: 'admin', \n      userAvatar: 'A',\n      action: '删除用户', \n      actionType: 'delete',\n      target: 'user3', \n      ip: '192.168.1.100',\n      timestamp: '2026-04-12 09:15:33', \n      status: 'failed',\n      duration: '0.2s',\n    },\n    { \n      key: '4', \n      id: '4',\n      user: 'user2', \n      userAvatar: 'U',\n      action: '更新配置', \n      actionType: 'update',\n      target: '系统设置', \n      ip: '192.168.1.102',\n      timestamp: '2026-04-12 08:45:00', \n      status: 'pending',\n      duration: '-',\n    },\n    { \n      key: '5', \n      id: '5',\n      user: 'admin', \n      userAvatar: 'A',\n      action: '导出报告', \n      actionType: 'read',\n      target: '月报-2026-03', \n      ip: '192.168.1.100',\n      timestamp: '2026-04-11 16:20:15', \n      status: 'success',\n      duration: '5.8s',\n    },\n  ]);\n\n  const statusMap = {\n    success: { color: 'success', text: '成功', icon: <CheckCircleOutlined /> },\n    failed: { color: 'error', text: '失败', icon: <CloseCircleOutlined /> },\n    pending: { color: 'processing', text: '进行中', icon: <ClockCircleOutlined /> },\n  };\n\n  const actionTypeMap = {\n    create: { color: 'cyan', text: '创建' },\n    read: { color: 'blue', text: '查看' },\n    update: { color: 'orange', text: '更新' },\n    delete: { color: 'red', text: '删除' },\n  };\n\n  const columns: ColumnsType<AuditLog> = [\n    {\n      title: '时间',\n      dataIndex: 'timestamp',\n      key: 'timestamp',\n      width: 180,\n    },\n    {\n      title: '用户',\n      key: 'user',\n      render: (_, record) => (\n        <Space>\n          <Avatar size=\"small\" style={{ background: '#1677ff' }}>{record.userAvatar}</Avatar>\n          <Text>{record.user}</Text>\n        </Space>\n      ),\n    },\n    {\n      title: '操作类型',\n      dataIndex: 'actionType',\n      key: 'actionType',\n      render: (type: keyof typeof actionTypeMap) => (\n        <Tag color={actionTypeMap[type].color}>{actionTypeMap[type].text}</Tag>\n      ),\n    },\n    {\n      title: '操作描述',\n      dataIndex: 'action',\n      key: 'action',\n    },\n    {\n      title: '操作对象',\n      dataIndex: 'target',\n      key: 'target',\n      render: (target: string) => <Text code>{target}</Text>,\n    },\n    {\n      title: 'IP',\n      dataIndex: 'ip',\n      key: 'ip',\n    },\n    {\n      title: '耗时',\n      dataIndex: 'duration',\n      key: 'duration',\n    },\n    {\n      title: '状态',\n      dataIndex: 'status',\n      key: 'status',\n      render: (status: keyof typeof statusMap) => (\n        <Tag color={statusMap[status].color} icon={statusMap[status].icon}>\n          {statusMap[status].text}\n        </Tag>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>分析审计</Title>\n        <Text type=\"secondary\">追踪所有用户操作和系统事件</Text>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={16} style={{ marginBottom: 24 }}>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic title=\"今日操作\" value={12} />\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic \n              title=\"成功操作\" \n              value={10} \n              valueStyle={{ color: '#52c41a' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic \n              title=\"失败操作\" \n              value={2} \n              valueStyle={{ color: '#ff4d4f' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic title=\"进行中\" value={0} />\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 筛选器 */}\n      <Card bordered={false} style={{ marginBottom: 16 }}>\n        <Row gutter={[16, 16]} align=\"middle\">\n          <Col>\n            <Input\n              placeholder=\"搜索操作或对象...\"\n              prefix={<SearchOutlined />}\n              style={{ width: 250 }}\n            />\n          </Col>\n          <Col>\n            <Select\n              placeholder=\"操作类型\"\n              style={{ width: 120 }}\n              allowClear\n              options={[\n                { value: 'create', label: '创建' },\n                { value: 'read', label: '查看' },\n                { value: 'update', label: '更新' },\n                { value: 'delete', label: '删除' },\n              ]}\n            />\n          </Col>\n          <Col>\n            <Select\n              placeholder=\"状态\"\n              style={{ width: 120 }}\n              value={selectedStatus}\n              onChange={setSelectedStatus}\n              options={[\n                { value: 'all', label: '全部' },\n                { value: 'success', label: '成功' },\n                { value: 'failed', label: '失败' },\n                { value: 'pending', label: '进行中' },\n              ]}\n            />\n          </Col>\n          <Col>\n            <RangePicker />\n          </Col>\n          <Col flex=\"auto\">\n            <Space style={{ float: 'right' }}>\n              <Button icon={<ReloadOutlined />}>刷新</Button>\n              <Button icon={<DownloadOutlined />}>导出</Button>\n            </Space>\n          </Col>\n        </Row>\n      </Card>\n\n      {/* 日志表格 */}\n      <Card bordered={false}>\n        <Table\n          dataSource={logs}\n          columns={columns}\n          rowKey=\"key\"\n          size=\"middle\"\n          pagination={{\n            showSizeChanger: true,\n            showQuickJumper: true,\n            showTotal: (total) => `共 ${total} 条记录`,\n          }}\n        />\n      </Card>\n    </div>\n  );\n}\n",
+      "__isJSFile": true,
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/audit.tsx"
+    },
+    "6": {
+      "path": "/settings",
+      "file": "@/pages/settings.tsx",
+      "parentId": "1",
+      "id": "6",
+      "absPath": "/settings",
+      "__content": "import { Card, Form, Input, Switch, Button, Space, Divider, Row, Col, Typography, Tabs, message, Alert } from 'antd';\nimport {\n  SaveOutlined,\n  GlobalOutlined,\n  LockOutlined,\n  BellOutlined,\n  RobotOutlined,\n  DatabaseOutlined,\n  ApiOutlined,\n} from '@ant-design/icons';\n\nconst { Title, Text } = Typography;\n\nexport default function Settings() {\n  const [form] = Form.useForm();\n\n  const handleSave = async () => {\n    try {\n      const values = await form.validateFields();\n      console.log('保存设置:', values);\n      message.success('设置已保存');\n    } catch (error) {\n      console.error('验证失败:', error);\n    }\n  };\n\n  const items = [\n    {\n      key: 'basic',\n      label: (\n        <span>\n          <GlobalOutlined />\n          基础配置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form form={form} layout=\"vertical\" initialValues={{\n            systemName: 'GitIntel Admin',\n            apiBaseUrl: 'http://localhost:8000',\n            timeout: 30,\n          }}>\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item\n                  name=\"systemName\"\n                  label=\"系统名称\"\n                  rules={[{ required: true, message: '请输入系统名称' }]}\n                >\n                  <Input placeholder=\"GitIntel Admin\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item\n                  name=\"apiBaseUrl\"\n                  label=\"API 基础地址\"\n                  rules={[{ required: true, message: '请输入 API 地址' }]}\n                >\n                  <Input placeholder=\"http://localhost:8000\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item name=\"timeout\" label=\"请求超时时间（秒）\">\n                  <Input type=\"number\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item name=\"maxRetries\" label=\"最大重试次数\">\n                  <Input type=\"number\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'features',\n      label: (\n        <span>\n          <RobotOutlined />\n          功能开关\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Form.Item\n              label={\n                <Space>\n                  <Text>启用分析功能</Text>\n                  <Text type=\"secondary\">(允许用户创建新的代码分析任务)</Text>\n                </Space>\n              }\n            >\n              <Switch defaultChecked />\n            </Form.Item>\n            <Divider />\n            <Form.Item\n              label={\n                <Space>\n                  <Text>启用通知</Text>\n                  <Text type=\"secondary\">(分析完成时发送邮件通知)</Text>\n                </Space>\n              }\n            >\n              <Switch defaultChecked />\n            </Form.Item>\n            <Divider />\n            <Form.Item\n              label={\n                <Space>\n                  <Text>启用审计日志</Text>\n                  <Text type=\"secondary\">(记录所有用户操作)</Text>\n                </Space>\n              }\n            >\n              <Switch defaultChecked />\n            </Form.Item>\n            <Divider />\n            <Form.Item\n              label={\n                <Space>\n                  <Text>调试模式</Text>\n                  <Text type=\"secondary\">(显示详细的调试信息)</Text>\n                </Space>\n              }\n            >\n              <Switch />\n            </Form.Item>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'security',\n      label: (\n        <span>\n          <LockOutlined />\n          安全设置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Alert\n              message=\"安全建议\"\n              description=\"建议定期更换密码，启用双因素认证，并限制 API 访问频率。\"\n              type=\"info\"\n              showIcon\n              style={{ marginBottom: 24 }}\n            />\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"会话超时（分钟）\">\n                  <Input type=\"number\" placeholder=\"60\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"密码最小长度\">\n                  <Input type=\"number\" placeholder=\"8\" />\n                </Form.Item>\n              </Col>\n            </Row>\n            <Form.Item label=\"启用双因素认证\">\n              <Space direction=\"vertical\">\n                <Switch />\n                <Text type=\"secondary\">启用后，用户登录时需要输入手机验证码</Text>\n              </Space>\n            </Form.Item>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'notifications',\n      label: (\n        <span>\n          <BellOutlined />\n          通知设置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Form.Item label=\"邮件通知\">\n              <Switch defaultChecked />\n            </Form.Item>\n            <Form.Item label=\"SMTP 服务器\">\n              <Input placeholder=\"smtp.example.com\" />\n            </Form.Item>\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"邮箱地址\">\n                  <Input placeholder=\"noreply@example.com\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"邮箱密码\">\n                  <Input.Password placeholder=\"••••••••\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'database',\n      label: (\n        <span>\n          <DatabaseOutlined />\n          数据库\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Alert\n            message=\"数据库配置\"\n            description=\"修改数据库配置前请确保服务已停止，避免数据丢失。\"\n            type=\"warning\"\n            showIcon\n            style={{ marginBottom: 24 }}\n          />\n          <Form layout=\"vertical\">\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"数据库类型\">\n                  <Input value=\"PostgreSQL\" disabled />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"连接地址\">\n                  <Input placeholder=\"localhost:5432\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"数据库名称\">\n                  <Input placeholder=\"gitintel\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"连接池大小\">\n                  <Input type=\"number\" placeholder=\"10\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'api',\n      label: (\n        <span>\n          <ApiOutlined />\n          API 配置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"AI 模型\">\n                  <Input placeholder=\"gpt-4\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"API Key\">\n                  <Input.Password placeholder=\"sk-...\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"最大 Token 数\">\n                  <Input type=\"number\" placeholder=\"4000\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"Temperature\">\n                  <Input type=\"number\" placeholder=\"0.7\" step=\"0.1\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>系统设置</Title>\n        <Text type=\"secondary\">配置系统参数和功能选项</Text>\n      </div>\n\n      <Tabs\n        tabPosition=\"left\"\n        style={{ minHeight: 600 }}\n        items={items}\n        tabBarStyle={{ width: 180 }}\n      />\n\n      <div style={{ marginTop: 24, textAlign: 'right' }}>\n        <Space>\n          <Button>重置</Button>\n          <Button type=\"primary\" icon={<SaveOutlined />} onClick={handleSave}>\n            保存设置\n          </Button>\n        </Space>\n      </div>\n    </div>\n  );\n}\n",
+      "__isJSFile": true,
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/settings.tsx"
+    }
+  },
+  "apiRoutes": {},
+  "hasSrcDir": true,
+  "npmClient": "pnpm",
+  "umi": {
+    "version": "4.6.42",
+    "name": "Umi",
+    "importSource": "umi",
+    "cliName": "umi"
+  },
+  "bundleStatus": {
+    "done": false
+  },
+  "mfsuBundleStatus": {
+    "done": false
+  },
+  "react": {
+    "version": "18.3.1",
+    "path": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react"
+  },
+  "react-dom": {
+    "version": "18.3.1",
+    "path": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react-dom"
+  },
+  "appJS": null,
+  "locale": "zh-CN",
+  "globalCSS": [],
+  "globalJS": [],
+  "overridesCSS": [],
+  "bundler": "webpack",
+  "git": {
+    "originUrl": "https://github.com/xecho-dev/GitIntel-AI-Analysis.git"
+  },
+  "framework": "react",
+  "typescript": {
+    "tsVersion": "5.6.3",
+    "tslibVersion": "2.8.1"
+  },
+  "faviconFiles": [],
+  "port": 8001,
+  "host": "0.0.0.0",
+  "ip": "192.168.1.10"
+}

@@ -22,26 +22,16 @@ import re
 from typing import AsyncGenerator, Optional
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
+from utils.llm_factory import get_llm
 
 _logger = logging.getLogger("gitintel")
+
 
 # ─── LLM 懒加载 ────────────────────────────────────────────────────────
 
 def _get_llm():
-    """懒加载 LLM client（当前使用阿里云 DashScope OpenAI 兼容接口）。"""
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if openai_key:
-        try:
-            from langchain_openai import ChatOpenAI
-            return ChatOpenAI(
-                model=os.getenv("OPENAI_MODEL", "qwen-plus"),
-                temperature=0.2,
-                openai_api_key=openai_key,
-                base_url=os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-            )
-        except Exception:
-            pass
-    return None
+    """懒加载 LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
+    return get_llm(temperature=0.2)
 
 
 def _build_arch_context(

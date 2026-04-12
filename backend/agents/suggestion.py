@@ -18,20 +18,9 @@ _logger = logging.getLogger("gitintel")
 # ─── LLM 懒加载 ─────────────────────────────────────────────────────────────
 
 def _get_llm():
-    """懒加载 LLM client（阿里云 DashScope OpenAI 兼容接口）。"""
-    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if openai_key:
-        try:
-            from langchain_openai import ChatOpenAI
-            return ChatOpenAI(
-                model=os.getenv("OPENAI_MODEL", "qwen-plus"),
-                temperature=0.3,
-                openai_api_key=openai_key,
-                base_url=os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-            )
-        except Exception as exc:
-            _logger.warning(f"[SuggestionAgent] LLM 初始化失败: {exc}")
-    return None
+    """懒加载 LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
+    from utils.llm_factory import get_llm
+    return get_llm(temperature=0.3)
 
 
 # ─── 代码摘要工具 ────────────────────────────────────────────────────────────
