@@ -34,76 +34,7 @@
 
 ## 核心流程
 
-```mermaid
-flowchart TB
-    %% ===================== 入口 =====================
-    A([🚀 请求进入])
-
-    %% ===================== 仓库加载阶段 =====================
-    subgraph S1[📦 仓库加载]
-        direction TB
-        B1[RepoLoaderAgent 获取仓库文件树]
-        B2[AI 优先级决策 P0 / P1 / P2]
-        B3[加载核心文件]
-        B1 --> B2 --> B3
-    end
-
-    %% ===================== 代码解析阶段 =====================
-    subgraph S2[🧩 代码解析]
-        direction TB
-        C1[CodeParserAgent AST 解析]
-        C2[提取函数 / 类 / 导入关系]
-        C1 --> C2
-    end
-
-    %% ===================== 并行分析阶段 =====================
-    subgraph S3[⚙️ 并行分析]
-        direction LR
-        D1[TechStackAgent 技术栈识别]
-        D2[QualityAgent 代码质量分析]
-        D3[DependencyAgent 依赖风险分析]
-    end
-
-    %% ===================== RAG 记忆核心 =====================
-    subgraph S4[🧠 RAG 记忆核心]
-        direction TB
-        E1[短期记忆 同仓库历史分析]
-        E2[向量检索 相似项目案例]
-        E3[知识库 最佳实践]
-    end
-
-    %% ===================== 建议生成阶段 =====================
-    subgraph S5[💡 建议生成]
-        direction TB
-        F1[SuggestionAgent 整合分析与RAG上下文]
-        F2[生成优化建议与架构洞察]
-        F1 --> F2
-    end
-
-    %% ===================== 结果存储阶段 =====================
-    subgraph S6[💾 结果存储与记忆更新]
-        direction LR
-        G1[更新短期记忆库]
-        G2[更新向量知识库]
-        G3[沉淀结构化最佳实践]
-    end
-
-    %% ===================== 主流程 =====================
-    A --> S1
-    S1 --> S2
-    S2 --> S3
-    S3 --> F1
-    F1 --> F2
-    F2 --> S6
-
-    %% ===================== RAG 增强关系 =====================
-    D1 --> E1
-    D2 --> E2
-    D3 --> E3
-    E1 --> F1
-    E2 --> F1
-    E3 --> F1
-    ```
+![核心流程](images/mermaid.png)
 
 ---
 
@@ -113,34 +44,17 @@ flowchart TB
 
 ---
 
-## 技术架构
-
-```mermaid
-C4Context
-    title 系统架构 - GitIntel AI Analysis
-
-    Person(user, "用户", "通过浏览器访问 GitIntel")
-    System(frontend, "前端", "Next.js 15", "用户界面 + BFF 层")
-    System(agent, "Agent 层", "FastAPI + LangGraph", "并行调度 4 个 Agent 执行分析")
-    SystemDb(supabase, "Supabase", "PostgreSQL", "用户数据 & 分析历史持久化")
-
-    Rel(user, frontend, "HTTP / SSE")
-    Rel(frontend, agent, "HTTP / SSE")
-    Rel(agent, supabase, "读写数据")
-
-    UpdateRelStyle(user, frontend, $offsetY="-40")
-    UpdateRelStyle(frontend, agent, $offsetY="40")
-    UpdateRelStyle(agent, supabase, $offsetX="-60")
-```
-
-### 4 个 Agent
+### 主要 Agent
 
 | Agent | 职责 |
 |---|---|
-| `ArchitectureAgent` | 扫描目录树，识别技术栈，推断分层架构 |
-| `QualityAgent` | 检测代码坏味道、圈复杂度、重复片段 |
-| `DependencyAgent` | 检查依赖版本、已知漏洞、弃用警告 |
-| `OptimizationAgent` | 综合前三者输出结构化优化建议 |
+| `RepoLoaderAgent` | 获取文件树 + AI 分类 P0/P1/P2 + 渐进式加载 |
+| `CodeParserAgent` | AST 解析代码结构（函数/类/导入/语义分块） |
+| `TechStackAgent` | 识别技术栈（语言/框架/基础设施） |
+| `QualityAgent` | 代码质量评分（健康度/复杂度/测试覆盖率） |
+| `DependencyAgent` | 依赖风险分析（版本/漏洞/弃用警告） |
+| `ArchitectureAgent` | 架构评估（分层/组件/模式识别） |
+| `SuggestionAgent` | RAG 增强的优化建议生成 |
 
 ---
 
