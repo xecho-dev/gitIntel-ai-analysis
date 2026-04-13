@@ -89,7 +89,12 @@ flowchart TB
     end
 
     %% ===================== 主流程 =====================
-    A --> S1 --> S2 --> S3 --> F1 --> F2 --> S6
+    A --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> F1
+    F1 --> F2
+    F2 --> S6
 
     %% ===================== RAG 增强关系 =====================
     D1 --> E1
@@ -110,30 +115,22 @@ flowchart TB
 
 ## 技术架构
 
-```
-┌─────────────────────────────────────┐
-│         Frontend  (Next.js)        │  ← Docker 部署，端口 3000
-│    Next.js App Router + Tailwind    │
-│    Zustand / Framer Motion / SSE    │
-└───────────────┬─────────────────────┘
-                │ HTTP / SSE
-                ▼
-┌─────────────────────────────────────┐
-│        BFF  (Next.js Route)         │  ← 同部署于 Docker
-│   /frontend/app/api/analyze/route   │
-└───────────────┬─────────────────────┘
-                │ HTTP
-                ▼
-┌─────────────────────────────────────┐
-│        Agent 层  (FastAPI)          │  ← Railway / Render 部署，端口 8000
-│   LangGraph 并行调度 4 个 Agent     │
-│   架构 · 质量 · 依赖 · 优化          │
-└─────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────┐
-│        Supabase (PostgreSQL)        │  ← 用户数据 & 分析历史持久化
-└─────────────────────────────────────┘
+```mermaid
+C4Context
+    title 系统架构 - GitIntel AI Analysis
+
+    Person(user, "用户", "通过浏览器访问 GitIntel")
+    System(frontend, "前端", "Next.js 15", "用户界面 + BFF 层")
+    System(agent, "Agent 层", "FastAPI + LangGraph", "并行调度 4 个 Agent 执行分析")
+    SystemDb(supabase, "Supabase", "PostgreSQL", "用户数据 & 分析历史持久化")
+
+    Rel(user, frontend, "HTTP / SSE")
+    Rel(frontend, agent, "HTTP / SSE")
+    Rel(agent, supabase, "读写数据")
+
+    UpdateRelStyle(user, frontend, $offsetY="-40")
+    UpdateRelStyle(frontend, agent, $offsetY="40")
+    UpdateRelStyle(agent, supabase, $offsetX="-60")
 ```
 
 ### 4 个 Agent
