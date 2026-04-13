@@ -111,6 +111,8 @@
         "hooks": {
           "modifyRoutes": [
             0,
+            0,
+            0,
             0
           ]
         },
@@ -131,7 +133,10 @@
             15,
             2,
             3,
-            3
+            3,
+            4,
+            1,
+            2
           ]
         },
         "register": 0
@@ -152,7 +157,9 @@
           ],
           "onGenerateFiles": [
             2,
-            4
+            4,
+            5,
+            5
           ]
         },
         "register": 21
@@ -169,6 +176,8 @@
       "time": {
         "hooks": {
           "addEntryCode": [
+            0,
+            0,
             0,
             0
           ]
@@ -196,9 +205,15 @@
             0,
             0,
             0,
+            0,
             0
           ],
           "onCheckCode": [
+            0,
+            0,
+            0,
+            0,
+            0,
             0,
             0,
             0,
@@ -1218,6 +1233,9 @@
           "modifyHTMLFavicon": [
             0,
             0,
+            0,
+            0,
+            0,
             0
           ]
         },
@@ -1236,9 +1254,13 @@
         "hooks": {
           "onGenerateFiles": [
             1,
-            1
+            1,
+            1,
+            0
           ],
           "addRuntimePlugin": [
+            0,
+            0,
             0,
             0
           ]
@@ -1315,9 +1337,15 @@
         "hooks": {
           "onGenerateFiles": [
             0,
+            0,
+            0,
             0
           ],
           "addEntryImports": [
+            0,
+            0,
+            0,
+            0,
             0,
             0,
             0,
@@ -1355,9 +1383,15 @@
           ],
           "onGenerateFiles": [
             80,
-            25
+            25,
+            17,
+            17
           ],
           "addPolyfillImports": [
+            0,
+            0,
+            0,
+            0,
             0,
             0,
             0,
@@ -1380,6 +1414,10 @@
             0,
             0,
             0,
+            0,
+            0,
+            0,
+            0,
             0
           ]
         },
@@ -1398,6 +1436,8 @@
         "hooks": {
           "onGenerateFiles": [
             126,
+            0,
+            0,
             0
           ]
         },
@@ -1442,6 +1482,8 @@
         "hooks": {
           "onGenerateFiles": [
             0,
+            0,
+            0,
             0
           ],
           "addBeforeMiddlewares": [
@@ -1465,7 +1507,11 @@
             12,
             4,
             7,
-            1
+            1,
+            6,
+            1,
+            5,
+            2
           ]
         },
         "register": 5
@@ -1521,7 +1567,9 @@
         "hooks": {
           "onGenerateFiles": [
             369,
-            13
+            13,
+            8,
+            6
           ]
         },
         "register": 3
@@ -1607,7 +1655,9 @@
         "hooks": {
           "onGenerateFiles": [
             5,
-            1
+            1,
+            0,
+            0
           ]
         },
         "register": 1
@@ -1741,6 +1791,9 @@
         "hooks": {
           "addHTMLHeadScripts": [
             11,
+            0,
+            0,
+            0,
             0,
             0
           ]
@@ -2276,7 +2329,7 @@
       "parentId": "1",
       "id": "5",
       "absPath": "/users",
-      "__content": "import { useState, useEffect, useCallback } from 'react';\nimport {\n  Table,\n  Tag,\n  Button,\n  Space,\n  Avatar,\n  Input,\n  Card,\n  Row,\n  Col,\n  Typography,\n  Modal,\n  message,\n  Spin,\n  Drawer,\n  Tooltip,\n} from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  UserAddOutlined,\n  SearchOutlined,\n  EditOutlined,\n  DeleteOutlined,\n  MailOutlined,\n  CheckCircleOutlined,\n  StopOutlined,\n  StarOutlined,\n  ForkOutlined,\n  HistoryOutlined,\n  EyeOutlined,\n} from '@ant-design/icons';\nimport dayjs from 'dayjs';\nimport { getUserList, updateUser } from '@/services/admin';\nimport type { AdminUserItem, AdminUserListResponse, AdminHistoryListResponse } from '@/types';\nimport AnalysisDetailDrawer from '@/components/AnalysisDetailDrawer';\n\nconst { Title, Text } = Typography;\nconst { confirm } = Modal;\n\nexport default function Users() {\n  const [loading, setLoading] = useState(false);\n  const [users, setUsers] = useState<AdminUserListResponse | null>(null);\n  const [search, setSearch] = useState('');\n  const [page, setPage] = useState(1);\n  const [pageSize, setPageSize] = useState(10);\n\n  // 用户分析历史抽屉\n  const [historyOpen, setHistoryOpen] = useState(false);\n  const [historyLoading, setHistoryLoading] = useState(false);\n  const [historyData, setHistoryData] = useState<{\n    user: AdminUserItem;\n    history: AdminHistoryListResponse;\n  } | null>(null);\n  const [historyPage, setHistoryPage] = useState(1);\n  const [historyPageSize, setHistoryPageSize] = useState(10);\n\n  // 详情抽屉\n  const [detailOpen, setDetailOpen] = useState(false);\n  const [detailLoading, setDetailLoading] = useState(false);\n  const [detailData, setDetailData] = useState<import('@/types').AdminHistoryDetailResponse | null>(null);\n\n  const fetchUsers = useCallback(async () => {\n    setLoading(true);\n    try {\n      const res = await getUserList({ page, pageSize, search: search || undefined });\n      setUsers(res);\n    } catch {\n      message.error('加载用户列表失败');\n    } finally {\n      setLoading(false);\n    }\n  }, [page, pageSize, search]);\n\n  useEffect(() => {\n    fetchUsers();\n  }, [fetchUsers]);\n\n  const handleSearch = () => {\n    setPage(1);\n    fetchUsers();\n  };\n\n  const handlePageChange = (newPage: number, newPageSize: number) => {\n    if (newPageSize !== pageSize) {\n      setPageSize(newPageSize);\n      setPage(1);\n    } else {\n      setPage(newPage);\n    }\n  };\n\n  const handleViewUserHistory = async (user: AdminUserItem) => {\n    setHistoryOpen(true);\n    setHistoryPage(1);\n    setHistoryPageSize(10);\n    setHistoryLoading(true);\n    try {\n      const { getUserHistory } = await import('@/services/admin');\n      const res = await getUserHistory(user.id, { page: 1, pageSize: 10 });\n      setHistoryData(res);\n    } catch {\n      message.error('加载用户分析历史失败');\n      setHistoryOpen(false);\n    } finally {\n      setHistoryLoading(false);\n    }\n  };\n\n  const handleHistoryPageChange = async (newPage: number, newPageSize: number) => {\n    if (!historyData) return;\n    setHistoryPage(newPage);\n    setHistoryPageSize(newPageSize);\n    setHistoryLoading(true);\n    try {\n      const { getUserHistory } = await import('@/services/admin');\n      const res = await getUserHistory(historyData.user.id, {\n        page: newPage,\n        pageSize: newPageSize,\n      });\n      setHistoryData(res);\n    } catch {\n      message.error('加载失败');\n    } finally {\n      setHistoryLoading(false);\n    }\n  };\n\n  const handleViewDetail = async (recordId: string) => {\n    setDetailOpen(true);\n    setDetailLoading(true);\n    setDetailData(null);\n    try {\n      const { getHistoryDetail } = await import('@/services/admin');\n      const res = await getHistoryDetail(recordId);\n      setDetailData(res);\n    } catch {\n      message.error('加载详情失败');\n      setDetailOpen(false);\n    } finally {\n      setDetailLoading(false);\n    }\n  };\n\n  const userColumns: ColumnsType<AdminUserItem> = [\n    {\n      title: '用户',\n      key: 'user',\n      render: (_, record) => (\n        <Space>\n          <Avatar\n            src={record.avatar_url || undefined}\n            style={{ background: '#1677ff' }}\n          >\n            {record.login?.slice(0, 1).toUpperCase() || 'U'}\n          </Avatar>\n          <div>\n            <Text strong>{record.login}</Text>\n            {record.name && (\n              <Text type=\"secondary\" style={{ display: 'block', fontSize: 11 }}>\n                {record.name}\n              </Text>\n            )}\n            {record.email && (\n              <Text type=\"secondary\" style={{ display: 'block', fontSize: 11 }}>\n                <MailOutlined style={{ marginRight: 3 }} />\n                {record.email}\n              </Text>\n            )}\n          </div>\n        </Space>\n      ),\n    },\n    {\n      title: 'GitHub 统计',\n      key: 'github_stats',\n      width: 180,\n      render: (_, record) => (\n        <Space size=\"middle\">\n          <Tooltip title=\"公开仓库\">\n            <span>\n              <ForkOutlined style={{ color: '#8b909f', marginRight: 3 }} />\n              <Text style={{ fontSize: 12 }}>{record.public_repos}</Text>\n            </span>\n          </Tooltip>\n          <Tooltip title=\"Followers\">\n            <span>\n              <StarOutlined style={{ color: '#8b909f', marginRight: 3 }} />\n              <Text style={{ fontSize: 12 }}>{record.followers}</Text>\n            </span>\n          </Tooltip>\n          <Tooltip title=\"Following\">\n            <span>\n              <Text style={{ fontSize: 12 }}>{record.following}</Text>\n              <Text type=\"secondary\" style={{ fontSize: 11 }}> following</Text>\n            </span>\n          </Tooltip>\n        </Space>\n      ),\n    },\n    {\n      title: '位置',\n      dataIndex: 'location',\n      key: 'location',\n      width: 120,\n      render: (loc: string | null) => loc || <Text type=\"secondary\">-</Text>,\n    },\n    {\n      title: '注册时间',\n      dataIndex: 'created_at',\n      key: 'created_at',\n      width: 160,\n      render: (ts: string) => (\n        <Text style={{ fontSize: 12 }} type=\"secondary\">\n          {dayjs(ts).format('YYYY-MM-DD HH:mm')}\n        </Text>\n      ),\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 180,\n      render: (_, record) => (\n        <Space size=\"small\">\n          <Button\n            type=\"text\"\n            size=\"small\"\n            icon={<HistoryOutlined />}\n            onClick={() => handleViewUserHistory(record)}\n          >\n            分析记录\n          </Button>\n          <Button type=\"text\" size=\"small\" icon={<EditOutlined />}>\n            编辑\n          </Button>\n        </Space>\n      ),\n    },\n  ];\n\n  const historyColumns: ColumnsType<import('@/types').AdminAnalysisItem> = [\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <div>\n          <a\n            href={record.repo_url}\n            target=\"_blank\"\n            rel=\"noopener noreferrer\"\n            style={{ fontWeight: 500 }}\n          >\n            {record.repo_name}\n          </a>\n          <div>\n            <Tag style={{ fontSize: 10 }}>{record.branch || 'main'}</Tag>\n            <Text type=\"secondary\" style={{ fontSize: 11 }}>\n              {dayjs(record.created_at).format('YYYY-MM-DD HH:mm')}\n            </Text>\n          </div>\n        </div>\n      ),\n    },\n    {\n      title: '健康分',\n      dataIndex: 'health_score',\n      key: 'health_score',\n      width: 80,\n      render: (s: number | null) => {\n        if (s === null) return <Text type=\"secondary\">-</Text>;\n        const color = s >= 85 ? '#52c41a' : s >= 60 ? '#faad14' : '#ff4d4f';\n        return <Tag color={s >= 85 ? 'success' : s >= 60 ? 'warning' : 'error'}>{s}%</Tag>;\n      },\n    },\n    {\n      title: '质量',\n      dataIndex: 'quality_score',\n      key: 'quality_score',\n      width: 60,\n      render: (score: string | null) => {\n        const sc: Record<string, string> = {\n          'A+': '#52c41a', 'A': '#73d13d', 'B+': '#1677ff', 'B': '#4096ff',\n          'C': '#faad14', 'C-': '#ff7a45', 'D': '#ff4d4f',\n        };\n        return (\n          <Tag style={{ color: sc[score || ''] || '#8b909f', fontWeight: 700 }}>\n            {score || '-'}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '风险',\n      dataIndex: 'risk_level',\n      key: 'risk_level',\n      width: 70,\n      render: (level: string | null) => {\n        const cfg: Record<string, { color: string; text: string }> = {\n          高危: { color: '#ff4d4f', text: '高危' },\n          中等: { color: '#722ed1', text: '中等' },\n          极低: { color: '#52c41a', text: '极低' },\n        };\n        const c = cfg[level || ''] || { color: '#8b909f', text: level || '-' };\n        return <Tag style={{ color: c.color, borderColor: c.color }}>{c.text}</Tag>;\n      },\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 80,\n      render: (_, record) => (\n        <Button\n          type=\"text\"\n          size=\"small\"\n          icon={<EyeOutlined />}\n          onClick={() => handleViewDetail(record.id)}\n        >\n          详情\n        </Button>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Row justify=\"space-between\" align=\"middle\">\n          <Col>\n            <Title level={4} style={{ margin: 0 }}>用户管理</Title>\n            <Text type=\"secondary\">管理系统用户和权限</Text>\n          </Col>\n          <Col>\n            <Button type=\"primary\" icon={<UserAddOutlined />}>\n              添加用户\n            </Button>\n          </Col>\n        </Row>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={16} style={{ marginBottom: 24 }}>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总用户数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#1677ff' }}>\n              {users?.total || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">活跃用户</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#52c41a' }}>\n              {users?.items.filter((u) => u.email).length || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总仓库数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa8c16' }}>\n              {users?.items.reduce((acc, u) => acc + u.public_repos, 0) || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总关注者数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#722ed1' }}>\n              {users?.items.reduce((acc, u) => acc + u.followers, 0) || 0}\n            </div>\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 用户表格 */}\n      <Card bordered={false}>\n        <div style={{ marginBottom: 16 }}>\n          <Space>\n            <Input\n              placeholder=\"搜索用户名或邮箱...\"\n              prefix={<SearchOutlined />}\n              style={{ width: 300 }}\n              value={search}\n              onChange={(e) => setSearch(e.target.value)}\n              onPressEnter={handleSearch}\n              allowClear\n            />\n            <Button type=\"primary\" onClick={handleSearch}>搜索</Button>\n          </Space>\n        </div>\n        <Spin spinning={loading}>\n          <Table\n            dataSource={users?.items || []}\n            columns={userColumns}\n            rowKey=\"id\"\n            size=\"middle\"\n            pagination={{\n              current: page,\n              pageSize: pageSize,\n              total: users?.total || 0,\n              showSizeChanger: true,\n              showQuickJumper: true,\n              showTotal: (total) => `共 ${total} 条记录`,\n              onChange: handlePageChange,\n            }}\n          />\n        </Spin>\n      </Card>\n\n      {/* 用户分析历史抽屉 */}\n      <Drawer\n        title={\n          historyData ? (\n            <Space>\n              <Avatar\n                src={historyData.user.avatar_url || undefined}\n                style={{ background: '#1677ff' }}\n              >\n                {historyData.user.login?.slice(0, 1).toUpperCase()}\n              </Avatar>\n              <span>{historyData.user.login} 的分析记录</span>\n            </Space>\n          ) : '用户分析记录'\n        }\n        placement=\"right\"\n        width={900}\n        open={historyOpen}\n        onClose={() => setHistoryOpen(false)}\n        styles={{ body: { padding: 0 } }}\n      >\n        <Spin spinning={historyLoading} tip=\"加载中...\">\n          {historyData && (\n            <>\n              {/* 用户基本信息 */}\n              <div style={{ padding: '12px 24px', borderBottom: '1px solid #303030', background: '#181c22' }}>\n                <Space wrap>\n                  {historyData.user.name && <Text>{historyData.user.name}</Text>}\n                  {historyData.user.email && (\n                    <Text type=\"secondary\">\n                      <MailOutlined style={{ marginRight: 4 }} />\n                      {historyData.user.email}\n                    </Text>\n                  )}\n                  {historyData.user.location && (\n                    <Text type=\"secondary\">{historyData.user.location}</Text>\n                  )}\n                  <Text type=\"secondary\">\n                    <ForkOutlined style={{ marginRight: 3 }} />\n                    {historyData.user.public_repos} 仓库\n                  </Text>\n                  <Text type=\"secondary\">\n                    <StarOutlined style={{ marginRight: 3 }} />\n                    {historyData.user.followers} followers\n                  </Text>\n                  {historyData.user.blog && (\n                    <a href={historyData.user.blog} target=\"_blank\" rel=\"noopener noreferrer\">\n                      <Text type=\"secondary\">{historyData.user.blog}</Text>\n                    </a>\n                  )}\n                </Space>\n                {/* 历史统计 */}\n                <Row gutter={[16, 8]} style={{ marginTop: 8 }}>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      总分析: <strong style={{ color: '#1677ff' }}>{historyData.history.stats.total_scans}</strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      平均健康分:{' '}\n                      <strong style={{ color: historyData.history.stats.avg_health_score >= 85 ? '#52c41a' : '#faad14' }}>\n                        {historyData.history.stats.avg_health_score}%\n                      </strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      高危: <strong style={{ color: '#ff4d4f' }}>{historyData.history.stats.high_risk_count}</strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      中等: <strong style={{ color: '#722ed1' }}>{historyData.history.stats.medium_risk_count}</strong>\n                    </Text>\n                  </Col>\n                </Row>\n              </div>\n\n              {/* 历史表格 */}\n              <div style={{ padding: '16px 24px' }}>\n                <Table\n                  dataSource={historyData.history.items}\n                  columns={historyColumns}\n                  rowKey=\"id\"\n                  size=\"small\"\n                  pagination={{\n                    current: historyPage,\n                    pageSize: historyPageSize,\n                    total: historyData.history.total,\n                    showSizeChanger: true,\n                    showTotal: (total) => `共 ${total} 条记录`,\n                    onChange: handleHistoryPageChange,\n                  }}\n                />\n              </div>\n            </>\n          )}\n        </Spin>\n      </Drawer>\n\n      {/* 详情抽屉 */}\n      <AnalysisDetailDrawer\n        open={detailOpen}\n        loading={detailLoading}\n        data={detailData}\n        onClose={() => {\n          setDetailOpen(false);\n          setDetailData(null);\n        }}\n      />\n    </div>\n  );\n}\n",
+      "__content": "import { useState, useEffect, useCallback } from 'react';\nimport {\n  Table,\n  Tag,\n  Button,\n  Space,\n  Avatar,\n  Input,\n  Card,\n  Row,\n  Col,\n  Typography,\n  Modal,\n  message,\n  Spin,\n  Drawer,\n  Tooltip,\n} from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  UserAddOutlined,\n  SearchOutlined,\n  EditOutlined,\n  DeleteOutlined,\n  MailOutlined,\n  CheckCircleOutlined,\n  StopOutlined,\n  StarOutlined,\n  ForkOutlined,\n  HistoryOutlined,\n  EyeOutlined,\n} from '@ant-design/icons';\nimport dayjs from 'dayjs';\nimport { getUserList, updateUser } from '@/services/admin';\nimport type { AdminUserItem, AdminUserListResponse, AdminHistoryListResponse } from '@/types';\nimport AnalysisDetailDrawer from '@/components/AnalysisDetailDrawer';\n\nconst { Title, Text } = Typography;\nconst { confirm } = Modal;\n\nexport default function Users() {\n  const [loading, setLoading] = useState(false);\n  const [users, setUsers] = useState<AdminUserListResponse | null>(null);\n  const [search, setSearch] = useState('');\n  const [page, setPage] = useState(1);\n  const [pageSize, setPageSize] = useState(10);\n\n  // 用户分析历史抽屉\n  const [historyOpen, setHistoryOpen] = useState(false);\n  const [historyLoading, setHistoryLoading] = useState(false);\n  const [historyData, setHistoryData] = useState<{\n    user: AdminUserItem;\n    history: AdminHistoryListResponse;\n  } | null>(null);\n  const [historyPage, setHistoryPage] = useState(1);\n  const [historyPageSize, setHistoryPageSize] = useState(10);\n\n  // 详情抽屉\n  const [detailOpen, setDetailOpen] = useState(false);\n  const [detailLoading, setDetailLoading] = useState(false);\n  const [detailData, setDetailData] = useState<import('@/types').AdminHistoryDetailResponse | null>(null);\n\n  const fetchUsers = useCallback(async () => {\n    setLoading(true);\n    try {\n      const res = await getUserList({ page, pageSize, search: search || undefined });\n      setUsers(res);\n    } catch {\n      message.error('加载用户列表失败');\n    } finally {\n      setLoading(false);\n    }\n  }, [page, pageSize, search]);\n\n  useEffect(() => {\n    fetchUsers();\n  }, [fetchUsers]);\n\n  const handleSearch = () => {\n    setPage(1);\n    fetchUsers();\n  };\n\n  const handlePageChange = (newPage: number, newPageSize: number) => {\n    if (newPageSize !== pageSize) {\n      setPageSize(newPageSize);\n      setPage(1);\n    } else {\n      setPage(newPage);\n    }\n  };\n\n  const handleViewUserHistory = async (user: AdminUserItem) => {\n    setHistoryOpen(true);\n    setHistoryPage(1);\n    setHistoryPageSize(10);\n    setHistoryLoading(true);\n    try {\n      const { getUserHistory } = await import('@/services/admin');\n      const res = await getUserHistory(user.id, { page: 1, pageSize: 10 });\n      setHistoryData(res);\n    } catch {\n      message.error('加载用户分析历史失败');\n      setHistoryOpen(false);\n    } finally {\n      setHistoryLoading(false);\n    }\n  };\n\n  const handleHistoryPageChange = async (newPage: number, newPageSize: number) => {\n    if (!historyData) return;\n    setHistoryPage(newPage);\n    setHistoryPageSize(newPageSize);\n    setHistoryLoading(true);\n    try {\n      const { getUserHistory } = await import('@/services/admin');\n      const res = await getUserHistory(historyData.user.id, {\n        page: newPage,\n        pageSize: newPageSize,\n      });\n      setHistoryData(res);\n    } catch {\n      message.error('加载失败');\n    } finally {\n      setHistoryLoading(false);\n    }\n  };\n\n  const handleViewDetail = async (recordId: string) => {\n    setDetailOpen(true);\n    setDetailLoading(true);\n    setDetailData(null);\n    try {\n      const { getHistoryDetail } = await import('@/services/admin');\n      const res = await getHistoryDetail(recordId);\n      setDetailData(res);\n    } catch {\n      message.error('加载详情失败');\n      setDetailOpen(false);\n    } finally {\n      setDetailLoading(false);\n    }\n  };\n\n  const userColumns: ColumnsType<AdminUserItem> = [\n    {\n      title: '用户',\n      key: 'user',\n      render: (_, record) => (\n        <Space>\n          <Avatar\n            src={record.avatar_url || undefined}\n            style={{ background: '#1677ff' }}\n          >\n            {record.login?.slice(0, 1).toUpperCase() || 'U'}\n          </Avatar>\n          <div>\n            <Text strong>{record.login}</Text>\n            {record.name && (\n              <Text type=\"secondary\" style={{ display: 'block', fontSize: 11 }}>\n                {record.name}\n              </Text>\n            )}\n            {record.email && (\n              <Text type=\"secondary\" style={{ display: 'block', fontSize: 11 }}>\n                <MailOutlined style={{ marginRight: 3 }} />\n                {record.email}\n              </Text>\n            )}\n          </div>\n        </Space>\n      ),\n    },\n    {\n      title: 'GitHub 统计',\n      key: 'github_stats',\n      width: 180,\n      render: (_, record) => (\n        <Space size=\"middle\">\n          <Tooltip title=\"公开仓库\">\n            <span>\n              <ForkOutlined style={{ color: '#8b909f', marginRight: 3 }} />\n              <Text style={{ fontSize: 12 }}>{record.public_repos}</Text>\n            </span>\n          </Tooltip>\n          <Tooltip title=\"Followers\">\n            <span>\n              <StarOutlined style={{ color: '#8b909f', marginRight: 3 }} />\n              <Text style={{ fontSize: 12 }}>{record.followers}</Text>\n            </span>\n          </Tooltip>\n          <Tooltip title=\"Following\">\n            <span>\n              <Text style={{ fontSize: 12 }}>{record.following}</Text>\n              <Text type=\"secondary\" style={{ fontSize: 11 }}> following</Text>\n            </span>\n          </Tooltip>\n        </Space>\n      ),\n    },\n    {\n      title: '位置',\n      dataIndex: 'location',\n      key: 'location',\n      width: 120,\n      render: (loc: string | null) => loc || <Text type=\"secondary\">-</Text>,\n    },\n    {\n      title: '注册时间',\n      dataIndex: 'created_at',\n      key: 'created_at',\n      width: 160,\n      render: (ts: string) => (\n        <Text style={{ fontSize: 12 }} type=\"secondary\">\n          {dayjs(ts).format('YYYY-MM-DD HH:mm')}\n        </Text>\n      ),\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 180,\n      render: (_, record) => (\n        <Space size=\"small\">\n          <Button\n            type=\"text\"\n            size=\"small\"\n            icon={<HistoryOutlined />}\n            onClick={() => handleViewUserHistory(record)}\n          >\n            分析记录\n          </Button>\n          <Button type=\"text\" size=\"small\" icon={<EditOutlined />}>\n            编辑\n          </Button>\n        </Space>\n      ),\n    },\n  ];\n\n  const historyColumns: ColumnsType<import('@/types').AdminAnalysisItem> = [\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <div>\n          <a\n            href={record.repo_url}\n            target=\"_blank\"\n            rel=\"noopener noreferrer\"\n            style={{ fontWeight: 500 }}\n          >\n            {record.repo_name}\n          </a>\n          <div>\n            <Tag style={{ fontSize: 10 }}>{record.branch || 'main'}</Tag>\n            <Text type=\"secondary\" style={{ fontSize: 11 }}>\n              {dayjs(record.created_at).format('YYYY-MM-DD HH:mm')}\n            </Text>\n          </div>\n        </div>\n      ),\n    },\n    {\n      title: '健康分',\n      dataIndex: 'health_score',\n      key: 'health_score',\n      width: 80,\n      render: (s: number | null) => {\n        if (s === null) return <Text type=\"secondary\">-</Text>;\n        const color = s >= 85 ? '#52c41a' : s >= 60 ? '#faad14' : '#ff4d4f';\n        return <Tag color={s >= 85 ? 'success' : s >= 60 ? 'warning' : 'error'}>{s}%</Tag>;\n      },\n    },\n    {\n      title: '质量',\n      dataIndex: 'quality_score',\n      key: 'quality_score',\n      width: 60,\n      render: (score: string | null) => {\n        const sc: Record<string, string> = {\n          'A+': '#52c41a', 'A': '#73d13d', 'B+': '#1677ff', 'B': '#4096ff',\n          'C': '#faad14', 'C-': '#ff7a45', 'D': '#ff4d4f',\n        };\n        return (\n          <Tag style={{ color: sc[score || ''] || '#8b909f', fontWeight: 700 }}>\n            {score || '-'}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '风险',\n      dataIndex: 'risk_level',\n      key: 'risk_level',\n      width: 70,\n      render: (level: string | null) => {\n        const cfg: Record<string, { color: string; text: string }> = {\n          高危: { color: '#ff4d4f', text: '高危' },\n          中等: { color: '#722ed1', text: '中等' },\n          极低: { color: '#52c41a', text: '极低' },\n        };\n        const c = cfg[level || ''] || { color: '#8b909f', text: level || '-' };\n        return <Tag style={{ color: c.color, borderColor: c.color }}>{c.text}</Tag>;\n      },\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 80,\n      render: (_, record) => (\n        <Button\n          type=\"text\"\n          size=\"small\"\n          icon={<EyeOutlined />}\n          onClick={() => handleViewDetail(record.id)}\n        >\n          详情\n        </Button>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Row justify=\"space-between\" align=\"middle\">\n          <Col>\n            <Title level={4} style={{ margin: 0 }}>用户管理</Title>\n            <Text type=\"secondary\">管理系统用户和权限</Text>\n          </Col>\n          <Col>\n            <Button type=\"primary\" icon={<UserAddOutlined />}>\n              添加用户\n            </Button>\n          </Col>\n        </Row>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={16} style={{ marginBottom: 24 }}>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总用户数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#1677ff' }}>\n              {users?.total || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">活跃用户</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#52c41a' }}>\n              {users?.items.filter((u) => u.email).length || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总仓库数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa8c16' }}>\n              {users?.items.reduce((acc, u) => acc + u.public_repos, 0) || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总关注者数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#722ed1' }}>\n              {users?.items.reduce((acc, u) => acc + u.followers, 0) || 0}\n            </div>\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 用户表格 */}\n      <Card bordered={false}>\n        <div style={{ marginBottom: 16 }}>\n          <Space>\n            <Input\n              placeholder=\"搜索用户名或邮箱...\"\n              prefix={<SearchOutlined />}\n              style={{ width: 300 }}\n              value={search}\n              onChange={(e) => setSearch(e.target.value)}\n              onPressEnter={handleSearch}\n              allowClear\n            />\n            <Button type=\"primary\" onClick={handleSearch}>搜索</Button>\n          </Space>\n        </div>\n        <Spin spinning={loading}>\n          <Table\n            dataSource={users?.items || []}\n            columns={userColumns}\n            rowKey=\"id\"\n            size=\"middle\"\n            pagination={{\n              current: page,\n              pageSize: pageSize,\n              total: users?.total || 0,\n              showSizeChanger: true,\n              showQuickJumper: true,\n              showTotal: (total) => `共 ${total} 条记录`,\n              onChange: handlePageChange,\n            }}\n          />\n        </Spin>\n      </Card>\n\n      {/* 用户分析历史抽屉 */}\n      <Drawer\n        title={\n          historyData ? (\n            <Space>\n              <Avatar\n                src={historyData.user.avatar_url || undefined}\n                style={{ background: '#1677ff' }}\n              >\n                {historyData.user.login?.slice(0, 1).toUpperCase()}\n              </Avatar>\n              <span>{historyData.user.login} 的分析记录</span>\n            </Space>\n          ) : '用户分析记录'\n        }\n        placement=\"right\"\n        width={900}\n        open={historyOpen}\n        onClose={() => setHistoryOpen(false)}\n        styles={{ body: { padding: 0 } }}\n      >\n        <Spin spinning={historyLoading} tip=\"加载中...\">\n          {historyData && (\n            <>\n              {/* 用户基本信息 */}\n              <div style={{ padding: '12px 24px', borderBottom: '1px solid #f3f4f6', background: '#fafafa' }}>\n                <Space wrap>\n                  {historyData.user.name && <Text>{historyData.user.name}</Text>}\n                  {historyData.user.email && (\n                    <Text type=\"secondary\">\n                      <MailOutlined style={{ marginRight: 4 }} />\n                      {historyData.user.email}\n                    </Text>\n                  )}\n                  {historyData.user.location && (\n                    <Text type=\"secondary\">{historyData.user.location}</Text>\n                  )}\n                  <Text type=\"secondary\">\n                    <ForkOutlined style={{ marginRight: 3 }} />\n                    {historyData.user.public_repos} 仓库\n                  </Text>\n                  <Text type=\"secondary\">\n                    <StarOutlined style={{ marginRight: 3 }} />\n                    {historyData.user.followers} followers\n                  </Text>\n                  {historyData.user.blog && (\n                    <a href={historyData.user.blog} target=\"_blank\" rel=\"noopener noreferrer\">\n                      <Text type=\"secondary\">{historyData.user.blog}</Text>\n                    </a>\n                  )}\n                </Space>\n                {/* 历史统计 */}\n                <Row gutter={[16, 8]} style={{ marginTop: 8 }}>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      总分析: <strong style={{ color: '#1677ff' }}>{historyData.history.stats.total_scans}</strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      平均健康分:{' '}\n                      <strong style={{ color: historyData.history.stats.avg_health_score >= 85 ? '#52c41a' : '#faad14' }}>\n                        {historyData.history.stats.avg_health_score}%\n                      </strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      高危: <strong style={{ color: '#ff4d4f' }}>{historyData.history.stats.high_risk_count}</strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      中等: <strong style={{ color: '#722ed1' }}>{historyData.history.stats.medium_risk_count}</strong>\n                    </Text>\n                  </Col>\n                </Row>\n              </div>\n\n              {/* 历史表格 */}\n              <div style={{ padding: '16px 24px' }}>\n                <Table\n                  dataSource={historyData.history.items}\n                  columns={historyColumns}\n                  rowKey=\"id\"\n                  size=\"small\"\n                  pagination={{\n                    current: historyPage,\n                    pageSize: historyPageSize,\n                    total: historyData.history.total,\n                    showSizeChanger: true,\n                    showTotal: (total) => `共 ${total} 条记录`,\n                    onChange: handleHistoryPageChange,\n                  }}\n                />\n              </div>\n            </>\n          )}\n        </Spin>\n      </Drawer>\n\n      {/* 详情抽屉 */}\n      <AnalysisDetailDrawer\n        open={detailOpen}\n        loading={detailLoading}\n        data={detailData}\n        onClose={() => {\n          setDetailOpen(false);\n          setDetailData(null);\n        }}\n      />\n    </div>\n  );\n}\n",
       "__isJSFile": true,
       "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/users.tsx"
     },
