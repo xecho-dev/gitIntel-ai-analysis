@@ -1,9 +1,10 @@
-"""SuggestionAgent — LLM 驱动的优化建议生成。
+"""SuggestionAgent — LLM 驱动的优化建议生成（RAG 增强）。
 
 核心策略：
-  1. LLM 优先：接收真实代码内容 + 分析数据，生成深度优化建议
-  2. 规则引擎兜底：仅在 LLM 不可用时补充关键性建议
-  3. 传真实代码片段给 LLM，而非仅传摘要
+  1. RAG 优先：检索同类仓库的历史分析经验
+  2. LLM 增强：接收真实代码内容 + RAG 上下文 + 分析数据，生成深度优化建议
+  3. 规则引擎兜底：仅在 LLM 不可用时补充关键性建议
+  4. RAG 存储：分析完成后，将高优先级建议存入向量库供后续复用
 """
 import logging
 import os
@@ -14,6 +15,20 @@ from .base_agent import AgentEvent, BaseAgent, _make_event
 
 _logger = logging.getLogger("gitintel")
 
+# ─── RAG Store 懒加载 ────────────────────────────────────────────────────────
+
+_rag_store: Optional["DashVectorStore"] = None
+
+
+def _get_rag_store() -> "DashVectorStore":
+    """懒加载 DashVector Store。"""
+    global _rag_store
+    if _rag_store is None:
+        from memory.dashvector_store import DashVectorStore
+        _rag_store = DashVectorStore()
+        _logger.info(f"[SuggestionAgent] RAG Store 初始化完成，可用: {_rag_store.is_available}")
+    return _rag_store
+
 
 # ─── LLM 懒加载 ─────────────────────────────────────────────────────────────
 
@@ -21,6 +36,38 @@ def _get_llm():
     """懒加载 LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
     from utils.llm_factory import get_llm
     return get_llm(temperature=0.3)
+
+
+# ─── RAG 上下文构建 ─────────────────────────────────────────────────────────
+
+def _build_rag_context(
+    rag_results: list[dict],
+    similar_results: list[dict],
+) -> str:
+    """从 RAG 检索结果构建上下文文本，插入到 LLM prompt 中。"""
+    if not rag_results and not similar_results:
+        return ""
+
+    parts = ["\n\n【RAG 增强上下文 — 历史分析经验】\n"]
+    parts.append("以下是从同类仓库分析中积累的经验和建议，可作为参考：\n")
+
+    if rag_results:
+        parts.append("--- 同仓库历史分析 ---")
+        for idx, r in enumerate(rag_results[:3], 1):
+            parts.append(f"{idx}. [{r.get('category', '')}] {r.get('title', '')}")
+            parts.append(f"   {r.get('content', '')[:200]}")
+        parts.append("")
+
+    if similar_results:
+        parts.append("--- 相似项目分析 ---")
+        for idx, r in enumerate(similar_results[:3], 1):
+            parts.append(
+                f"{idx}. {r.get('repo_url', 'unknown')} — "
+                f"[{r.get('category', '')}] {r.get('title', '')}"
+            )
+            parts.append(f"   {r.get('content', '')[:200]}")
+
+    return "\n".join(parts)
 
 
 # ─── 代码摘要工具 ────────────────────────────────────────────────────────────
@@ -46,8 +93,9 @@ def _build_llm_context(
     tech_stack_result: dict | None,
     quality_result: dict | None,
     dependency_result: dict | None,
+    rag_context: str = "",
 ) -> str:
-    """构建发送给 LLM 的完整上下文，包含真实代码片段。"""
+    """构建发送给 LLM 的完整上下文，包含真实代码片段和 RAG 上下文。"""
     import json
 
     parts = [f"仓库: {repo_path}@{branch}\n"]
@@ -141,6 +189,10 @@ def _build_llm_context(
             for d in risky:
                 parts.append(f"    - {d['name']}@{d.get('version', '*')} ({d.get('risk_level', 'unknown')})")
 
+    # ── RAG 上下文 ───────────────────────────────────────────────────────
+    if rag_context:
+        parts.append(rag_context)
+
     return "\n".join(parts)
 
 
@@ -185,9 +237,12 @@ class SuggestionAgent(BaseAgent):
         quality_result: dict | None = None,
         dependency_result: dict | None = None,
     ) -> AsyncGenerator[AgentEvent, None]:
-        """LLM 驱动的优化建议生成。
+        """LLM 驱动的优化建议生成（含 RAG 检索增强 + 分析后存储）。
 
-        优先使用 LLM 分析真实代码内容；LLM 不可用时才用规则引擎兜底。
+        流程：
+          1. RAG 检索：获取同类仓库历史经验 + 最佳实践
+          2. LLM 生成：结合 RAG 上下文 + 真实代码内容生成建议
+          3. RAG 存储：分析完成后，将高优先级建议存入向量库
         """
         yield _make_event(
             self.name, "status",
@@ -201,6 +256,36 @@ class SuggestionAgent(BaseAgent):
             v = _id[0]
             _id[0] += 1
             return v
+
+        # ── RAG 检索 ─────────────────────────────────────────────────────────
+        rag_results: list[dict] = []
+        similar_results: list[dict] = []
+        rag_context = ""
+
+        rag_store = _get_rag_store()
+        if rag_store and rag_store.is_available:
+            try:
+                # 1. 检索同一仓库的历史分析
+                rag_results = rag_store.retrieve_by_repo(repo_path, top_k=3)
+                rag_results = [
+                    {"category": r.category, "title": r.title, "content": r.content}
+                    for r in rag_results
+                ]
+                # 2. 检索相似项目经验
+                tech_stack = tech_stack_result.get("frameworks", []) if tech_stack_result else []
+                quality_score = quality_result.get("health_score", "") if quality_result else ""
+                query = f"{', '.join(tech_stack[:3])} {quality_score}"
+                similar = rag_store.retrieve_similar(query, top_k=3)
+                similar_results = [
+                    {"repo_url": r.repo_url, "category": r.category, "title": r.title, "content": r.content}
+                    for r in similar
+                ]
+                # 3. 构建 RAG 上下文
+                rag_context = _build_rag_context(rag_results, similar_results)
+                if rag_context:
+                    _logger.info(f"[SuggestionAgent] RAG 检索到 {len(rag_results)} 条历史 + {len(similar_results)} 条相似")
+            except Exception as exc:
+                _logger.warning(f"[SuggestionAgent] RAG 检索失败: {exc}")
 
         # ── LLM 生成（核心） ─────────────────────────────────────────────────
         llm = _get_llm()
@@ -219,6 +304,7 @@ class SuggestionAgent(BaseAgent):
                     tech_stack_result=tech_stack_result,
                     quality_result=quality_result,
                     dependency_result=dependency_result,
+                    rag_context=rag_context,
                 )
 
                 llm_suggestions = await self._generate_llm_suggestions(
@@ -286,6 +372,21 @@ class SuggestionAgent(BaseAgent):
         # 按 priority 排序
         priority_order = {"high": 0, "medium": 1, "low": 2}
         suggestions.sort(key=lambda s: priority_order.get(s["priority"], 2))
+
+        # ── RAG 存储 ─────────────────────────────────────────────────────────
+        if rag_store and rag_store.is_available:
+            try:
+                # 只存储高优先级建议
+                high_priority = [s for s in suggestions if s.get("priority") == "high"]
+                if high_priority:
+                    rag_store.store_suggestions(
+                        repo_url=repo_path,
+                        suggestions=high_priority,
+                        category="suggestion",
+                    )
+                    _logger.info(f"[SuggestionAgent] RAG 存储了 {len(high_priority)} 条高优先级建议")
+            except Exception as exc:
+                _logger.warning(f"[SuggestionAgent] RAG 存储失败: {exc}")
 
         yield _make_event(
             self.name, "result", f"生成了 {len(suggestions)} 条优化建议",

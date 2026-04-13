@@ -28,6 +28,9 @@
 #   LANGSMITH_ENDPOINT   - LangSmith API 端点（如 https://api.smith.langchain.com）
 #   LANGSMITH_PROJECT    - LangSmith 项目名称
 #   LANGSMITH_API_KEY    - LangSmith API Key
+#   DASHVECTOR_API_KEY   - DashVector API 密钥
+#   DASHVECTOR_ENDPOINT  - DashVector 服务地址（默认 dashvector.aliyuncs.com）
+#   DASHVECTOR_COLLECTION - DashVector Collection 名称（默认 gitintel_knowledge）
 # ============================================================
 
 name: Deploy
@@ -192,6 +195,11 @@ jobs:
           LANGSMITH_ENDPOINT=${{ secrets.LANGSMITH_ENDPOINT }}
           LANGSMITH_PROJECT=${{ secrets.LANGSMITH_PROJECT }}
           LANGSMITH_API_KEY=${{ secrets.LANGSMITH_API_KEY }}
+
+          # DashVector（RAG 向量存储）
+          DASHVECTOR_API_KEY=${{ secrets.DASHVECTOR_API_KEY }}
+          DASHVECTOR_ENDPOINT=${{ secrets.DASHVECTOR_ENDPOINT }}
+          DASHVECTOR_COLLECTION=${{ secrets.DASHVECTOR_COLLECTION }}
           ENVFILE
 
       - name: Upload env file to server
@@ -218,6 +226,9 @@ jobs:
           LANGSMITH_ENDPOINT="${{ secrets.LANGSMITH_ENDPOINT }}"
           LANGSMITH_PROJECT="${{ secrets.LANGSMITH_PROJECT }}"
           LANGSMITH_API_KEY="${{ secrets.LANGSMITH_API_KEY }}"
+          DASHVECTOR_API_KEY="${{ secrets.DASHVECTOR_API_KEY }}"
+          DASHVECTOR_ENDPOINT="${{ secrets.DASHVECTOR_ENDPOINT }}"
+          DASHVECTOR_COLLECTION="${{ secrets.DASHVECTOR_COLLECTION }}"
           DEPLOY_PATH="/opt/gitintel"
           COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
 
@@ -272,6 +283,9 @@ jobs:
                 LANGSMITH_ENDPOINT: LANGSMITH_ENDPOINT_PLACEHOLDER
                 LANGSMITH_PROJECT: LANGSMITH_PROJECT_PLACEHOLDER
                 LANGSMITH_API_KEY: LANGSMITH_API_KEY_PLACEHOLDER
+                DASHVECTOR_API_KEY: DASHVECTOR_API_KEY_PLACEHOLDER
+                DASHVECTOR_ENDPOINT: DASHVECTOR_ENDPOINT_PLACEHOLDER
+                DASHVECTOR_COLLECTION: DASHVECTOR_COLLECTION_PLACEHOLDER
               networks:
                 - gitintel-net
               healthcheck:
@@ -297,6 +311,9 @@ jobs:
           sed -i "s|LANGSMITH_ENDPOINT_PLACEHOLDER|$LANGSMITH_ENDPOINT|g" docker-compose.yml
           sed -i "s|LANGSMITH_PROJECT_PLACEHOLDER|$LANGSMITH_PROJECT|g" docker-compose.yml
           sed -i "s|LANGSMITH_API_KEY_PLACEHOLDER|$LANGSMITH_API_KEY|g" docker-compose.yml
+          sed -i "s|DASHVECTOR_API_KEY_PLACEHOLDER|$DASHVECTOR_API_KEY|g" docker-compose.yml
+          sed -i "s|DASHVECTOR_ENDPOINT_PLACEHOLDER|$DASHVECTOR_ENDPOINT|g" docker-compose.yml
+          sed -i "s|DASHVECTOR_COLLECTION_PLACEHOLDER|$DASHVECTOR_COLLECTION|g" docker-compose.yml
 
           echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin
           echo "正在拉取镜像..."
