@@ -1,10 +1,38 @@
 # GitIntel AI Analysis
 
-AI 驱动的 GitHub 仓库智能分析工具，对任意公开仓库进行深度扫描，自动输出架构质量、代码健康度、依赖风险和优化建议。
+<div align="center">
 
-支持流式输出（ SSE ），用户实时看到分析进展；登录后可保存历史记录，随时回顾每次分析结果。
+![GitIntel Banner](images/home.png)
+
+### AI 驱动的 GitHub 仓库智能分析工具
+
+对任意公开仓库进行深度扫描，自动输出架构质量、代码健康度、依赖风险和优化建议。
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)](https://fastapi.tiangolo.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.1-blue)](https://langchain-ai.github.io/langgraph/)
+
+</div>
 
 ---
+
+## 功能特性
+
+| 功能 | 说明 |
+|---|---|
+| **架构分析** | 解析目录结构与模块组织，生成架构图与组件说明 |
+| **代码质量** | 扫描常见代码问题（重复代码、命名规范等），给出健康度评分 |
+| **依赖风险** | 分析 `package.json` / `requirements.txt`，识别过时、高风险依赖 |
+| **优化建议** | 基于分析结果，给出可落地的代码重构与性能优化建议 |
+| **SSE 流式输出** | 分析过程实时推送，用户无需等待完整结果 |
+| **历史记录** | 登录用户可保存、浏览、删除分析历史 |
+| **GitHub OAuth** | 通过 NextAuth.js + Supabase 完成 GitHub 登录 |
+| **健康度评分** | 综合四个维度的评分，以可视化卡片展示最终结果 |
+
+---
+
+## 核心流程
 
 ```mermaid
 flowchart TB
@@ -72,18 +100,11 @@ flowchart TB
     E3 --> F1
     ```
 
-## 功能特性
+---
 
-| 功能 | 说明 |
-|---|---|
-| **架构分析** | 解析目录结构与模块组织，生成架构图与组件说明 |
-| **代码质量** | 扫描常见代码问题（重复代码、命名规范等），给出健康度评分 |
-| **依赖风险** | 分析 `package.json` / `requirements.txt`，识别过时、高风险依赖 |
-| **优化建议** | 基于分析结果，给出可落地的代码重构与性能优化建议 |
-| **SSE 流式输出** | 分析过程实时推送，用户无需等待完整结果 |
-| **历史记录** | 登录用户可保存、浏览、删除分析历史 |
-| **GitHub OAuth** | 通过 NextAuth.js + Supabase 完成 GitHub 登录 |
-| **健康度评分** | 综合四个维度的评分，以可视化卡片展示最终结果 |
+## 分析结果示例
+
+![PR Analysis Result](images/pr.png)
 
 ---
 
@@ -190,9 +211,9 @@ gitintel-ai-analysis/
 │   ├── schemas/
 │   │   ├── request.py        # 请求 Pydantic 模型
 │   │   ├── response.py       # 响应 Pydantic 模型
-│   │   └── history.py        # 历史记录模型
+│   │   └── history.py         # 历史记录模型
 │   ├── services/
-│   │   └── database.py       # Supabase 数据库操作
+│   │   └── database.py        # Supabase 数据库操作
 │   ├── main.py               # FastAPI 入口，路由定义
 │   ├── supabase_client.py    # Supabase 客户端工厂
 │   └── requirements.txt
@@ -207,7 +228,7 @@ gitintel-ai-analysis/
 │
 ├── pnpm-workspace.yaml        # pnpm workspace 配置
 ├── turbo.json                 # Turborepo 构建流水线
-└── package.json               # 根 workspace 元信息
+└── package.json              # 根 workspace 元信息
 ```
 
 ---
@@ -289,7 +310,7 @@ pnpm dev
 
 # 或单独启动
 pnpm dev:frontend   # 前端 → http://localhost:3000
-pnpm dev:backend    # 后端 → http://localhost:8000
+pnpm dev:backend     # 后端 → http://localhost:8000
 ```
 
 ---
@@ -369,7 +390,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 1. 在 [Supabase](https://supabase.com) 创建项目
 2. 在 SQL Editor 执行 `supabase/migrations/001_initial_schema.sql`
-3. 获取 `SUPABASE_URL`、 填入后端 `.env`
+3. 获取 `SUPABASE_URL`、填入后端 `.env`
 
 ---
 
