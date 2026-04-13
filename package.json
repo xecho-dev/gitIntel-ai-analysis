@@ -10,9 +10,10 @@
     "test:frontend": "pnpm --filter frontend test",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:admin": "pnpm --filter @gitintel/admin dev",
+    "dev:backend": "cd backend && export $(cat ../deploy.env | grep -v '^#' | grep -v '^$' | xargs) && .venv/bin/python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
     "build:frontend": "pnpm --filter frontend build",
-    "build:admin": "pnpm --filter @gitintel/admin build",
-    "dev:backend": "cd backend && export $(cat ../deploy.env | grep -v '^#' | grep -v '^$' | xargs) && .venv/bin/python3 -B -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    "build:admin": "pnpm --filter @gitintel/admin build"
+
   },
   "devDependencies": {
     "turbo": "^2.5.3",
