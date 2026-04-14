@@ -141,7 +141,7 @@ jobs:
     if: ${{ github.event.inputs.deploy_to_server == 'true' || (github.event_name == 'push' && vars.DEPLOY_TO_SERVER == 'true') }}
 
     steps:
-      - name: Checkout deploy scripts
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
