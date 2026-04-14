@@ -315,6 +315,67 @@ jobs:
           sed -i "s|DASHVECTOR_ENDPOINT_PLACEHOLDER|$DASHVECTOR_ENDPOINT|g" docker-compose.yml
           sed -i "s|DASHVECTOR_COLLECTION_PLACEHOLDER|$DASHVECTOR_COLLECTION|g" docker-compose.yml
 
+          # ==================== 配置 Nginx 反向代理 ====================
+          echo "正在配置 Nginx..."
+          cat > nginx.conf << 'NGINXCONF'
+upstream gitintel_backend {
+    server 127.0.0.1:8000;
+    keepalive 32;
+}
+
+upstream gitintel_frontend {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    # 根路径 -> 前端
+    location / {
+        proxy_pass http://gitintel_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API 请求 -> 后端
+    location /api/ {
+        proxy_pass http://gitintel_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+        proxy_buffering off;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # 健康检查
+    location /health {
+        proxy_pass http://gitintel_backend/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        access_log off;
+    }
+}
+NGINXCONF
+
+          # 备份并安装 Nginx 配置
+          if [ -f /etc/nginx/conf.d/gitintel.conf ]; then
+            sudo cp /etc/nginx/conf.d/gitintel.conf /etc/nginx/conf.d/gitintel.conf.bak
+          fi
+          sudo cp nginx.conf /etc/nginx/conf.d/gitintel.conf
+
+          # 测试并重载 Nginx
+          sudo nginx -t && sudo nginx -s reload
+          echo "Nginx 配置完成"
+
           echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin
           echo "正在拉取镜像..."
           docker-compose pull
