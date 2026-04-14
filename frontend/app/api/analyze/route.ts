@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 // BFF 只做鉴权和透传，SSE 直接从后端流向客户端
 // 历史保存由后端分析完成后自动写入数据库
