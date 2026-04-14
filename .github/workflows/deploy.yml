@@ -317,7 +317,8 @@ jobs:
 
           # ==================== 配置 Nginx 反向代理 ====================
           echo "正在配置 Nginx..."
-          cat > nginx.conf << 'NGINXCONF'
+
+          tee nginx.conf > /dev/null <<'EOF'
 upstream gitintel_backend {
     server 127.0.0.1:8000;
     keepalive 32;
@@ -332,7 +333,6 @@ server {
     listen 80;
     server_name _;
 
-    # 根路径 -> 前端
     location / {
         proxy_pass http://gitintel_frontend;
         proxy_http_version 1.1;
@@ -342,7 +342,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # API 请求 -> 后端
     location /api/ {
         proxy_pass http://gitintel_backend;
         proxy_http_version 1.1;
@@ -356,7 +355,6 @@ server {
         proxy_send_timeout 86400s;
     }
 
-    # 健康检查
     location /health {
         proxy_pass http://gitintel_backend/health;
         proxy_http_version 1.1;
@@ -364,7 +362,7 @@ server {
         access_log off;
     }
 }
-NGINXCONF
+EOF
 
           # 备份并安装 Nginx 配置
           if [ -f /etc/nginx/conf.d/gitintel.conf ]; then
