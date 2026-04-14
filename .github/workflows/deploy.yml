@@ -318,51 +318,29 @@ jobs:
           # ==================== 配置 Nginx 反向代理 ====================
           echo "正在配置 Nginx..."
 
-          tee nginx.conf > /dev/null <<'EOF'
-upstream gitintel_backend {
-    server 127.0.0.1:8000;
-    keepalive 32;
-}
-
-upstream gitintel_frontend {
-    server 127.0.0.1:3000;
-    keepalive 32;
-}
-
-server {
-    listen 80;
-    server_name _;
-
-    location / {
-        proxy_pass http://gitintel_frontend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /api/ {
-        proxy_pass http://gitintel_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache off;
-        proxy_buffering off;
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
-    }
-
-    location /health {
-        proxy_pass http://gitintel_backend/health;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        access_log off;
-    }
-}
-EOF
+          # Base64 编码的 Nginx 配置
+          cat > nginx.conf << 'ENDBASE64'
+dXBzdHJlYW0gZ2l0aW50ZWxfYmFja2VuZCB7CiAgICBzZXJ2ZXIgMTI3LjAuMC4xOjgwMDA7CiAgICBr
+ZWVwYWxpdmUgMzI7Cn0KCnVwc3RyZWFtIGdpdGludGVsX2Zyb250ZW5kIHsKICAgIHNlcnZlciAxMjcu
+MC4wLjE6MzAwMDsKICAgIGtlZXBhbGl2ZSAzMjsKfQoKc2VydmVyIHsKICAgIGxpc3RlbiA4MDsKICAg
+IHNlcnZlcl9uYW1lIF87CgogICAgbG9jYXRpb24gLyB7CiAgICAgICAgcHJveHlfcGFzcyBodHRwOi8v
+Z2l0aW50ZWxfZnJvbnRlbmQ7CiAgICAgICAgcHJveHlfaHR0cF92ZXJzaW9uIDEuMTsKICAgICAgICBw
+cm94eV9zZXRfaGVhZGVyIEhvc3QgJGhvc3Q7CiAgICAgICAgcHJveHlfc2V0X2hlYWRlciBYLVJlYWwt
+SVAgJHJlbW90ZV9hZGRyOwogICAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1Gb3J3YXJkZWQtRm9yICRw
+cm94eV9hZGRfeF9mb3J3YXJkZWRfZm9yOwogICAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1Gb3J3YXJk
+ZWQtUHJvdG8gJHNjaGVtZTsKICAgIH0KCiAgICBsb2NhdGlvbiAvYXBpLyB7CiAgICAgICAgcHJveHlf
+cGFzcyBodHRwOi8vZ2l0aW50ZWxfYmFja2VuZDsKICAgICAgICBwcm94eV9odHRwX3ZlcnNpb24gMS4x
+OwogICAgICAgIHByb3h5X3NldF9oZWFkZXIgSG9zdCAkaG9zdDsKICAgICAgICBwcm94eV9zZXRfaGVh
+ZGVyIFgtUmVhbC1JUCAkcmVtb3RlX2FkZHI7CiAgICAgICAgcHJveHlfc2V0X2hlYWRlciBYLUZvcndo
+YXJkZWQtRm9yICRwcm94eV9hZGRfeF9mb3J3YXJkZWRfZm9yOwogICAgICAgIHByb3h5X3NldF9oZWFk
+ZXIgWC1Gb3J3YXJkZWQtUHJvdG8gJHNjaGVtZTsKICAgICAgICBwcm94eV9jYWNoZSBvZmY7CiAgICAg
+ICAgcHJveHlfYnVmZmVyaW5nIG9mZjsKICAgICAgICBwcm94eV9yZWFkX3RpbWVvdXQgODY0MDBzOwog
+ICAgICAgIHByb3h5X3NlbmRfdGltZW91dCA4NjQwMHM7CiAgICB9CgoKICAgIGxvY2F0aW9uIC9oZWFs
+dGggewogICAgICAgIHByb3h5X3Bhc3MgaHR0cDovL2dpdGludGVsX2JhY2tlbmQvaGVhbHRoOwogICAg
+ICAgIHByb3h5X2h0dHBfdmVyc2lvbiAxLjE7CiAgICAgICAgcHJveHlfc2V0X2hlYWRlciBIb3N0ICRo
+b3N0OwogICAgICAgIGFjY2Vzc19sb2cgb2ZmOwogICAgfQp9Cg==
+ENDBASE64
+          base64 -d nginx.conf > nginx.conf.tmp && mv nginx.conf.tmp nginx.conf
 
           # 备份并安装 Nginx 配置
           if [ -f /etc/nginx/conf.d/gitintel.conf ]; then
