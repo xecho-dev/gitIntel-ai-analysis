@@ -24,14 +24,11 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - ./deploy.env
     environment:
       NODE_ENV: production
       AUTH_TRUST_HOST: "true"
-      AUTH_SECRET: ${AUTH_SECRET}
-    networks:
-      - gitintel-net
-    env_file:
-      - ./deploy.env
 
   # ── Backend — FastAPI Agent Layer ────────────────────────────
   backend:
@@ -48,8 +45,6 @@ services:
     environment:
       # 运行时额外变量（可覆盖或补充 .env）
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      # NextAuth JWT 签名密钥（必须与前端 AUTH_SECRET 一致）
-      AUTH_SECRET: ${AUTH_SECRET}
       # GitHub 操作权限 Token
       GITHUB_TOKEN: ${GITHUB_TOKEN}
       # OpenAI（Agent 层调用 LLM）
