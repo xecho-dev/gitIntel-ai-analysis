@@ -6,7 +6,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
-  console.log('💪🐻👉 ~ GET ~ session:', session)
   if (!session) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }

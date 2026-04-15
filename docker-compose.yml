@@ -27,6 +27,7 @@ services:
     environment:
       NODE_ENV: production
       AUTH_TRUST_HOST: "true"
+      AUTH_SECRET: ${AUTH_SECRET}
     networks:
       - gitintel-net
     env_file:
