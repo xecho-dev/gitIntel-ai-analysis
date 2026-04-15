@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Search, Zap, Loader2 } from "lucide-react";
-import { useAppStore } from "@/store/useAppStore";
+import { useAppStore, AgentEventData } from "@/store/useAppStore";
 import { analyzeRepo } from "@/lib/api";
 
 export const AnalyzeInput = ({ userId }: { userId: string }) => {
@@ -50,7 +50,7 @@ export const AnalyzeInput = ({ userId }: { userId: string }) => {
               store.setActiveAgent(null);
               return;
             }
-            store.pushAgentEvent(data);
+            store.pushAgentEvent(data as AgentEventData);
           }).catch((err) => {
             store.setError(err instanceof Error ? err.message : "分析失败");
           }).finally(() => {
