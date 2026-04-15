@@ -102,7 +102,7 @@ jobs:
           tags: ${{ steps.meta-frontend.outputs.tags }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/frontend:buildcache
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.FRONTEND_URL }}/api
+            NEXT_PUBLIC_API_URL=http://backend:8000
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_AUTH_URL=${{ secrets.FRONTEND_URL }}
