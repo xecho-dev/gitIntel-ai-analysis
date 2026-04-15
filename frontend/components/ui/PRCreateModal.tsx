@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { X, Rocket, Loader2, CheckCircle2, AlertCircle, GitPullRequest, ExternalLink, Sparkles, FileCode, GitBranch, Github } from "lucide-react";
-import { useSession, signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
 // Monaco DiffEditor 必须动态导入，禁用 SSR
