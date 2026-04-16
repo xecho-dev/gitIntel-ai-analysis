@@ -106,49 +106,100 @@ async def health():
 
 @app.post("/api/analyze")
 async def analyze(req: AnalyzeRequest, request: Request):
-    """分析仓库 - SSE 流式响应（需要登录）。分析完成后自动保存到数据库。"""
+    """
+    分析仓库 - SSE 流式响应（需要登录）。分析完成后自动保存到数据库。
+
+    流程概述:
+    1. 用户认证（从请求中提取 auth token）
+    2. 生成 thread_id（用于 LangGraph checkpoint 和 LangSmith 关联）
+    3. 启动 SSE 流，实时推送分析进度和结果
+    4. 流结束后，收集所有 Agent 的 result 事件并保存到数据库
+    """
     import logging
     logger = logging.getLogger("gitintel")
 
     logger.info(f"[/api/analyze] 收到请求: repo_url={req.repo_url}, branch={req.branch}")
 
+    # ─── Step 1: 用户认证 ────────────────────────────────────────
+    # require_auth 从请求的 cookie/header 中解析 JWT，验证用户身份
     user = require_auth(request)
+    # 获取用户的 auth_user_id（来自 Supabase Auth 的唯一标识）
+    # 兼容不同版本的 Supabase 返回格式（"sub" 或 "id"）
     auth_user_id = user.get("sub") or user.get("id") or ""
     logger.info(f"[/api/analyze] 认证通过: auth_user_id={auth_user_id}")
 
-    # 生成 thread_id 用于 LangGraph checkpoint 和 LangSmith 查询关联
+    # ─── Step 2: 生成 thread_id ─────────────────────────────────
+    # LangGraph 使用 thread_id 来恢复/checkpoint 工作流状态
+    # 同时用于在 LangSmith 中关联同一次分析的所有 trace
     thread_id = f"{req.repo_url}::{req.branch}"
 
-    async def event_stream():
+    # ─── Step 3: SSE 流式响应 ───────────────────────────────────
+    def event_stream():
+        # 立即发送初始事件，解锁 HTTP 响应头和 StreamingResponse 的初始传输
+        # 否则 FastAPI/uvicorn 可能在等待第一个 yield 后才发送 HTTP headers，
+        # 导致客户端长时间无响应
+        yield "data: {\"type\": \"connected\", \"agent\": \"pipeline\", \"message\": \"连接已建立，开始分析...\", \"percent\": 0}\n\n"
+
+        # collected_events 用于在流结束后聚合同一 agent 的 result 事件
         collected_events: list[dict] = []
 
         def collect(event_str: str) -> str:
-            """解析并收集 result 类型的事件"""
+            """
+            解析 SSE 事件字符串，收集 type=result 的事件。
+
+            SSE 格式示例:
+                data: {"type": "status", "agent": "architecture", "message": "..."}
+                data: {"type": "result", "agent": "architecture", "data": {...}}
+                data: [DONE]
+
+            只有 type=result 且包含 agent 字段的事件才需要保存（包含最终分析数据）
+            """
+            # 处理 [DONE] 事件（可能被错误地包装为 data: [DONE]）
+            stripped = event_str.strip()
+            if stripped == "data: [DONE]":
+                return "data: [DONE]\n\n"
+            if stripped == "[DONE]":
+                return "data: [DONE]\n\n"
+
             if event_str.startswith("data: "):
                 data = event_str[6:].strip()
                 if data and data != "[DONE]":
                     try:
                         parsed = json.loads(data)
+                        # 判断是否为 Agent 的最终结果（用于数据库持久化）
                         if isinstance(parsed, dict) and parsed.get("type") == "result" and parsed.get("agent"):
                             collected_events.append(parsed)
-                    except Exception:
+                    except json.JSONDecodeError:
+                        # JSON 解析失败不影响事件转发，继续 yield 原始字符串
+                        logger.debug(f"[/api/analyze] 无法解析 SSE 数据: {data[:100]}")
                         pass
             return event_str
 
         try:
-            async for event in stream_analysis_sse(req.repo_url, req.branch, thread_id=thread_id):
-                yield collect(event)
+            # stream_analysis_sse 是同步生成器，FastAPI 会自动在线程池中运行它
+            # 这确保 SSE 事件能实时 flush 到客户端，而不会阻塞 FastAPI 事件循环
+            for event in stream_analysis_sse(req.repo_url, req.branch, thread_id=thread_id):
+                collected = collect(event)
+                if collected:
+                    yield collected
         except Exception as e:
             logger.error(f"[/api/analyze] stream 异常: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"[/api/analyze] 堆栈: {traceback.format_exc()}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        # SSE 结束，收集完毕，保存到数据库
+        # ─── Step 4: 流结束，保存结果到数据库 ──────────────────────
+        # 此时所有 Agent 已执行完毕，collected_events 包含所有 result 事件
+
         if not collected_events:
+            # 边界情况：没有收到任何 result 事件（如所有 Agent 都超时/失败）
             logger.warning(f"[/api/analyze] 无 result 事件，跳过保存")
             return
 
+        # 将 collected_events 按 agent 分组，合并为 result_data
+        # result_data 格式: { "architecture": {...}, "quality": {...}, ... }
         result_data: dict[str, Any] = {}
         for evt in collected_events:
             agent = evt.get("agent", "")
@@ -162,12 +213,17 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
         logger.info(f"[/api/analyze] 分析完成，准备保存 history，agents={list(result_data.keys())}")
 
+        # ─── Step 4a: 初始化 Supabase 客户端 ──────────────────
+        # 使用服务角色 key 的 admin 客户端（绕过 RLS 限制）
         try:
             sb = get_supabase_admin()
         except RuntimeError as e:
             logger.error(f"[/api/analyze] Supabase 连接失败: {e}")
             return
 
+        # ─── Step 4b: 验证用户是否已完成 GitHub 资料同步 ───────
+        # auth_user_id（Auth 表主键）和 users 表（profiles 表）需要通过 GitHub OAuth 关联
+        # 若用户从未访问过账户页，users 表中就不会有对应记录，导致外键关联失败
         if not get_user_uuid(sb, auth_user_id):
             logger.warning(
                 f"[/api/analyze] users 表中无 auth_user_id={auth_user_id}，跳过保存。"
@@ -175,6 +231,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             )
             return
 
+        # ─── Step 4c: 持久化历史记录 ───────────────────────────
         try:
             saved = save_analysis(sb, auth_user_id, req.repo_url, req.branch, result_data, thread_id=thread_id)
             logger.info(f"[/api/analyze] 历史记录保存成功: id={saved.id}")
@@ -186,8 +243,8 @@ async def analyze(req: AnalyzeRequest, request: Request):
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",         # 保持长连接，支持 SSE
+            "X-Accel-Buffering": "no",           # 禁用 Nginx 缓冲，确保实时推送
         },
     )
 

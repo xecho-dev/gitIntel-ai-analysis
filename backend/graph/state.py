@@ -7,9 +7,10 @@ SharedState — LangGraph 工作流中所有 Agent 共享的状态结构。
   3. 需要 P1 → 加载 P1 → CodeParser 分析 → AI 决策是否需要更多
   4. 后续 Agent (TechStack, Quality, Suggestion)
 """
-from typing import Optional
+from typing import Annotated, Optional
 
 from typing_extensions import TypedDict
+from operator import add
 
 
 class SharedState(TypedDict, total=False):
@@ -67,5 +68,7 @@ class SharedState(TypedDict, total=False):
     final_result: Optional[dict]  # 全部结果打包，供前端展示
 
     # ─── 错误与元数据 ───────────────────────────────────────────
-    errors: list[str]
-    finished_agents: list[str]  # 已完成的 agent 名称列表
+    # Annotated + operator.add reducer：允许三个并行节点同时追加错误
+    errors: Annotated[list[str], add]
+    # finished_agents 同理，也需要支持并行追加
+    finished_agents: Annotated[list[str], add]

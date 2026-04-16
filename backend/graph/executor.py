@@ -33,14 +33,14 @@ def format_sse_event(event: dict) -> str:
 
 
 def format_sse_error(agent: str, message: str, data: dict | None = None) -> str:
-    """格式化 SSE 错误事件。"""
-    return format_sse_event({
+    """格式化 SSE 错误事件（返回原始字符串，不带 data: 前缀）。"""
+    return f"data: {json.dumps({
         "type": "error",
         "agent": agent,
         "message": message,
         "percent": 0,
         "data": data,
-    })
+    })}\n\n"
 
 
 # ─── 通用 Agent 执行 ────────────────────────────────────────────────
