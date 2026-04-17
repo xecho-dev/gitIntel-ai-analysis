@@ -1,4 +1,15 @@
-"""DependencyAgent — 分析项目依赖的版本、已知漏洞和安全风险。"""
+"""DependencyAgent — 分析项目依赖的版本、已知漏洞和安全风险。
+
+支持两种工作模式：
+  - 内存模式（GitHub API）：传入 file_contents，Agent 内部过滤出依赖配置文件
+  - 本地模式：传入 repo_path，从磁盘扫描依赖文件
+
+风险评估策略：
+  - KNOWN_HIGH：直接执行系统命令/读取敏感信息的包（eval、child_process、ssh2...）
+  - KNOWN_MEDIUM：已弃用/有历史漏洞的包（request、lodash、moment...）
+  - SUSPICIOUS_PATTERNS：可疑代码模式（exec、system、subprocess...）
+  - 未锁定版本、file: 协议依赖、远程 URL 依赖均标记为 medium 风险
+"""
 import asyncio
 import json
 import logging
@@ -105,7 +116,6 @@ class DependencyAgent(BaseAgent):
         }
         return types.get(name, "unknown")
 
-    @staticmethod
     @staticmethod
     def _is_dep_file(path: str) -> bool:
         """判断路径是否指向依赖配置文件（排除 lock 文件和第三方依赖目录）。"""

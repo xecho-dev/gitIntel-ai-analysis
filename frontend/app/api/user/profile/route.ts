@@ -33,9 +33,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const body = await request.json();
+  // 先读取原始 text，避免空 body 时 request.json() 抛 SyntaxError
+  const rawBody = await request.text();
+  if (!rawBody.trim()) {
+    return NextResponse.json({ error: "请求体为空" }, { status: 400 });
+  }
 
-    const upstream = await fetch(`${API_BASE}/api/user/profile`, {
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "无效的 JSON 格式" }, { status: 400 });
+  }
+
+  const upstream = await fetch(`${API_BASE}/api/user/profile`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

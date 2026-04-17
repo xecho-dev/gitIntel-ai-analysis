@@ -1,20 +1,16 @@
 """FixGeneratorAgent — 基于优化建议生成代码修改方案。
 
-核心流程：
-  SuggestionAgent 结果（含 code_fix: {original, updated, file, type, reason}）
-       ↓
-  FixGeneratorAgent（直接使用已有 code_fix；必要时调用 LLM 补充）
-       ↓
-  返回 CodeFix[]:
-    - file: 文件路径
-    - type: replace | insert | delete
-    - original: 原代码
-    - updated: 修改后代码
-    - reason: 修改原因
+核心策略：
+  1. 直接使用 SuggestionAgent 已生成的 code_fix（包含 original/updated/file/type/reason）
+  2. 仅在 code_fix 为空时调用 LLM 补充，传入 file_contents 作为上下文
+  3. 不再依赖关键词猜测文件路径（避免大量无效修改）
+
+使用注意：
+  - 此 Agent 目前未在 LangGraph Pipeline 中注册
+  - 可作为独立工具调用（fix_generator.py 直接实例化使用）
 """
 import json
 import logging
-import os
 import re
 from typing import AsyncGenerator
 

@@ -1,9 +1,45 @@
 """
-GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出融合版。
+GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出。
+
+整体 Pipeline（线性 → 渐进式加载 → 并行分析 → 串行收尾）：
+
+    fetch_tree_classify ──► load_p0 ──► code_parser_p0 ──► decide_p1
+                                                              │
+                                          needs_more? ────────┤
+                                              │               │
+                                              ▼ (True)         ▼ (False)
+                                          load_p1        load_p2_decide
+                                              │               │
+                                          code_parser_p1    │
+                                              │               ▼
+                                              ▼         load_more_p2
+                                          load_p2_decide ◄─┘  (循环，最多 3 轮)
+                                              │
+                                              ▼
+                                      code_parser_final
+                                              │
+                         ┌─────────────────────┼─────────────────────┐
+                         ▼                     ▼                     ▼
+                   tech_stack            quality              dependency
+                         │                     │                     │
+                         └──────────► architecture ◄──────────────┘
+                                              │
+                                    merge_analysis
+                                              │
+                                   optimization / END
+
+工作模式：
+  - stream_analysis_sse() — SSE 流式接口（主要入口），实时推送进度
+  - run_analysis_sync()  — 同步阻塞接口（向后兼容），直接返回结果
+  - build_initial_state() — 构建 LangGraph 初始状态
+
+断点续传：
+  - MemorySaver（内存版），适合开发/演示
+  - 生产换 PostgresSaver + RedisSaver（见下方注释）
 """
+
 import asyncio
 import logging
-import concurrent.futures
 from typing import Any, Generator
 
 # 配置日志
@@ -14,7 +50,6 @@ from langgraph.graph import StateGraph, END
 
 from agents import (
     RepoLoaderAgent,
-    GitHubPermissionError,
     CodeParserAgent,
     TechStackAgent,
     QualityAgent,
@@ -41,62 +76,6 @@ from .executor import (
 #   _checkpointer = PostgresSaver.from_conn_string(DATABASE_URL)
 #   _checkpointer = RedisSaver.from_url(REDIS_URL)
 _checkpointer = MemorySaver()
-
-# ─── 辅助函数 ───────────────────────────────────────────────────────────
-
-PHASE_TIMEOUT = 120.0  # 每个主要阶段的最大执行时间（秒）
-
-
-async def _run_with_timeout(
-    coro,
-    timeout: float,
-    error_msg: str = "操作超时",
-):
-    """带超时的协程执行。
-
-    Args:
-        coro: 要执行的协程
-        timeout: 超时时间（秒）
-        error_msg: 超时时抛出的错误信息
-
-    Returns:
-        协程的返回值
-
-    Raises:
-        asyncio.TimeoutError: 超时时抛出
-    """
-    try:
-        return await asyncio.wait_for(coro, timeout=timeout)
-    except asyncio.TimeoutError:
-        raise asyncio.TimeoutError(f"{error_msg}（超时 {timeout}秒）")
-
-
-def _has_tree_and_classified(state: SharedState) -> bool:
-    """判断是否已完成文件树获取和分类（断点恢复时跳过已完成的步骤）。"""
-    return bool(state.get("repo_tree") and state.get("classified_files"))
-
-
-def _get_inputs(state: SharedState) -> tuple[str, str, dict]:
-    """从 SharedState 提取公共输入参数，供下游 Agent 使用。
-
-    兼容两种来源：
-      - loaded_files: 早期版本的合并结果
-      - loaded_p0 + loaded_p1: 渐进式加载的结果
-    """
-    file_contents = (
-        state.get("loaded_files") or
-        state.get("loaded_p0") or
-        state.get("loaded_p1") or
-        {}
-    )
-    repo_id = state.get("local_path", "")
-    if not repo_id:
-        rlr = state.get("repo_loader_result")
-        if rlr:
-            repo_id = rlr.get("repo", "")
-    branch = state.get("branch", "main")
-    return repo_id, branch, file_contents
-
 
 # ─── LangGraph 节点函数 ─────────────────────────────────────────────────
 # 重要：这些是纯计算函数，接收 SharedState，返回更新的字段字典。
@@ -179,7 +158,7 @@ def node_load_p0(state: SharedState) -> dict:
 
     支持断点恢复：如果某些 P0 文件已加载，跳过重复加载。
     """
-    if not _has_tree_and_classified(state):
+    if not (state.get("repo_tree") and state.get("classified_files")):
         return {"errors": ["node_load_p0: 跳过（无分类结果）"]}
 
     repo_url = state.get("repo_url", "")
@@ -218,10 +197,10 @@ def node_load_p0(state: SharedState) -> dict:
 
 
 def node_code_parser_p0(state: SharedState) -> dict:
-    """节点 3：AST 解析 P0 代码文件，提取函数/类/import 信息。
+    """节点 3：AST 解析 P0 代码文件，提取函数/类/import 等结构信息。
 
-    使用 tree-sitter 做语言感知的代码结构解析（非简单正则）。
-    结果供后续 AI 决策（P1/P2 是否需要加载）使用。
+    结果供后续 decide_p1 决策使用——AI 根据 P0 的代码复杂度
+    判断是否需要加载更多上下文（渐进式加载的核心依据）。
     """
     loaded_p0 = state.get("loaded_p0", {})
     if not loaded_p0:
@@ -327,7 +306,7 @@ def node_load_p1(state: SharedState) -> dict:
 
 
 def node_code_parser_p1(state: SharedState) -> dict:
-    """节点 6：AST 解析 P1 代码（与 node_code_parser_p0 相同逻辑）。"""
+    """节点 6：AST 解析 P1 文件，与 node_code_parser_p0 逻辑相同。"""
     loaded_p1 = state.get("loaded_p1", {})
     if not loaded_p1:
         return {"errors": ["node_code_parser_p1: 跳过（无 P1 文件）"]}
@@ -520,11 +499,11 @@ def node_code_parser_final(state: SharedState) -> dict:
 
 
 def node_merge_analysis(state: SharedState) -> dict:
-    """节点 10：合并 TechStack + Quality + Dependency 并行分析结果。
+    """节点 10：并行分析结果验证。
 
-    注意：真正的并行是在 LangGraph 的图定义中通过 add_edge 从同一个节点
-    分发到三个节点实现的（见下方 _build_graph）。此节点在三者都完成后执行，
-    主要做结果验证和错误收集。
+    tech_stack / quality / dependency 三个并行节点全部完成后触发。
+    此节点不做实际合并（合并在 node_optimization 的 final_result 中完成），
+    仅做结果存在性验证，收集错误信息。
     """
     tech_result = state.get("tech_stack_result") or {}
     quality_result = state.get("quality_result") or {}
@@ -614,27 +593,76 @@ def node_dependency(state: SharedState) -> dict:
 def node_architecture(state: SharedState) -> dict:
     """节点 14：架构评估（基于 AST 结构 + TechStack + Quality + LLM）。
 
-    在 tech_stack + quality + dependency 三个并行节点都完成后执行。
+    在 tech_stack + quality + dependency 三个并行节点全部完成后执行。
     ArchitectureAgent 综合代码结构、依赖关系、技术栈特征，给出架构评估。
-    """
-    repo_id, branch, file_contents = get_inputs_from_state(state)
-    errors = []
 
-    result = ArchitectureAgent.parse_and_build(
-        repo_id,
-        branch,
-        code_parser_result=state.get("code_parser_result"),
-        tech_stack_result=state.get("tech_stack_result"),
-        quality_result=state.get("quality_result"),
-        total_tree_files=len(state.get("repo_tree") or []),
-    )
+    流式执行：
+      1. 后台线程驱动 ArchitectureAgent.stream() 异步迭代器
+      2. 所有中间事件（status、progress、result）收集到 architecture_events
+      3. SSE 层通过 _yield_sse_for_node 将事件逐个透传到前端
+
+    这样前端能实时看到架构评估的进度：
+      正在分析项目架构 → 检测到 N 个组件 → 调用 LLM 生成洞察 → 完成
+    """
+    import queue as _queue_module
+    import threading
+
+    repo_id, branch, _ = get_inputs_from_state(state)
+    repo_tree = state.get("repo_tree") or []
+
+    q: Any = _queue_module.Queue()
+    exc_info: list = []
+
+    def run_stream():
+        """在子线程中运行异步 stream 迭代器，收集所有事件。"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def consume():
+                agent = ArchitectureAgent()
+                async for event in agent.stream(
+                    repo_id,
+                    branch,
+                    code_parser_result=state.get("code_parser_result"),
+                    tech_stack_result=state.get("tech_stack_result"),
+                    quality_result=state.get("quality_result"),
+                    total_tree_files=len(repo_tree),
+                ):
+                    q.put(dict(event))
+
+            loop.run_until_complete(consume())
+            loop.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"[node_architecture] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            exc_info.append(e)
+        finally:
+            q.put(None)
+
+    t = threading.Thread(target=run_stream, daemon=True)
+    t.start()
+    t.join()
+
+    all_events: list[dict] = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        all_events.append(item)
+
+    result: dict = {}
+    for event in all_events:
+        if event.get("type") == "result":
+            result = event.get("data") or {}
 
     if not result:
-        errors.append("ArchitectureAgent: 执行返回空结果")
+        exc_info.append("ArchitectureAgent: 执行返回空结果")
 
     return {
         "architecture_result": result,
-        "errors": errors,
+        "architecture_events": all_events,
+        "errors": exc_info,
     }
 
 
@@ -642,38 +670,83 @@ def node_optimization(state: SharedState) -> dict:
     """节点 15：生成优化建议（综合所有分析结果的 LLM 驱动阶段）。
 
     这是整个 Pipeline 的最后一个分析节点。
-    SuggestionAgent 接收：
-      - 真实代码内容（file_contents）
-      - 所有前置分析结果（code_parser / tech_stack / quality / dependency / architecture）
+    SuggestionAgent 接收真实代码内容 + 所有前置分析结果
+    （code_parser / tech_stack / quality / dependency / architecture），
     输出针对项目实际情况的优化建议，而非通用建议。
+
+    RAG 流程（流式执行）：
+      1. 后台线程驱动 SuggestionAgent.stream() 异步迭代器
+      2. 所有中间事件（RAG 检索、LLM 调用进度、结果）收集到 optimization_events
+      3. 最终 result 数据存入 optimization_result / suggestion_result
+      4. SSE 层通过 _yield_sse_for_node 将 optimization_events 逐个透传到前端
+
+    同时构建 final_result 打包所有分析数据，供前端展示。
     """
+    import queue as _queue_module
+    import threading
+
     repo_id, branch, _ = get_inputs_from_state(state)
-    errors = []
 
     file_contents = (
         state.get("loaded_files") or
         {**state.get("loaded_p0", {}), **state.get("loaded_p1", {})}
     )
 
-    result = run_agent_sync(
-        SuggestionAgent(),
-        repo_id,
-        branch,
-        file_contents=file_contents or None,
-        code_parser_result=state.get("code_parser_result"),
-        tech_stack_result=state.get("tech_stack_result"),
-        quality_result=state.get("quality_result"),
-        dependency_result=state.get("dependency_result"),
-    )
+    q: Any = _queue_module.Queue()
+    exc_info: list = []
 
-    architecture_result = state.get("architecture_result") or {}
+    def run_stream():
+        """在子线程中运行异步 stream 迭代器，收集所有事件。"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def consume():
+                agent = SuggestionAgent()
+                async for event in agent.stream(
+                    repo_id,
+                    branch,
+                    file_contents=file_contents or None,
+                    code_parser_result=state.get("code_parser_result"),
+                    tech_stack_result=state.get("tech_stack_result"),
+                    quality_result=state.get("quality_result"),
+                    dependency_result=state.get("dependency_result"),
+                ):
+                    q.put(dict(event))  # 转为普通 dict 避免序列化问题
+
+            loop.run_until_complete(consume())
+            loop.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"[node_optimization] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            exc_info.append(e)
+        finally:
+            q.put(None)  # 哨兵：迭代结束
+
+    t = threading.Thread(target=run_stream, daemon=True)
+    t.start()
+    t.join()  # 等待线程完成，确保所有事件已收集
+
+    # 收集所有中间事件
+    all_events: list[dict] = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        all_events.append(item)
+
+    result: dict = {}
+    for event in all_events:
+        if event.get("type") == "result":
+            result = event.get("data") or {}
+
     final_result = {
         "repo_loader": state.get("repo_loader_result"),
         "code_parser": state.get("code_parser_result"),
         "tech_stack": state.get("tech_stack_result"),
         "quality": state.get("quality_result"),
         "dependency": state.get("dependency_result"),
-        "architecture": architecture_result,
+        "architecture": state.get("architecture_result"),
         "suggestion": result,
     }
 
@@ -681,20 +754,20 @@ def node_optimization(state: SharedState) -> dict:
         "optimization_result": result,
         "suggestion_result": result,
         "final_result": final_result,
-        "errors": errors,
+        "optimization_events": all_events,
+        "errors": exc_info,
     }
-
-
-def node_suggestion(state: SharedState) -> dict:
-    """节点 16：优化建议（向后兼容别名，实际委托给 node_optimization）。"""
-    return node_optimization(state)
 
 
 # ─── 错误处理节点 ──────────────────────────────────────────────────────
 
 
 def node_error(state: SharedState) -> dict:
-    """错误处理节点：记录错误但不中断流程（LangGraph END 前的兜底）。"""
+    """错误处理兜底节点。
+
+    当流程进入异常分支时触发，记录错误并正常结束流程。
+    LangGraph 中的错误节点用于捕获未处理的异常，防止流程中断。
+    """
     return {
         "errors": ["Pipeline: 进入错误处理节点"],
     }
@@ -747,22 +820,20 @@ def route_p2_iteration(state: SharedState) -> str:
 def _build_graph() -> StateGraph:
     """构建并编译 LangGraph 工作流。
 
-    图结构说明：
+    图结构约定：
       - add_edge(A, B): A 执行完后顺序执行 B
-      - add_conditional_edges(A, router, {key: node}): A 执行完后
-        调用 router(state)，根据返回值选择下一个节点
-      - 多个 add_edge(from, to) 从同一节点出发 → LangGraph 并行执行这些 to 节点
-        （Fan-out）；所有 to 节点都完成后，下一个 add_edge(to, X) 才会触发 X
-        （Fan-in，等价于 join barrier）
+      - add_conditional_edges(A, router, mapping): A 执行完后调用 router(state)，
+        根据返回值从 mapping 中选择下一个节点
+      - 从同一节点 add_edge 到多个节点 → LangGraph 自动并行执行（Fan-out），
+        所有目标节点都完成后才触发下一个节点（Fan-in，等价于 join barrier）
 
-    并行分析的实现：
+    并行分析实现：
       code_parser_final ─┬─► tech_stack
                           ├─► quality
                           └─► dependency
-                          │
-                          └── tech_stack/quality/dependency 全部完成后，各自的
-                              add_edge(tech_stack, architecture) 等才触发，
-                              所以三个并行节点都结束后才进入 architecture。
+      三条边同时建立，LangGraph 自动并发执行三个节点；
+      三个节点都结束后，各自的 add_edge(..., architecture) 才触发，
+      最终汇入 architecture 节点。
     """
     graph = StateGraph(state_schema=SharedState)
 
@@ -859,27 +930,6 @@ _workflow = _build_graph().compile(checkpointer=_checkpointer)
 #    不是作为主要流式输出接口。实践证明它在节点返回复杂 dict 时捕获行为不稳定。
 #    用 astream() + get_state() 更可靠，且 astream() 天然支持断点续传。
 # ══════════════════════════════════════════════════════════════════════════
-
-
-# 节点 → SSE percent 映射
-_NODE_PERCENT: dict[str, int] = {
-    "fetch_tree_classify": 25,
-    "load_p0": 35,
-    "code_parser_p0": 45,
-    "decide_p1": 50,
-    "load_p1": 60,
-    "code_parser_p1": 65,
-    "load_p2_decide": 68,
-    "load_more_p2": 70,
-    "code_parser_final": 75,
-    "tech_stack": 82,
-    "quality": 85,
-    "dependency": 87,
-    "architecture": 91,
-    "merge_analysis": 93,
-    "optimization": 100,
-    "final_result": 100,
-}
 
 
 def _yield_sse_for_node(
@@ -1013,7 +1063,7 @@ def stream_analysis_sse(
         logger.debug(f"[stream_analysis_sse] 创建线程...")
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        logger.debug(f"[stream_analysis_sse] 线程已启动，waaitq.get()")
+        logger.debug(f"[stream_analysis_sse] 线程已启动，wait q.get()")
 
         while True:
             chunk = q.get()
@@ -1383,6 +1433,21 @@ def _state_to_sse_events(
     # ── architecture ────────────────────────────────────────────────
     elif node_name == "architecture":
         result = state.get("architecture_result") or {}
+
+        # 透传 ArchitectureAgent.stream() 产生的所有中间事件
+        arch_events: list[dict] = state.get("architecture_events") or []
+        for ev in arch_events:
+            # 跳过 status（由下面统一发），其余透传
+            if ev.get("type") == "status":
+                continue
+            events.append(format_sse_event({
+                "type": ev.get("type", "progress"),
+                "agent": ev.get("agent", "architecture"),
+                "message": ev.get("message") or "架构分析中...",
+                "percent": ev.get("percent", 88),
+                "data": ev.get("data"),
+            }))
+
         if "architecture" not in status_sent:
             status_sent.add("architecture")
             events.append(format_sse_event({
@@ -1429,6 +1494,30 @@ def _state_to_sse_events(
                 "data": None,
             }))
 
+        # 透传 SuggestionAgent.stream() 产生的所有中间事件
+        #（RAG 检索进度、LLM 调用进度等，在 node_optimization 中已收集到状态）
+        opt_events: list[dict] = state.get("optimization_events") or []
+        for ev in opt_events:
+            # 不重复发送已发送过的 result
+            if ev.get("type") == "result" and "optimization_result" in result_sent:
+                continue
+            # 跳过 status（已在上面统一发过），其余类型直接透传
+            if ev.get("type") == "status":
+                continue
+            ev_type = ev.get("type", "progress")
+            ev_percent = ev.get("percent", 93)
+            ev_message = ev.get("message") or "生成优化建议中..."
+            ev_data = ev.get("data")
+            events.append(format_sse_event({
+                "type": ev_type,
+                "agent": ev.get("agent", "optimization"),
+                "message": ev_message,
+                "percent": ev_percent,
+                "data": ev_data,
+            }))
+            if ev_type == "result":
+                result_sent.add("optimization_result")
+
         # 发送 optimization result（供前端的 OptimizationAgentCard 展示）
         if opt_result and "optimization" not in result_sent:
             result_sent.add("optimization")
@@ -1464,8 +1553,8 @@ def run_analysis_sync(
 ) -> dict:
     """同步运行 LangGraph 工作流，直接返回最终结果（供非 SSE 场景使用）。
 
-    使用 checkpointing：同一 thread_id 的请求可以恢复之前的状态。
-    推荐用 stream_analysis_sse() 代替此方法（可实时看到进度）。
+    使用 checkpointing：同一 thread_id 的请求可从断点恢复。
+    推荐优先使用 stream_analysis_sse()（可实时看到进度）。
 
     Args:
         repo_url: GitHub 仓库 URL

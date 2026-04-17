@@ -59,10 +59,14 @@ class SharedState(TypedDict, total=False):
 
     # ─── Stage 6: 架构评估（LLM 驱动）─────────────────────────
     architecture_result: Optional[dict]  # {complexity, components, techStack, maintainability, architectureStyle, keyPatterns, hotSpots, summary, llmPowered}
+    # 流式中间事件（架构 Agent 的 status/progress 进度，用于透传到 SSE 前端）
+    architecture_events: list[dict]
 
     # ─── Stage 7: 优化建议生成 ─────────────────────────────────
     suggestion_result: Optional[dict]  # {suggestions, total, high_priority, medium_priority, low_priority}
     optimization_result: Optional[dict]  # 同上，别名（optimization agent 使用）
+    # 流式中间事件（RAG 检索进度、LLM 生成进度等，用于透传到 SSE 前端）
+    optimization_events: list[dict]
 
     # ─── 最终聚合结果 ───────────────────────────────────────────
     final_result: Optional[dict]  # 全部结果打包，供前端展示

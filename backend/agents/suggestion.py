@@ -7,7 +7,6 @@
   4. RAG 存储：分析完成后，将高优先级建议存入向量库供后续复用
 """
 import logging
-import os
 import re
 from typing import AsyncGenerator, Optional
 
@@ -263,12 +262,13 @@ class SuggestionAgent(BaseAgent):
         rag_context = ""
 
         rag_store = _get_rag_store()
-        if rag_store and rag_store.is_available:
+        rag_available = bool(rag_store and rag_store.is_available)
+        if rag_available:
             try:
                 # 1. 检索同一仓库的历史分析
                 rag_results = rag_store.retrieve_by_repo(repo_path, top_k=3)
                 rag_results = [
-                    {"category": r.category, "title": r.title, "content": r.content}
+                    {"category": r.category, "title": r.title, "content": r.content[:80]}
                     for r in rag_results
                 ]
                 # 2. 检索相似项目经验
@@ -277,15 +277,33 @@ class SuggestionAgent(BaseAgent):
                 query = f"{', '.join(tech_stack[:3])} {quality_score}"
                 similar = rag_store.retrieve_similar(query, top_k=3)
                 similar_results = [
-                    {"repo_url": r.repo_url, "category": r.category, "title": r.title, "content": r.content}
+                    {"repo_url": r.repo_url, "category": r.category, "title": r.title, "content": r.content[:80]}
                     for r in similar
                 ]
                 # 3. 构建 RAG 上下文
                 rag_context = _build_rag_context(rag_results, similar_results)
-                if rag_context:
-                    _logger.info(f"[SuggestionAgent] RAG 检索到 {len(rag_results)} 条历史 + {len(similar_results)} 条相似")
+                _logger.info(f"[SuggestionAgent] RAG 检索到 {len(rag_results)} 条历史 + {len(similar_results)} 条相似")
+
+                # 主动 yield 事件，让 SSE 调用方清楚知道 RAG 执行结果
+                yield _make_event(
+                    self.name, "progress",
+                    f"RAG 检索完成：{len(rag_results)} 条历史 + {len(similar_results)} 条相似项目经验",
+                    15,
+                    {
+                        "rag_active": True,
+                        "rag_history_count": len(rag_results),
+                        "rag_similar_count": len(similar_results),
+                        "rag_history": rag_results,
+                        "rag_similar": similar_results,
+                        "rag_context_preview": rag_context[:200] if rag_context else "",
+                    },
+                )
             except Exception as exc:
                 _logger.warning(f"[SuggestionAgent] RAG 检索失败: {exc}")
+                yield _make_event(self.name, "progress", f"RAG 检索失败: {exc}", 15, {"rag_active": False})
+        else:
+            _logger.info("[SuggestionAgent] RAG Store 不可用，跳过检索")
+            yield _make_event(self.name, "progress", "RAG Store 不可用，跳过历史经验检索", 15, {"rag_active": False})
 
         # ── LLM 生成（核心） ─────────────────────────────────────────────────
         llm = _get_llm()
@@ -374,6 +392,7 @@ class SuggestionAgent(BaseAgent):
         suggestions.sort(key=lambda s: priority_order.get(s["priority"], 2))
 
         # ── RAG 存储 ─────────────────────────────────────────────────────────
+        high_priority: list[dict] = []
         if rag_store and rag_store.is_available:
             try:
                 # 只存储高优先级建议
@@ -399,6 +418,12 @@ class SuggestionAgent(BaseAgent):
                 "low_priority": sum(1 for s in suggestions if s["priority"] == "low"),
                 "llm_powered": len(llm_suggestions) > 0,
                 "rule_count": rule_count,
+                "rag": {
+                    "active": rag_available,
+                    "history_count": len(rag_results),
+                    "similar_count": len(similar_results),
+                    "stored_count": len(high_priority) if rag_available else 0,
+                },
             },
         )
 

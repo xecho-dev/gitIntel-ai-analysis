@@ -152,46 +152,6 @@ def _build_quality_context(
     return "\n\n".join(parts) if parts else "（无可用质量数据）"
 
 
-# ─── 工具函数 ───────────────────────────────────────────────────
-
-def _read_text(path: str) -> str:
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except UnicodeDecodeError:
-        try:
-            with open(path, "r", encoding="latin-1") as f:
-                return f.read()
-        except Exception:
-            return ""
-
-
-def _cyclomatic_complexity(node) -> int:
-    """递归计算 tree-sitter 节点的圈复杂度（CF-type 节点 + 1）。"""
-    COMPLEXITY_NODES = {
-        "if_statement", "elif_clause", "else_clause",
-        "for_statement", "for_in_statement",
-        "while_statement", "do_statement",
-        "switch_statement", "case_statement",
-        "catch_clause", "try_statement",
-        "conditional_expression", "ternary_expression",
-        "and_operator", "or_operator",
-        "with_statement",
-        "labeled_statement",
-    }
-    count = 0
-
-    def walk(n):
-        nonlocal count
-        if n.type in COMPLEXITY_NODES:
-            count += 1
-        for child in n.children:
-            walk(child)
-
-    walk(node)
-    return max(count + 1, 1)
-
-
 # ─── Agent ──────────────────────────────────────────────────────
 
 class QualityAgent(BaseAgent):
@@ -396,9 +356,6 @@ class QualityAgent(BaseAgent):
                     continue
 
                 # 统计函数、类、复杂度
-                for node in tree.root_node.children:
-                    QualityAgent._walk_python(node, [], 0)
-
                 funcs, classes, complexity = QualityAgent._walk_python(tree.root_node, [], 0)
                 func_count += funcs
                 class_count += classes

@@ -48,7 +48,8 @@ export const ArchitectureAgentCard = () => {
     "code_parser_p0", "code_parser_p1", "code_parser_final",
     "architecture", "tech_stack",
   ]);
-  const isScanning = isAnalyzing && activeAgent !== null && ARCH_AGENTS.has(activeAgent);
+  const archInProgress = isAnalyzing && activeAgent !== null && ARCH_AGENTS.has(activeAgent);
+  const isScanning = archInProgress || (isAnalyzing && activeAgent === "architecture" && !archData);
 
   // ── 累加进度日志 ──────────────────────────────────────────────
   const linesRef = useRef<{ text: string; color: string }[]>([]);
@@ -257,6 +258,11 @@ export const ArchitectureAgentCard = () => {
               {line.text}
             </p>
           ))}
+          {isScanning && activeAgent === "architecture" && !archEvent?.message && (
+            <p className="text-blue-400 animate-pulse">
+              ▌ 正在分析项目架构…
+            </p>
+          )}
           {isScanning && (
             <p className="text-blue-400 animate-pulse">
               ▌ {activeAgent}...
@@ -264,6 +270,9 @@ export const ArchitectureAgentCard = () => {
           )}
           {!isAnalyzing && linesRef.current.length === 0 && (
             <p className="text-slate-600">等待分析开始...</p>
+          )}
+          {isAnalyzing && !isScanning && !archData && (
+            <p className="text-slate-600 animate-pulse">等待轮到架构分析...</p>
           )}
         </motion.div>
       )}

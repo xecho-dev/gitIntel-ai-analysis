@@ -17,9 +17,8 @@
   - summary: string（LLM 生成的架构摘要，200字以内）
 """
 import logging
-import os
 import re
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
 from utils.llm_factory import get_llm
@@ -490,12 +489,25 @@ class ArchitectureAgent(BaseAgent):
     ) -> dict:
         """同步构建架构分析结果（供 graph 同步调用）。
 
+        使用 get_running_loop().run_until_complete()，兼容 LangGraph 的事件循环。
+
         Returns:
             dict: 架构分析结果，与 stream() 返回的 data 结构一致。
         """
         agent = ArchitectureAgent()
-        import asyncio
-        return asyncio.run(agent.run(
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # 无运行中的循环时用标准方式（防御性）
+            return asyncio.run(agent.run(
+                repo_path, branch,
+                file_contents=file_contents,
+                code_parser_result=code_parser_result,
+                tech_stack_result=tech_stack_result,
+                quality_result=quality_result,
+                total_tree_files=total_tree_files,
+            ))
+        return loop.run_until_complete(agent.run(
             repo_path, branch,
             file_contents=file_contents,
             code_parser_result=code_parser_result,
