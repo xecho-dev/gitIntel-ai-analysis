@@ -26,7 +26,13 @@ GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出。
                                               │
                                     merge_analysis
                                               │
-                                   optimization / END
+                              optimization / react_suggestion / END
+
+ReAct Agent 扩展（Phase 1-3）：
+  - node_react_loader:    基于 ReAct 模式的智能仓库探索（可选，默认关闭）
+  - node_react_suggestion: 基于 ReAct 模式的优化建议生成（可选，默认关闭）
+  - ReActRepoLoaderAgent: 多轮 Thought→Action→Observation 循环
+  - ReActSuggestionAgent: 通过工具验证每个建议的精确性
 
 工作模式：
   - stream_analysis_sse() — SSE 流式接口（主要入口），实时推送进度
@@ -57,6 +63,8 @@ from agents import (
     SuggestionAgent,
     ArchitectureAgent,
 )
+from agents.repo_loader_agent import ReActRepoLoaderAgent
+from agents.suggestion_agent import ReActSuggestionAgent
 from .state import SharedState
 from .executor import (
     format_sse_event,
@@ -151,6 +159,165 @@ def node_fetch_tree_classify(state: SharedState) -> dict:
         "errors": [],
         "finished_agents": ["fetch_tree_classify"],
     }
+
+
+def node_react_loader(state: SharedState) -> dict:
+    """节点 1.5：ReAct 模式的智能仓库加载（替代 fetch_tree_classify + 渐进加载链）。
+
+    当 use_react_mode=True 时启用。
+
+    与旧版流程（fetch_tree_classify → load_p0 → load_p1 → load_p2）的区别：
+      - 旧版：LLM 只做"是否加载"的判断，文件选择基于硬编码的优先级
+      - ReAct：Agent 自主决定调用什么工具、加载什么文件，是真正的自主推理
+
+    工作流程：
+      1. Agent 先获取仓库信息和文件树
+      2. 通过 Thought → Action → Observation 循环探索
+      3. 自主选择调用 GitHub 工具和代码分析工具
+      4. 直到达到 max_files (50) 或 agent 认为足够
+
+    关键改进：ReAct 的 loaded_files 会写入 state，供后续节点使用。
+    """
+    import queue as _q_module
+    import threading
+
+    repo_url = state.get("repo_url", "")
+    parsed = parse_repo_url(repo_url)
+    if not parsed:
+        return {"errors": ["node_react_loader: 无法解析 URL"]}
+
+    owner, repo = parsed
+    branch = state.get("branch", "main")
+
+    q: Any = _q_module.Queue()
+    exc_info: list = []
+    react_events: list[dict] = []
+    result_ref: list[dict] = []  # 用于跨线程传递结果
+
+    def run_react():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def consume():
+                agent = ReActRepoLoaderAgent()
+                result = await agent.explore(owner, repo, branch)
+
+                # 将探索过程转为 SSE 事件
+                for call in result.tool_calls:
+                    if call.thought:
+                        react_events.append({
+                            "type": "progress",
+                            "agent": "react_loader",
+                            "message": f"[推理 {call.iteration + 1}] {call.thought[:80]}",
+                            "percent": min(30 + call.iteration * 5, 80),
+                            "data": {
+                                "tool": call.tool_name,
+                                "args": call.tool_args,
+                                "observation": call.observation[:200],
+                                "elapsed_ms": call.elapsed_ms,
+                            },
+                        })
+
+                    # 加载文件进度
+                    if call.tool_name in ("get_file_blobs", "read_file_content"):
+                        react_events.append({
+                            "type": "progress",
+                            "agent": "react_loader",
+                            "message": f"加载: {call.observation[:60]}",
+                            "percent": min(50, 30 + len(result.loaded_paths) * 0.8),
+                            "data": {"loaded_count": len(result.loaded_paths)},
+                        })
+
+                # 最终结果
+                react_events.append({
+                    "type": "result",
+                    "agent": "react_loader",
+                    "message": f"ReAct 探索完成: {result.total_iterations} 轮, {len(result.loaded_paths)} 个文件",
+                    "percent": 100,
+                    "data": {
+                        "total_iterations": result.total_iterations,
+                        "loaded_count": len(result.loaded_paths),
+                        "loaded_paths": result.loaded_paths[:30],
+                        "is_sufficient": result.is_sufficient,
+                        "summary": result.summary[:500],
+                        "errors": result.errors,
+                    },
+                })
+
+                # 将 loaded_files 跨线程传递（通过 result_ref）
+                result_ref.append({
+                    "loaded_files": result.loaded_files,
+                    "loaded_paths": result.loaded_paths,
+                    "repo_sha": getattr(result, "sha", branch),
+                })
+
+            loop.run_until_complete(consume())
+            loop.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"[node_react_loader] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            exc_info.append(e)
+        finally:
+            q.put(None)
+
+    t = threading.Thread(target=run_react, daemon=True)
+    t.start()
+    t.join()
+
+    # 收集所有事件
+    all_events: list[dict] = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        all_events.append(item)
+
+    # 从 result_ref 获取加载的文件
+    loaded_files: dict[str, str] = {}
+    loaded_paths: list[str] = []
+    repo_sha = branch
+    if result_ref:
+        loaded_files = result_ref[0].get("loaded_files", {})
+        loaded_paths = result_ref[0].get("loaded_paths", [])
+        repo_sha = result_ref[0].get("repo_sha", branch)
+
+    # 合并事件
+    all_events = react_events + all_events
+
+    summary = ""
+    iterations = 0
+    for ev in all_events:
+        if isinstance(ev, dict) and ev.get("type") == "result":
+            data = ev.get("data", {})
+            summary = data.get("summary", "")
+            iterations = data.get("total_iterations", 0)
+
+    if loaded_files:
+        logger.info(
+            f"[node_react_loader] ReAct 完成: {len(loaded_files)} 个文件, "
+            f"{len(loaded_paths)} 条路径, {iterations} 轮"
+        )
+        return {
+            "loaded_files": loaded_files,
+            "loaded_paths": loaded_paths,
+            "repo_sha": repo_sha,
+            "file_contents": loaded_files,
+            "errors": exc_info,
+            "react_events": all_events,
+            "react_summary": summary,
+            "react_iterations": iterations,
+            "finished_agents": ["react_loader"],
+        }
+    else:
+        logger.warning(f"[node_react_loader] ReAct 无结果，回退到旧版流程")
+        return {
+            "errors": exc_info + ["ReAct 无结果，使用已有加载流程"],
+            "react_events": all_events,
+            "react_summary": summary,
+            "react_iterations": iterations,
+            "finished_agents": [],
+        }
 
 
 def node_load_p0(state: SharedState) -> dict:
@@ -431,7 +598,18 @@ def node_code_parser_final(state: SharedState) -> dict:
 
     这是进入并行分析阶段前的最后一步，确保所有文件都有解析数据。
     如果 P2 文件被加载但尚未解析，这里会补充解析。
+
+    注意：ReAct 模式下此节点不可达（流程会走 react_loader → explorer），
+    这里添加保护以确保兼容性。
     """
+    # ReAct 模式下不可达，跳过执行（但确保 code_parser_result 已透传）
+    if state.get("use_react_mode", False):
+        return {
+            "code_parser_result": state.get("code_parser_result"),
+            "errors": [],
+            "finished_agents": [],
+        }
+
     p0_result = state.get("code_parser_p0_result") or {}
     p1_result = state.get("code_parser_p1_result") or {}
     loaded_files = state.get("loaded_files") or {**state.get("loaded_p0", {}), **state.get("loaded_p1", {})}
@@ -498,6 +676,182 @@ def node_code_parser_final(state: SharedState) -> dict:
     }
 
 
+def node_explorer(state: SharedState) -> dict:
+    """节点 9.5（可选）：并行 ReAct 探索。
+
+    ReAct 模式（use_react_mode=True）下的探索入口：
+      - react_loader 已将 loaded_files 写入状态
+      - 此节点负责：① 代码解析（生成 code_parser_result）② 多维度并行探索
+
+    工作流程：
+      1. 获取 loaded_files
+      2. ReAct 模式：先 CodeParser 解析，再 ExplorerOrchestrator 探索
+      3. 旧版模式：直接 ExplorerOrchestrator 探索（代码解析已在 code_parser_final 完成）
+
+    SSE 事件：explorer_events 透传到前端，显示每个 Agent 的探索进度。
+    """
+    import queue as _q_module
+    import threading
+
+    repo_id, branch, _ = get_inputs_from_state(state)
+    file_contents = (
+        state.get("loaded_files") or
+        {**state.get("loaded_p0", {}), **state.get("loaded_p1", {})}
+    )
+    logger.info(f"[node_explorer] 入参检查: use_react_mode={state.get('use_react_mode')}, file_contents={len(file_contents) if file_contents else 0} 个文件")
+
+    owner, repo = parse_repo_url(state.get("repo_url", ""))
+    if not owner or not repo:
+        return {"errors": ["node_explorer: 无法解析 repo_url"]}
+
+    q: Any = _q_module.Queue()
+    exc_info: list = []
+    explorer_events: list[dict] = []
+    code_parser_result: dict = {}
+    # 依赖分析结果：None 表示未执行，dict 表示执行结果
+    dependency_result: dict | None = None
+
+    # ── 依赖分析（始终执行，DependencyAgent 能自己从 GitHub 获取依赖文件）────────
+    # ExplorerOrchestrator 不含 DependencyExplorer，所以在这里单独调用
+    try:
+        loop2 = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop2)
+
+        async def run_dep():
+            agent = DependencyAgent()
+            if not owner or not repo:
+                _logger.warning(f"[node_explorer] 无法解析 owner/repo，跳过依赖分析")
+                return None
+            result_data = {}
+            async for ev in agent.stream(
+                f"{owner}/{repo}",
+                branch,
+                file_contents=file_contents if file_contents else None,
+            ):
+                if ev.get("type") == "result":
+                    result_data = ev.get("data")
+            return result_data
+
+        dependency_result = loop2.run_until_complete(run_dep())
+        logger.info(f"[node_explorer] 依赖分析完成: {dependency_result}")
+        loop2.close()
+    except Exception as e:
+        logger.warning(f"[node_explorer] 依赖分析失败: {e}")
+        exc_info.append(str(e))
+
+    # ── ReAct 模式：代码解析（依赖依赖分析完成后）─────────────────────
+    if state.get("use_react_mode", False) and file_contents:
+        # ReAct 模式下，react_loader 已加载文件，在这里做代码解析
+        # 解析结果写入 state，供 architecture 节点使用
+        try:
+            files = [{"path": path, "content": content} for path, content in file_contents.items()]
+            if files:
+                code_parser_result = asyncio.run(
+                    CodeParserAgent()._analyze_inmemory_files(files)
+                )
+                logger.info(f"[node_explorer] ReAct 模式代码解析完成: {len(files)} 个文件")
+        except Exception as e:
+            logger.warning(f"[node_explorer] ReAct 模式代码解析失败: {e}")
+            exc_info.append(str(e))
+
+    # ── 探索（并行 ReAct 探索）───────────────────────────────────
+    def run_explorers():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def consume():
+                from agents.explorers import ExplorerOrchestrator
+                orchestrator = ExplorerOrchestrator()
+
+                explorer_events.append({
+                    "type": "status",
+                    "agent": "explorer",
+                    "message": "并行探索启动：TechStack / Quality / Architecture",
+                    "percent": 50,
+                    "data": None,
+                })
+
+                results = await orchestrator.explore_all(
+                    owner, repo, branch,
+                    file_contents=file_contents or None,
+                )
+
+                explorer_events.append({
+                    "type": "result",
+                    "agent": "explorer",
+                    "message": f"并行探索完成: {len(results)} 个维度",
+                    "percent": 100,
+                    "data": results,
+                })
+
+            loop.run_until_complete(consume())
+            loop.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"[node_explorer] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            exc_info.append(e)
+        finally:
+            q.put(None)
+
+    t = threading.Thread(target=run_explorers, daemon=True)
+    t.start()
+    t.join()
+
+    # 收集事件
+    all_events: list[dict] = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        all_events.append(item)
+
+    # 合并事件
+    all_events = explorer_events + all_events
+
+    result: dict = {}
+    for event in all_events:
+        if event.get("type") == "result":
+            result = event.get("data") or {}
+
+    # ── 构建返回状态 ───────────────────────────────────────────
+    return_val: dict = {
+        "explorer_result": result,
+        "explorer_events": all_events,
+        "errors": exc_info,
+    }
+
+    # 确保 file_contents 写入状态，供 tech_stack / quality / dependency 使用
+    if file_contents:
+        return_val["file_contents"] = file_contents
+
+    # ReAct 模式下，将 code_parser_result 写入状态，供 architecture 节点使用
+    if code_parser_result:
+        return_val["code_parser_result"] = code_parser_result
+
+    # 依赖分析始终写入状态（无论 ReAct 还是旧版模式）
+    if dependency_result is not None:
+        logger.info(f"[node_explorer] 写入 dependency_result 到状态: {dependency_result}")
+        return_val["dependency_result"] = dependency_result
+
+    # ReAct 模式下，将 Explorer 结果映射到对应字段（供后续节点使用）
+    # 注意：ExplorerOrchestrator 返回 {ExplorerName: {findings + _meta}}，需要提取 findings
+    if state.get("use_react_mode", False):
+        if result:
+            if "TechStackExplorer" in result:
+                ts_data = result["TechStackExplorer"]
+                # 提取 findings 字段，如果没有则直接使用整个数据
+                return_val["tech_stack_result"] = ts_data.get("findings", ts_data) if isinstance(ts_data, dict) else ts_data
+            if "QualityExplorer" in result:
+                q_data = result["QualityExplorer"]
+                return_val["quality_result"] = q_data.get("findings", q_data) if isinstance(q_data, dict) else q_data
+            if "ArchitectureExplorer" in result:
+                arch_data = result["ArchitectureExplorer"]
+                return_val["architecture_result"] = arch_data.get("findings", arch_data) if isinstance(arch_data, dict) else arch_data
+
+    return return_val
+
+
 def node_merge_analysis(state: SharedState) -> dict:
     """节点 10：并行分析结果验证。
 
@@ -554,6 +908,8 @@ def node_quality(state: SharedState) -> dict:
 
     if not result:
         errors.append("QualityAgent: 执行返回空结果")
+    elif "error" in result:
+        errors.append(f"QualityAgent: {result.get('error')}")
 
     return {
         "quality_result": result,
@@ -583,6 +939,8 @@ def node_dependency(state: SharedState) -> dict:
 
     if not result:
         errors.append("DependencyAgent: 执行返回空结果")
+    elif "error" in result:
+        errors.append(f"DependencyAgent: {result.get('error')}")
 
     return {
         "dependency_result": result,
@@ -759,6 +1117,197 @@ def node_optimization(state: SharedState) -> dict:
     }
 
 
+def node_react_suggestion(state: SharedState) -> dict:
+    """节点 15b（可选）：ReAct 模式的优化建议生成。
+
+    与 node_optimization 的区别：
+      - node_optimization：一次性塞入所有上下文，code_fix 是 guesswork
+      - node_react_suggestion：Agent 通过工具验证每个问题，生成精确可执行的 code_fix
+
+    工作流程：
+      1. 构建分析上下文（技术栈/质量/依赖/架构数据）
+      2. RAG 检索历史经验
+      3. ReAct 循环：Agent 调用工具验证问题（搜索代码/读文件/解析 AST）
+      4. 基于验证结果生成精确建议
+      5. 存储高优先级建议到 RAG
+
+    适用场景：
+      - 需要精确 code_fix 的场景（如 FixGeneratorAgent 需要基于此结果生成代码修改）
+      - 对建议质量要求更高的分析
+
+    注意：此节点为新能力，默认关闭。
+    """
+    import queue as _q_module
+    import threading
+
+    repo_id, branch, _ = get_inputs_from_state(state)
+    file_contents = (
+        state.get("loaded_files") or
+        {**state.get("loaded_p0", {}), **state.get("loaded_p1", {})}
+    )
+
+    # ReAct 模式下 get_inputs_from_state 可能返回空的 repo_id（因为没有 repo_loader_result），
+    # 需要直接从 repo_url 解析，确保 ReActSuggestionAgent 能拿到正确的 owner/repo
+    owner, repo = parse_repo_url(state.get("repo_url", ""))
+    if owner and repo:
+        repo_id = f"{owner}/{repo}"
+
+    q: Any = _q_module.Queue()
+    exc_info: list = []
+
+    def run_stream():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def consume():
+                agent = ReActSuggestionAgent()
+                async for event in agent.stream(
+                    repo_id,
+                    branch,
+                    file_contents=file_contents or None,
+                    code_parser_result=state.get("code_parser_result"),
+                    tech_stack_result=state.get("tech_stack_result"),
+                    quality_result=state.get("quality_result"),
+                    dependency_result=state.get("dependency_result"),
+                ):
+                    q.put(dict(event))
+
+            loop.run_until_complete(consume())
+            loop.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"[node_react_suggestion] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            exc_info.append(e)
+        finally:
+            q.put(None)
+
+    t = threading.Thread(target=run_stream, daemon=True)
+    t.start()
+    t.join()
+
+    all_events: list[dict] = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        all_events.append(item)
+
+    result: dict = {}
+    for event in all_events:
+        if event.get("type") == "result":
+            result = event.get("data") or {}
+
+    # 如果 ReActSuggestionAgent 返回空结果，使用规则引擎兜底
+    if not result or not result.get("suggestions"):
+        logger.warning("[node_react_suggestion] ReActSuggestionAgent 返回空结果，使用规则引擎兜底")
+        fallback = _generate_rule_based_suggestions(state)
+        if fallback:
+            result = fallback
+            # 添加兜底事件
+            all_events.append({
+                "type": "result",
+                "agent": "optimization",
+                "message": "规则引擎兜底生成建议",
+                "percent": 100,
+                "data": result,
+            })
+
+    final_result = {
+        "repo_loader": state.get("repo_loader_result"),
+        "code_parser": state.get("code_parser_result"),
+        "tech_stack": state.get("tech_stack_result"),
+        "quality": state.get("quality_result"),
+        "dependency": state.get("dependency_result"),
+        "architecture": state.get("architecture_result"),
+        "suggestion": result,
+    }
+
+    return {
+        "suggestion_result": result,
+        "final_result": final_result,
+        "optimization_events": all_events,
+        "errors": exc_info,
+    }
+
+
+def _generate_rule_based_suggestions(state: SharedState) -> dict:
+    """基于已有分析数据生成规则引擎建议。
+
+    当 ReActSuggestionAgent 失败时作为兜底方案。
+    """
+    from agents.suggestion import SuggestionAgent
+
+    suggestions = []
+    _id = [1]
+
+    def next_id():
+        v = _id[0]
+        _id[0] += 1
+        return v
+
+    # 从 quality_result 生成建议
+    quality_result = state.get("quality_result")
+    if quality_result and isinstance(quality_result, dict):
+        try:
+            suggestions.extend(SuggestionAgent._quality_suggestions(quality_result, next_id))
+        except Exception as e:
+            logger.warning(f"[_generate_rule_based_suggestions] _quality_suggestions 失败: {e}")
+
+    # 从 dependency_result 生成建议
+    dependency_result = state.get("dependency_result")
+    if dependency_result and isinstance(dependency_result, dict):
+        try:
+            suggestions.extend(SuggestionAgent._dependency_suggestions(dependency_result, next_id))
+        except Exception as e:
+            logger.warning(f"[_generate_rule_based_suggestions] _dependency_suggestions 失败: {e}")
+
+    # 从 architecture_result 生成建议（如果有的话）
+    architecture_result = state.get("architecture_result")
+    if architecture_result and isinstance(architecture_result, dict):
+        # 架构问题建议
+        concerns = architecture_result.get("concerns", [])
+        if concerns:
+            for concern in concerns[:3]:
+                suggestions.append({
+                    "id": next_id(),
+                    "type": "architecture",
+                    "title": "架构优化建议",
+                    "description": str(concern),
+                    "priority": "medium",
+                    "category": "architecture",
+                    "source": "rule",
+                })
+
+    # 如果仍然没有建议，生成一个通用建议
+    if not suggestions:
+        suggestions.append({
+            "id": next_id(),
+            "type": "general",
+            "title": "项目分析完成",
+            "description": "分析已完成，未检测到需要紧急处理的问题。",
+            "priority": "low",
+            "category": "general",
+            "source": "rule",
+        })
+
+    # 按优先级排序
+    priority_order = {"high": 0, "medium": 1, "low": 2}
+    suggestions.sort(key=lambda s: priority_order.get(s.get("priority", "low"), 2))
+
+    return {
+        "suggestions": suggestions,
+        "total": len(suggestions),
+        "high_priority": sum(1 for s in suggestions if s.get("priority") == "high"),
+        "medium_priority": sum(1 for s in suggestions if s.get("priority") == "medium"),
+        "low_priority": sum(1 for s in suggestions if s.get("priority") == "low"),
+        "verified_count": 0,
+        "tool_calls": 0,
+        "rag": {"active": False, "history_count": 0},
+        "_fallback": True,
+    }
+
+
 # ─── 错误处理节点 ──────────────────────────────────────────────────────
 
 
@@ -778,6 +1327,26 @@ def node_error(state: SharedState) -> dict:
 # LangGraph 根据返回值决定下一步执行哪个节点。
 
 
+def route_after_fetch(state: SharedState) -> str:
+    """fetch_tree_classify 之后：ReAct 模式下跳到 react_loader 获取智能加载结果。
+
+    ReAct 模式不走传统 P0/P1/P2 渐进加载，直接跳到 react_loader。
+    react_loader 会将 loaded_files 写入状态，后续节点直接使用。
+    """
+    if state.get("use_react_mode", False):
+        return "react_loader"
+    return "load_p0"
+def route_suggestion(state: SharedState) -> str:
+    """优化建议阶段路由。
+
+    - use_react_mode=True  → react_suggestion（ReAct 模式，主动验证每个建议）
+    - use_react_mode=False → optimization（旧版 SuggestionAgent）
+    """
+    if state.get("use_react_mode", False):
+        return "react_suggestion"
+    return "optimization"
+
+
 def route_after_decide_p1(state: SharedState) -> str:
     """decide_p1 之后：根据 needs_more 判断是否加载 P1。
 
@@ -787,6 +1356,28 @@ def route_after_decide_p1(state: SharedState) -> str:
     if state.get("needs_more", False):
         return "load_p1"
     return "load_p2_decide"
+
+
+def route_after_code_parser(state: SharedState) -> str:
+    """code_parser_final 之后：ReAct 模式走 explorer，旧版走并行分析。
+
+    - use_react_mode=True  → explorer（ReAct 探索，跳过独立 tech_stack/quality/dependency）
+    - use_react_mode=False → fan-out 到 tech_stack / quality / dependency
+    """
+    if state.get("use_react_mode", False):
+        return "explorer"
+    return "tech_stack"
+
+
+def route_to_architecture(state: SharedState) -> str:
+    """Fan-in 路由：explorer / tech_stack / quality / dependency → architecture。
+
+    通过 use_react_mode 判断哪些节点会执行，据此决定是否可以进入 architecture：
+      - use_react_mode=True  → 只有 explorer 会执行 → 直接进入 architecture
+      - use_react_mode=False → 只有 tech_stack/quality/dependency 会执行 → 直接进入 architecture
+    这样即使有未执行的节点，LangGraph 也不会死锁等待。
+    """
+    return "architecture"
 
 
 def route_after_p2_decide(state: SharedState) -> str:
@@ -827,18 +1418,27 @@ def _build_graph() -> StateGraph:
       - 从同一节点 add_edge 到多个节点 → LangGraph 自动并行执行（Fan-out），
         所有目标节点都完成后才触发下一个节点（Fan-in，等价于 join barrier）
 
-    并行分析实现：
-      code_parser_final ─┬─► tech_stack
-                          ├─► quality
-                          └─► dependency
-      三条边同时建立，LangGraph 自动并发执行三个节点；
-      三个节点都结束后，各自的 add_edge(..., architecture) 才触发，
-      最终汇入 architecture 节点。
+    ReAct 模式流程（use_react_mode=True）：
+      fetch_tree_classify
+           │ use_react_mode?
+           ▼
+      ┌──── react_loader ──► explorer ──► architecture ──► merge_analysis ──► react_suggestion
+      │
+      └──── load_p0 ──► ... ──► code_parser_final ──► (被跳过)
+
+    旧版流程（use_react_mode=False）：
+      fetch_tree_classify ──► load_p0 ──► code_parser_p0 ──► decide_p1 ──► load_p1 ──► ...
+      ──► code_parser_final ──► tech_stack / quality / dependency ──► architecture ──► optimization
+
+    关键设计：
+      - code_parser_final 用条件路由决定走 explorer（ReAct）还是 fan-out 到三个旧版节点（旧版）
+      - explorer / tech_stack / quality / dependency 都用条件路由进入 architecture（避免 fan-in 死锁）
     """
     graph = StateGraph(state_schema=SharedState)
 
     # 节点注册
     graph.add_node("fetch_tree_classify", node_fetch_tree_classify)
+    graph.add_node("react_loader", node_react_loader)
     graph.add_node("load_p0", node_load_p0)
     graph.add_node("code_parser_p0", node_code_parser_p0)
     graph.add_node("decide_p1", node_decide_p1)
@@ -847,19 +1447,37 @@ def _build_graph() -> StateGraph:
     graph.add_node("load_p2_decide", node_load_p2_decide)
     graph.add_node("load_more_p2", node_load_more_p2)
     graph.add_node("code_parser_final", node_code_parser_final)
+    graph.add_node("explorer", node_explorer)
     graph.add_node("tech_stack", node_tech_stack)
     graph.add_node("quality", node_quality)
     graph.add_node("dependency", node_dependency)
     graph.add_node("architecture", node_architecture)
     graph.add_node("merge_analysis", node_merge_analysis)
     graph.add_node("optimization", node_optimization)
+    graph.add_node("react_suggestion", node_react_suggestion)
     graph.add_node("error", node_error)
 
-    # 入口
+    # ── 入口 ──────────────────────────────────────────────────────
     graph.set_entry_point("fetch_tree_classify")
 
-    # 线性流程
-    graph.add_edge("fetch_tree_classify", "load_p0")
+    # ── 入口路由：fetch_tree_classify 之后 ─────────────────────────
+    # ReAct 模式：react_loader（智能自主加载）
+    # 旧版模式：load_p0（旧版渐进式加载）
+    graph.add_conditional_edges(
+        "fetch_tree_classify",
+        route_after_fetch,
+        {
+            "react_loader": "react_loader",
+            "load_p0": "load_p0",
+        },
+    )
+
+    # ── ReAct 加载路由：react_loader 之后 ──────────────────────────
+    # ── ReAct vs 旧版分流：code_parser_final / react_loader 之后 ────────────
+    # react_loader 之后
+    graph.add_edge("react_loader", "explorer")
+
+    # ── 旧版渐进加载链 ───────────────────────────────────────────
     graph.add_edge("load_p0", "code_parser_p0")
     graph.add_edge("code_parser_p0", "decide_p1")
 
@@ -893,22 +1511,46 @@ def _build_graph() -> StateGraph:
         },
     )
 
-    # 真正的并行分析（Fan-out / Fan-in）
-    graph.add_edge("code_parser_final", "tech_stack")
+    # code_parser_final 之后：ReAct 模式走 explorer（ReAct 探索），旧版走 fan-out（并行分析）
+    # 旧版时：code_parser_final 通过条件路由到 tech_stack，同时通过 fan-out 并行触发 quality 和 dependency
+    graph.add_conditional_edges(
+        "code_parser_final",
+        route_after_code_parser,
+        {
+            "explorer": "explorer",
+            "tech_stack": "tech_stack",
+        },
+    )
+    # Fan-out：旧版模式下并行触发 quality 和 dependency（与 tech_stack 同时执行）
+    # 注意：tech_stack 也通过上面的条件路由触发，所以这三条 fan-out 一起构成旧版的完整并行分析
     graph.add_edge("code_parser_final", "quality")
     graph.add_edge("code_parser_final", "dependency")
 
-    # Fan-in：三个并行节点都完成后进入 architecture
-    graph.add_edge("tech_stack", "architecture")
-    graph.add_edge("quality", "architecture")
-    graph.add_edge("dependency", "architecture")
+    # ── Fan-in：四个节点（explorer / tech_stack / quality / dependency）完成 → architecture ──
+    # 每个节点的条件路由确保 LangGraph fan-in 不会死锁
+    graph.add_conditional_edges("explorer", route_to_architecture, {"architecture": "architecture"})
+    graph.add_conditional_edges("tech_stack", route_to_architecture, {"architecture": "architecture"})
+    graph.add_conditional_edges("quality", route_to_architecture, {"architecture": "architecture"})
+    graph.add_conditional_edges("dependency", route_to_architecture, {"architecture": "architecture"})
 
-    # 串行收尾
+    # ── 收尾：architecture → merge_analysis ────────────────────────
     graph.add_edge("architecture", "merge_analysis")
-    graph.add_edge("merge_analysis", "optimization")
+
+    # ── 优化建议路由 ─────────────────────────────────────────────
+    # ReAct 模式：react_suggestion（主动验证每个建议）
+    # 旧版模式：optimization（传统 SuggestionAgent）
+    graph.add_conditional_edges(
+        "merge_analysis",
+        route_suggestion,
+        {
+            "react_suggestion": "react_suggestion",
+            "optimization": "optimization",
+        },
+    )
 
     # 结束
     graph.add_edge("optimization", END)
+    graph.add_edge("react_suggestion", END)
     graph.add_edge("error", END)
 
     return graph
@@ -974,27 +1616,37 @@ def stream_analysis_sse(
     repo_url: str,
     branch: str = "main",
     thread_id: str | None = None,
+    use_react_mode: bool = True,
 ) -> Generator[str, None, None]:
     """SSE 流式接口：LangGraph 工作流 + 实时 SSE 事件。
+
+    Args:
+        repo_url: GitHub 仓库 URL
+        branch: 分支名（默认 main）
+        thread_id: 可选的 thread ID（用于 LangGraph checkpoint 断点续传）
+        use_react_mode: 是否使用 ReAct 模式（默认 True，启用智能自主加载）
 
     方案：
       1. 用 _workflow.astream() 遍历每个节点（支持断点续传）
       2. 每次节点完成后，调用 get_state() 获取最新完整状态
       3. 根据节点名 + 状态内容，显式 yield 对应的 SSE 事件
-      4. tech_stack / quality / dependency 三个并行节点在
+      4. tech_stack / quality / dependency / explorer 四个并行节点在
          astream() 内部真正并发执行，都完成后才进入下一节点
 
-    注意：必须用同步生成器（def 而非 async def），因为 _workflow.astream() 是
-    同步迭代器（内部虽有异步节点，但迭代本身是同步的）。若用 async def + async for，
-    会导致迭代器协议错乱，所有事件无法正确 yield 到调用方。
+    ReAct 模式（use_react_mode=True）：
+      fetch_tree_classify → react_loader → explorer → architecture → merge_analysis → react_suggestion
 
-    SSE 事件类型：
-      - status: 阶段开始
-      - progress: 阶段完成（含结果数据）
-      - result: 最终/关键结果
-      - error: 错误（不中断流程）
+    旧版模式（use_react_mode=False）：
+      fetch_tree_classify → load_p0 → ... → code_parser_final → tech_stack/quality/dependency → optimization
     """
     logger.info(f"[stream_analysis_sse] 开始: repo={repo_url}, branch={branch}, thread={thread_id}")
+
+    # 重置 Token 计数器（每个新分析请求独立统计）
+    try:
+        from utils.llm_factory import reset_token_stats
+        reset_token_stats()
+    except ImportError:
+        pass
 
     parsed = parse_repo_url(repo_url)
     if not parsed:
@@ -1011,7 +1663,7 @@ def stream_analysis_sse(
         }
     }
 
-    initial_state = build_initial_state(repo_url, branch)
+    initial_state = build_initial_state(repo_url, branch, use_react_mode=use_react_mode)
 
     # ── 立即发送初始事件（让客户端立刻收到响应，而非等待第一个节点完成）──
     yield format_sse_event({
@@ -1077,7 +1729,20 @@ def stream_analysis_sse(
         if exc_info:
             raise exc_info[0]
 
-        # 正常结束
+        # 正常结束 — 记录 Token 使用量统计
+        try:
+            from utils.llm_factory import get_token_stats
+            stats = get_token_stats()
+            logger.info(
+                f"[stream_analysis_sse] 分析完成: "
+                f"input_tokens={stats['total_input_tokens']}, "
+                f"output_tokens={stats['total_output_tokens']}, "
+                f"total={stats['total_tokens']}, "
+                f"calls={stats['total_calls']}"
+            )
+        except Exception:
+            pass
+
         yield "data: [DONE]\n\n"
 
     except Exception as e:
@@ -1172,30 +1837,84 @@ def _state_to_sse_events(
             }))
 
         if tree_items:
-            events.append(format_sse_event({
-                "type": "progress",
-                "agent": "fetch_tree_classify",
-                "message": f"获取文件树完成，共 {len(tree_items)} 个文件",
-                "percent": 15,
-                "data": {"total_files": len(tree_items)},
-            }))
+            msg_tree_done = f"获取文件树完成，共 {len(tree_items)} 个文件"
+            if msg_tree_done not in status_sent:
+                status_sent.add(msg_tree_done)
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": "fetch_tree_classify",
+                    "message": msg_tree_done,
+                    "percent": 15,
+                    "data": {"total_files": len(tree_items)},
+                }))
+            msg_ai_classify = "正在进行 AI 分类..."
+            if msg_ai_classify not in status_sent:
+                status_sent.add(msg_ai_classify)
+                events.append(format_sse_event({
+                    "type": "status",
+                    "agent": "fetch_tree_classify",
+                    "message": msg_ai_classify,
+                    "percent": 20,
+                    "data": None,
+                }))
+            msg_classify_done = f"AI 分类完成: P0={len(p0)}, P1={len(p1)}, P2={len(p2)}"
+            if msg_classify_done not in status_sent:
+                status_sent.add(msg_classify_done)
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": "fetch_tree_classify",
+                    "message": msg_classify_done,
+                    "percent": 25,
+                    "data": {
+                        "p0": len(p0), "p1": len(p1), "p2": len(p2),
+                        "total_tree_files": len(tree_items),
+                    },
+                }))
+
+    # ── react_loader（ReAct 模式）────────────────────────────────────
+    elif node_name == "react_loader":
+        react_events: list[dict] = state.get("react_events") or []
+        loaded_files = state.get("loaded_files") or {}
+        loaded_paths = state.get("loaded_paths") or []
+
+        if "react_loader" not in status_sent:
+            status_sent.add("react_loader")
             events.append(format_sse_event({
                 "type": "status",
-                "agent": "fetch_tree_classify",
-                "message": "正在进行 AI 分类...",
-                "percent": 20,
+                "agent": "react_loader",
+                "message": "正在使用 ReAct 智能探索仓库...",
+                "percent": 25,
                 "data": None,
             }))
-            events.append(format_sse_event({
-                "type": "progress",
-                "agent": "fetch_tree_classify",
-                "message": f"AI 分类完成: P0={len(p0)}, P1={len(p1)}, P2={len(p2)}",
-                "percent": 25,
-                "data": {
-                    "p0": len(p0), "p1": len(p1), "p2": len(p2),
-                    "total_tree_files": len(tree_items),
-                },
-            }))
+
+        # 透传 ReAct 推理步骤的 progress 事件
+        for ev in react_events:
+            if ev.get("type") == "progress":
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": ev.get("agent", "react_loader"),
+                    "message": ev.get("message", ""),
+                    "percent": ev.get("percent", 50),
+                    "data": ev.get("data"),
+                }))
+
+        # result 事件
+        for ev in react_events:
+            if ev.get("type") == "result":
+                data = ev.get("data", {})
+                events.append(format_sse_event({
+                    "type": "result",
+                    "agent": "react_loader",
+                    "message": ev.get("message", "ReAct 探索完成"),
+                    "percent": data.get("percent", 100),
+                    "data": {
+                        "total_iterations": data.get("total_iterations"),
+                        "loaded_count": len(loaded_paths),
+                        "loaded_paths": data.get("loaded_paths", []),
+                        "is_sufficient": data.get("is_sufficient"),
+                        "summary": data.get("summary", ""),
+                    },
+                }))
 
     # ── load_p0 ──────────────────────────────────────────────────────
     elif node_name == "load_p0":
@@ -1430,6 +2149,104 @@ def _state_to_sse_events(
                 "data": result,
             }))
 
+    # ── explorer ─────────────────────────────────────────────────
+    elif node_name == "explorer":
+        explorer_result = state.get("explorer_result") or {}
+
+        if "explorer" not in status_sent:
+            status_sent.add("explorer")
+            events.append(format_sse_event({
+                "type": "status",
+                "agent": "explorer",
+                "message": "并行探索启动：TechStack / Quality / Architecture...",
+                "percent": 76,
+                "data": None,
+            }))
+        if explorer_result:
+            msg_explorer_done = "并行探索完成"
+            if msg_explorer_done not in status_sent:
+                status_sent.add(msg_explorer_done)
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": "explorer",
+                    "message": msg_explorer_done,
+                    "percent": 88,
+                    "data": explorer_result,
+                }))
+
+        # ReAct 模式时，ExplorerOrchestrator 内部已并行执行了 TechStackExplorer、
+        # QualityExplorer，结果通过 node_explorer 写入了 state["tech_stack_result"]
+        # 和 state["quality_result"]。SSE 层需要主动把它们转发出来（legacy 模式
+        # 下这些字段由独立节点写入，本分支不会重复）。
+        # 通过检查 state 而非 explorer_result 避免在 legacy 模式下重复发送。
+        ts_result = state.get("tech_stack_result")
+        if ts_result:
+            msg_ts_done = "技术栈识别完成"
+            if msg_ts_done not in status_sent:
+                status_sent.add(msg_ts_done)
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": "tech_stack",
+                    "message": msg_ts_done,
+                    "percent": 82,
+                    "data": ts_result,
+                }))
+            # 添加 result 事件用于数据库持久化
+            if "tech_stack" not in result_sent:
+                result_sent.add("tech_stack")
+                events.append(format_sse_event({
+                    "type": "result",
+                    "agent": "tech_stack",
+                    "message": "技术栈分析完成",
+                    "percent": 82,
+                    "data": ts_result,
+                }))
+
+        q_result = state.get("quality_result")
+        if q_result:
+            msg_q_done = "代码质量分析完成"
+            if msg_q_done not in status_sent:
+                status_sent.add(msg_q_done)
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": "quality",
+                    "message": msg_q_done,
+                    "percent": 85,
+                    "data": q_result,
+                }))
+            # 添加 result 事件用于数据库持久化
+            if "quality" not in result_sent:
+                result_sent.add("quality")
+                events.append(format_sse_event({
+                    "type": "result",
+                    "agent": "quality",
+                    "message": "代码质量分析完成",
+                    "percent": 85,
+                    "data": q_result,
+                }))
+
+        # dependency 分析结果始终发送（即使为空，也告知前端分析已完成）
+        dep_result = state.get("dependency_result")
+        logger.info(f"[SSE] dependency 检查: dep_result={dep_result}, status_sent={status_sent}, result_sent={result_sent}")
+        if dep_result is not None and "dependency" not in status_sent:
+            status_sent.add("dependency")
+            events.append(format_sse_event({
+                "type": "status",
+                "agent": "dependency",
+                "message": "依赖风险分析完成",
+                "percent": 87,
+                "data": None,
+            }))
+            if "dependency" not in result_sent:
+                result_sent.add("dependency")
+                events.append(format_sse_event({
+                    "type": "result",
+                    "agent": "dependency",
+                    "message": "依赖风险分析完成",
+                    "percent": 87,
+                    "data": dep_result or {},
+                }))
+
     # ── architecture ────────────────────────────────────────────────
     elif node_name == "architecture":
         result = state.get("architecture_result") or {}
@@ -1440,13 +2257,16 @@ def _state_to_sse_events(
             # 跳过 status（由下面统一发），其余透传
             if ev.get("type") == "status":
                 continue
-            events.append(format_sse_event({
-                "type": ev.get("type", "progress"),
-                "agent": ev.get("agent", "architecture"),
-                "message": ev.get("message") or "架构分析中...",
-                "percent": ev.get("percent", 88),
-                "data": ev.get("data"),
-            }))
+            msg = ev.get("message") or "架构分析中..."
+            if msg not in status_sent:
+                status_sent.add(msg)
+                events.append(format_sse_event({
+                    "type": ev.get("type", "progress"),
+                    "agent": ev.get("agent", "architecture"),
+                    "message": msg,
+                    "percent": ev.get("percent", 88),
+                    "data": ev.get("data"),
+                }))
 
         if "architecture" not in status_sent:
             status_sent.add("architecture")
@@ -1458,13 +2278,25 @@ def _state_to_sse_events(
                 "data": None,
             }))
         if result:
-            events.append(format_sse_event({
-                "type": "progress",
-                "agent": "architecture",
-                "message": "架构评估完成",
-                "percent": 91,
-                "data": result,
-            }))
+            msg_done = "架构评估完成"
+            if msg_done not in status_sent:
+                status_sent.add(msg_done)
+                events.append(format_sse_event({
+                    "type": "progress",
+                    "agent": "architecture",
+                    "message": msg_done,
+                    "percent": 91,
+                    "data": result,
+                }))
+            if "architecture" not in result_sent:
+                result_sent.add("architecture")
+                events.append(format_sse_event({
+                    "type": "result",
+                    "agent": "architecture",
+                    "message": "架构评估完成",
+                    "percent": 91,
+                    "data": result,
+                }))
 
     # ── merge_analysis ──────────────────────────────────────────────
     elif node_name == "merge_analysis":
@@ -1540,6 +2372,62 @@ def _state_to_sse_events(
                 "data": final_result,
             }))
 
+    # ── react_suggestion（ReAct 模式）───────────────────────────────
+    elif node_name == "react_suggestion":
+        opt_events: list[dict] = state.get("optimization_events") or []
+        opt_result = state.get("optimization_result") or state.get("suggestion_result")
+        final_result = state.get("final_result")
+
+        if "react_suggestion" not in status_sent:
+            status_sent.add("react_suggestion")
+            events.append(format_sse_event({
+                "type": "status",
+                "agent": "optimization",
+                "message": "正在使用 ReAct 生成优化建议（主动验证中）...",
+                "percent": 93,
+                "data": None,
+            }))
+
+        # 透传 ReActSuggestionAgent.stream() 产生的所有中间事件
+        for ev in opt_events:
+            if ev.get("type") == "status":
+                continue
+            ev_type = ev.get("type", "progress")
+            ev_percent = ev.get("percent", 93)
+            ev_message = ev.get("message") or "生成优化建议中..."
+            ev_data = ev.get("data")
+            events.append(format_sse_event({
+                "type": ev_type,
+                "agent": ev.get("agent", "react_suggestion"),
+                "message": ev_message,
+                "percent": ev_percent,
+                "data": ev_data,
+            }))
+            if ev_type == "result":
+                result_sent.add("react_suggestion_result")
+
+        # 发送 react_suggestion result
+        if opt_result and "react_suggestion" not in result_sent:
+            result_sent.add("react_suggestion")
+            events.append(format_sse_event({
+                "type": "result",
+                "agent": "optimization",
+                "message": f"ReAct 生成了优化建议",
+                "percent": 98,
+                "data": opt_result,
+            }))
+
+        # 发送 final_result（包含所有分析数据）
+        if final_result and "final_result" not in result_sent:
+            result_sent.add("final_result")
+            events.append(format_sse_event({
+                "type": "result",
+                "agent": "final_result",
+                "message": "全部分析完成",
+                "percent": 100,
+                "data": final_result,
+            }))
+
     return events
 
 
@@ -1550,16 +2438,15 @@ def run_analysis_sync(
     repo_url: str,
     branch: str = "main",
     thread_id: str | None = None,
+    use_react_mode: bool = True,
 ) -> dict:
     """同步运行 LangGraph 工作流，直接返回最终结果（供非 SSE 场景使用）。
-
-    使用 checkpointing：同一 thread_id 的请求可从断点恢复。
-    推荐优先使用 stream_analysis_sse()（可实时看到进度）。
 
     Args:
         repo_url: GitHub 仓库 URL
         branch: 分支名（默认 main）
-        thread_id: 可选的 thread ID
+        thread_id: 可选的 thread ID（用于 LangGraph checkpoint 断点续传）
+        use_react_mode: 是否使用 ReAct 模式（默认 True）
 
     Returns:
         final_result: 包含所有分析结果的字典
@@ -1570,12 +2457,16 @@ def run_analysis_sync(
         }
     }
 
-    initial_state = build_initial_state(repo_url, branch)
+    initial_state = build_initial_state(repo_url, branch, use_react_mode=use_react_mode)
     final_state = _workflow.invoke(initial_state, config=config)
     return final_state.get("final_result") or {}
 
 
-def build_initial_state(repo_url: str, branch: str = "main") -> SharedState:
+def build_initial_state(
+    repo_url: str,
+    branch: str = "main",
+    use_react_mode: bool = True,
+) -> SharedState:
     """构建 LangGraph 初始状态。
 
     所有字段使用默认值，表示从头开始执行。
@@ -1612,4 +2503,11 @@ def build_initial_state(repo_url: str, branch: str = "main") -> SharedState:
         final_result=None,
         errors=[],
         finished_agents=[],
+        use_react_mode=use_react_mode,
+        react_events=[],
+        react_summary="",
+        react_iterations=0,
+        loaded_paths=[],
+        explorer_result=None,
+        explorer_events=[],
     )

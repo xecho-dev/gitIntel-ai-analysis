@@ -43,7 +43,7 @@ class DependencyAgent(BaseAgent):
         """
         yield _make_event(self.name, "status", "正在扫描依赖文件…", 10, None)
 
-        if file_contents is not None:
+        if file_contents is not None and len(file_contents) > 0:
             dep_files = [
                 {"name": os.path.basename(p), "path": p, "type": self._detect_dep_type(p), "content": c}
                 for p, c in file_contents.items()
@@ -54,8 +54,16 @@ class DependencyAgent(BaseAgent):
             _logger.debug(f"[DependencyAgent] 所有文件 basename: {dep_names}")
             _logger.debug(f"[DependencyAgent] 通过 _is_dep_file 的文件: {[d['name'] for d in dep_files]}")
         else:
-            dep_files = await self._find_dep_files(repo_path)
-            _logger.info(f"[DependencyAgent] 本地模式: {len(dep_files)} 个依赖文件")
+            # GitHub API 模式：尝试获取依赖配置文件
+            # 解析 "owner/repo" 格式的 repo_path
+            _parts = repo_path.split("/", 1)
+            _owner = _parts[0] if len(_parts) > 0 else None
+            _repo = _parts[1] if len(_parts) > 1 else None
+            dep_files = await self._fetch_dep_files_from_github(_owner, _repo, branch)
+            if not dep_files:
+                # 回退到本地模式
+                dep_files = await self._find_dep_files(repo_path)
+                _logger.info(f"[DependencyAgent] 本地模式: {len(dep_files)} 个依赖文件")
 
         if not dep_files:
             yield _make_event(
@@ -175,6 +183,55 @@ class DependencyAgent(BaseAgent):
             return results
 
         return await asyncio.to_thread(_do)
+
+    @staticmethod
+    async def _fetch_dep_files_from_github(owner: str, repo: str, branch: str) -> list[dict]:
+        """从 GitHub API 获取依赖配置文件内容。
+
+        尝试获取常见的依赖配置文件，支持 npm/pip/go 等生态系统。
+        """
+        DEP_FILES = {
+            "package.json": "npm",
+            "requirements.txt": "pip",
+            "requirements-dev.txt": "pip",
+            "Pipfile": "pipenv",
+            "pyproject.toml": "poetry",
+            "go.mod": "go",
+            "Cargo.toml": "cargo",
+            "Gemfile": "bundler",
+            "composer.json": "composer",
+            "pom.xml": "maven",
+            "build.gradle": "gradle",
+        }
+
+        results: list[dict] = []
+
+        try:
+            from tools.github_tools import _read_file_content_impl
+
+            for fname, dep_type in DEP_FILES.items():
+                try:
+                    content = await _read_file_content_impl(owner, repo, fname, branch)
+                    if content and not content.startswith("[文件不存在]"):
+                        results.append({
+                            "name": fname,
+                            "path": fname,
+                            "type": dep_type,
+                            "content": content,
+                        })
+                        _logger.info(f"[DependencyAgent] GitHub 获取 {fname} 成功")
+                except Exception as e:
+                    _logger.debug(f"[DependencyAgent] GitHub 获取 {fname} 失败: {e}")
+
+            if results:
+                _logger.info(f"[DependencyAgent] GitHub 模式: 获取到 {len(results)} 个依赖文件")
+            else:
+                _logger.info(f"[DependencyAgent] GitHub 模式: 未找到依赖文件")
+
+        except Exception as e:
+            _logger.warning(f"[DependencyAgent] GitHub 模式异常: {e}")
+
+        return results
 
     @staticmethod
     async def _parse_all_deps(files: list[dict]) -> list[dict]:

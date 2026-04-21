@@ -49,7 +49,6 @@ export const QualityAgentCard = () => {
   const activeAgent = useAppStore((s) => s.activeAgent);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const qualityEvent = useAppStore((s) => s.agentEvents["quality"]);
-
   const qualityDone = finishedAgents.includes("quality");
   const isScanning = isAnalyzing || activeAgent === "quality";
 

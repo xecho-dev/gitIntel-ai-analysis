@@ -94,7 +94,7 @@ export const AnalyzeInput = ({ userId }: { userId: string }) => {
         }
         if (event?.type === "error") {
           // 后端返回的权限 / 访问错误，直接显示给用户
-          const msg = data.message ?? "分析失败，请检查仓库地址或 Token 权限";
+          const msg = (data as { message?: string }).message ?? "分析失败，请检查仓库地址或 Token 权限";
           store.setError(msg);
           store.setIsAnalyzing(false);
           store.setActiveAgent(null);

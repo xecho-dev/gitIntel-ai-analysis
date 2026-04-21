@@ -6,6 +6,9 @@ from .quality import QualityAgent
 from .dependency import DependencyAgent
 from .suggestion import SuggestionAgent
 from .architecture import ArchitectureAgent
+from .repo_loader_agent import ReActRepoLoaderAgent
+from .suggestion_agent import ReActSuggestionAgent
+from .explorers import ExplorerOrchestrator
 
 __all__ = [
     "BaseAgent",
@@ -19,4 +22,7 @@ __all__ = [
     "DependencyAgent",
     "SuggestionAgent",
     "ArchitectureAgent",
+    "ReActRepoLoaderAgent",
+    "ReActSuggestionAgent",
+    "ExplorerOrchestrator",
 ]

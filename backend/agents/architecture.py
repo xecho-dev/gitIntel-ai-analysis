@@ -16,21 +16,25 @@
   - hotSpots: string[]（潜在风险点）
   - summary: string（LLM 生成的架构摘要，200字以内）
 """
+import asyncio
 import logging
+import os
 import re
 from typing import AsyncGenerator
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
-from utils.llm_factory import get_llm
 
 _logger = logging.getLogger("gitintel")
 
+_MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
 
-# ─── LLM 懒加载 ────────────────────────────────────────────────────────
+
+# ─── LLM 懒加载（带 Token 追踪）──────────────────────────────────────────────
 
 def _get_llm():
-    """懒加载 LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
-    return get_llm(temperature=0.2)
+    """懒加载 LLM client（通过统一工厂，支持 Token 追踪）。"""
+    from utils.llm_factory import get_llm_with_tracking
+    return get_llm_with_tracking(agent_name="ArchitectureAgent", max_tokens=_MAX_OUTPUT_TOKENS)
 
 
 def _build_arch_context(
@@ -67,11 +71,15 @@ def _build_arch_context(
 
     # ── 技术栈 ─────────────────────────────────────────────────────────
     if tech_stack_result:
+        # 兼容 frameworks/infrastructure 可能是 dict 列表
+        def _extract_names(items: list) -> list[str]:
+            return [f.get("name", "") if isinstance(f, dict) else str(f) for f in items]
+
         parts.append(
             f"【技术栈】\n"
-            f"  语言: {', '.join(tech_stack_result.get('languages', []) or ['未知'])}\n"
-            f"  框架: {', '.join(tech_stack_result.get('frameworks', []) or ['无'])}\n"
-            f"  基础设施: {', '.join(tech_stack_result.get('infrastructure', []) or ['无'])}\n"
+            f"  语言: {', '.join(_extract_names(tech_stack_result.get('languages', [])) or ['未知'])}\n"
+            f"  框架: {', '.join(_extract_names(tech_stack_result.get('frameworks', [])) or ['无'])}\n"
+            f"  基础设施: {', '.join(_extract_names(tech_stack_result.get('infrastructure', [])) or ['无'])}\n"
             f"  包管理器: {tech_stack_result.get('package_manager', 'unknown')}"
         )
 
@@ -241,9 +249,17 @@ class ArchitectureAgent(BaseAgent):
         lang_stats = (code_parser_result or {}).get("language_stats", {})
         largest_files = (code_parser_result or {}).get("largest_files", [])
 
-        languages = (tech_stack_result or {}).get("languages", [])
-        frameworks = (tech_stack_result or {}).get("frameworks", [])
-        infra = (tech_stack_result or {}).get("infrastructure", [])
+        languages_raw = (tech_stack_result or {}).get("languages", [])
+        # 兼容 languages/frameworks/infrastructure 可能是 dict 列表
+        def _extract_names(items: list) -> list[str]:
+            return [f.get("name", "") if isinstance(f, dict) else str(f) for f in items]
+        languages = _extract_names(languages_raw)
+        raw_frameworks = (tech_stack_result or {}).get("frameworks", [])
+        if raw_frameworks and isinstance(raw_frameworks[0], dict):
+            frameworks = [f.get("name", "") for f in raw_frameworks if f.get("name")]
+        else:
+            frameworks = _extract_names(raw_frameworks)
+        infra = _extract_names((tech_stack_result or {}).get("infrastructure", []))
 
         health = quality_result.get("health_score", 70) if quality_result else 70
         maintainability = quality_result.get("maintainability", "B") if quality_result else "B"
@@ -336,7 +352,15 @@ class ArchitectureAgent(BaseAgent):
         largest_files: list[dict],
     ) -> str:
         """基于框架和基础设施推断架构风格。"""
-        all_tags = set(f.lower() for f in frameworks + infra)
+        # 兼容 frameworks 可能为 list[dict] 的情况
+        all_tags: set[str] = set()
+        for f in frameworks + infra:
+            if isinstance(f, str):
+                all_tags.add(f.lower())
+            elif isinstance(f, dict):
+                name = f.get("name", "")
+                if name:
+                    all_tags.add(name.lower())
 
         if any(f in all_tags for f in ["fastapi", "django", "flask", "rails", "laravel", "spring"]):
             if any(f in all_tags for f in ["docker", "kubernetes"]):
@@ -372,7 +396,16 @@ class ArchitectureAgent(BaseAgent):
     ) -> list[str]:
         """基于代码结构和依赖推断设计模式。"""
         patterns = []
-        frameworks = set(f.lower() for f in (tech_stack_result or {}).get("frameworks", []))
+        raw_frameworks = (tech_stack_result or {}).get("frameworks", [])
+        # 兼容两种格式：list[str] 或 list[dict{"name": str, ...}]
+        frameworks: set[str] = set()
+        for f in raw_frameworks:
+            if isinstance(f, str):
+                frameworks.add(f.lower())
+            elif isinstance(f, dict):
+                name = f.get("name", "")
+                if name:
+                    frameworks.add(name.lower())
         lang_stats = (code_parser_result or {}).get("language_stats", {})
         largest = (code_parser_result or {}).get("largest_files", [])
 

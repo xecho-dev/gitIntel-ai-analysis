@@ -18,6 +18,8 @@ class SharedState(TypedDict, total=False):
     repo_url: str
     branch: str
     auth_user_id: Optional[str]
+    # ─── Agent 模式开关 ──────────────────────────────────────
+    use_react_mode: bool  # 是否使用 ReAct 模式（默认 False，保持旧流程兼容）
 
     # ─── Stage 1: 仓库加载 ─────────────────────────────────────
     local_path: Optional[str]
@@ -67,6 +69,16 @@ class SharedState(TypedDict, total=False):
     optimization_result: Optional[dict]  # 同上，别名（optimization agent 使用）
     # 流式中间事件（RAG 检索进度、LLM 生成进度等，用于透传到 SSE 前端）
     optimization_events: list[dict]
+
+    # ─── ReAct 探索 ───────────────────────────────────────────
+    react_events: list[dict]   # ReAct 模式的推理步骤和事件
+    react_summary: str          # ReAct 探索总结
+    react_iterations: int       # ReAct 探索轮次
+    loaded_paths: list[str]     # ReAct 探索加载的文件路径列表
+
+    # ─── Explorer Agent ────────────────────────────────────
+    explorer_result: Optional[dict]   # 并行 Explorer Agent 的汇总结果
+    explorer_events: list[dict]       # Explorer 的中间事件
 
     # ─── 最终聚合结果 ───────────────────────────────────────────
     final_result: Optional[dict]  # 全部结果打包，供前端展示

@@ -53,6 +53,8 @@ import httpx
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
 
+logger = __import__("logging").getLogger("gitintel")
+
 
 # ─── Custom Exceptions ─────────────────────────────────────────────
 
@@ -137,17 +139,52 @@ class RepoLoaderAgent(BaseAgent):
         "pytest.ini", "tox.ini",
     })
 
+    # ── 规则引擎：多语言文件分类 ───────────────────────────────────
+
+    # 源码扩展名 → 语言名称（按优先级排序）
+    SOURCE_EXTENSIONS: dict[str, str] = {
+        # 前端/Node.js
+        ".js": "JavaScript", ".jsx": "JavaScript",
+        ".ts": "TypeScript", ".tsx": "TypeScript",
+        ".vue": "Vue", ".svelte": "Svelte",
+        # 后端/服务
+        ".py": "Python", ".go": "Go", ".rs": "Rust",
+        ".rb": "Ruby", ".java": "Java", ".kt": "Kotlin",
+        ".scala": "Scala", ".cs": "C#", ".php": "PHP",
+        # 系统/嵌入式
+        ".c": "C", ".cpp": "C++", ".cc": "C++", ".cxx": "C++",
+        ".h": "C/C++", ".hpp": "C++",
+        ".swift": "Swift", ".m": "Objective-C",
+        # 脚本/其他
+        ".sh": "Shell", ".bash": "Shell", ".zsh": "Shell",
+        ".lua": "Lua", ".r": "R", ".R": "R", ".dart": "Dart",
+        # 配置/数据
+        ".yaml": "YAML", ".yml": "YAML", ".toml": "TOML",
+        ".json": "JSON", ".xml": "XML", ".ini": "INI", ".cfg": "INI",
+        # 模板/样式
+        ".html": "HTML", ".css": "CSS",
+        ".scss": "SCSS", ".sass": "Sass", ".less": "Less",
+        ".md": "Markdown", ".rst": "reStructuredText",
+    }
+
+    # 入口文件模式（匹配文件名或路径）
     ENTRY_PATTERNS = (
-        r"^app\.(ts|tsx|js|jsx)$",
-        r"^index\.(ts|tsx|js|jsx)$",
-        r"^main\.(ts|tsx|js|jsx)$",
+        r"^app\.(ts|tsx|js|jsx|vue)$",
+        r"^index\.(ts|tsx|js|jsx|vue)$",
+        r"^main\.(ts|tsx|js|jsx|vue|py|go|rs|java)$",
         r"^src[/\\]app\.(ts|tsx|js|jsx)$",
         r"^src[/\\]index\.(ts|tsx|js|jsx)$",
-        r"^src[/\\]main\.(ts|tsx|js|jsx)$",
-        r"^(app|src|lib|packages?)[/\\]",
-        r"^pages?[/\\]",
+        r"^src[/\\]main\.(ts|tsx|js|jsx|py|go|java)$",
         r"^components?[/\\]",
         r"^hooks?[/\\]",
+        r"^pages?[/\\]",
+        r"^src[/\\]",
+        r"^lib[/\\]",
+        r"^api[/\\]",
+        r"^server[/\\]",
+        r"^internal[/\\]",
+        r"^cmd[/\\]",
+        r"^pkg[/\\]",
     )
 
     # ── 公开 SSE 接口 ──────────────────────────────────────────────
@@ -420,7 +457,11 @@ class RepoLoaderAgent(BaseAgent):
         response = await llm.ainvoke(prompt_template.invoke({}))
         raw = response.content.strip()
 
-        result = _json.loads(raw)
+        try:
+            result = _json.loads(raw)
+        except (_json.JSONDecodeError, Exception):
+            logger.warning(f"[phase_ai_decide_p1] LLM 返回格式异常，使用默认值")
+            return False, [], "LLM 不可用，默认不加载更多文件"
         need_more = bool(result.get("need_more", False))
         reason = result.get("reason", "基于代码分析的决定")
 
@@ -493,7 +534,11 @@ class RepoLoaderAgent(BaseAgent):
         response = await llm.ainvoke(prompt_template.invoke({}))
         raw = response.content.strip()
 
-        result = _json.loads(raw)
+        try:
+            result = _json.loads(raw)
+        except (_json.JSONDecodeError, Exception):
+            logger.warning(f"[phase_ai_decide_p2] LLM 返回格式异常，使用默认值")
+            return False, [], "LLM 不可用，默认不加载更多文件"
         need_more = bool(result.get("need_more", False))
         extra_paths: list[str] = result.get("additional_paths", [])[:30]
         reason = result.get("reason", "基于代码分析的决定")
@@ -574,24 +619,68 @@ class RepoLoaderAgent(BaseAgent):
 
     # ── LLM 决策 ──────────────────────────────────────────────────
 
+    def _classify_by_rules(self, blobs: list[dict]) -> tuple[set[str], set[str]]:
+        """基于规则的 P0/P1 分类，支持多语言。
+
+        P0: 配置文件 + 入口文件 + 核心源码
+        P1: 重要源码
+        P2: 其他文件
+        """
+        p0_paths: set[str] = set()
+        p1_paths: set[str] = set()
+
+        for blob in blobs:
+            path = blob["path"]
+            ext = os.path.splitext(path)[1].lower()
+
+            # 1. 配置文件 → P0
+            basename = os.path.basename(path)
+            if basename in self.DEFAULT_P0_FILES:
+                p0_paths.add(path)
+                continue
+
+            # 2. 入口文件/核心目录 → P0
+            matched = False
+            for pattern in self.ENTRY_PATTERNS:
+                if re.match(pattern, path):
+                    p0_paths.add(path)
+                    matched = True
+                    break
+            if matched:
+                continue
+
+            # 3. 源码文件 → P1
+            if ext in self.SOURCE_EXTENSIONS:
+                p1_paths.add(path)
+            # 4. 配置/数据/样式文件 → P1
+            elif ext in (".yaml", ".yml", ".json", ".toml", ".xml", ".ini", ".cfg",
+                         ".html", ".css", ".scss", ".sass", ".less"):
+                p1_paths.add(path)
+            # 5. Markdown 文档 → P1（有价值，排除 node_modules）
+            elif ext == ".md" and "node_modules" not in path:
+                p1_paths.add(path)
+
+        return p0_paths, p1_paths
+
     async def _llm_initial_classify(
         self, owner: str, repo: str, tree_items: list[dict]
     ) -> tuple[list[dict], dict]:
         """使用 LLM 对文件树做初始 P0/P1/P2 分类。
 
-        注意：必须使用 LLM，不支持降级。LLM 不可用或调用失败时抛出异常。
+        LLM 不可用或返回格式异常时，使用规则引擎兜底（支持多语言）。
         """
         llm = _get_llm()
-        if llm is None:
-            raise RuntimeError(
-                "LLM 不可用，无法进行文件分类。请确保 OPENAI_API_KEY 或其他 LLM API Key 已配置。"
-            )
 
         blobs = [
             {"path": item["path"], "type": item["type"], "size": item.get("size", 0)}
             for item in tree_items
             if item["type"] == "blob"
         ]
+
+        # 尝试使用 LLM
+        if llm is None:
+            logger.warning("[_llm_initial_classify] LLM 不可用，使用规则引擎")
+            return self._classify_by_rules_fallback(tree_items)
 
         from .prompts import build_repo_loader_initial_prompt
         tree_list = "\n".join(
@@ -604,10 +693,38 @@ class RepoLoaderAgent(BaseAgent):
             total_files=len(blobs),
         )
 
-        response = await llm.ainvoke(prompt_template.invoke({}))
-        raw = response.content.strip()
+        raw = ""
+        try:
+            response = await llm.ainvoke(prompt_template.invoke({}))
+            raw = response.content.strip()
 
-        result = _json.loads(raw)
+            # 尝试去除 markdown 代码块包裹
+            cleaned = raw
+            if cleaned.startswith("```"):
+                lines = cleaned.split("\n")
+                # 跳过第一行的 ```json 或 ```
+                if lines and re.match(r"^```[a-z]*$", lines[0].strip()):
+                    lines = lines[1:]
+                # 去掉最后一行的 ```
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                cleaned = "\n".join(lines).strip()
+
+            # 解析 JSON（可能是数组或对象）
+            parsed = _json.loads(cleaned)
+
+            # 处理数组格式：取第一个元素
+            if isinstance(parsed, list) and len(parsed) > 0:
+                result = parsed[0]
+            elif isinstance(parsed, dict):
+                result = parsed
+            else:
+                raise ValueError(f"Unexpected JSON type: {type(parsed)}")
+        except Exception as e:
+            logger.warning(f"[_llm_initial_classify] LLM 调用或解析失败 ({e})，使用规则引擎")
+            logger.debug(f"[_llm_initial_classify] LLM 原始返回: {raw[:500] if raw else '(empty)'}")
+            return self._classify_by_rules_fallback(tree_items)
+
         p0_set = set(result.get("p0_paths", []))
         p1_set = set(result.get("p1_paths", []))
 
@@ -629,6 +746,40 @@ class RepoLoaderAgent(BaseAgent):
             "p1_count": len(p1_set),
             "p2_count": len(classified) - len(p0_set) - len(p1_set),
         }
+        return classified, llm_result
+
+    def _classify_by_rules_fallback(self, tree_items: list[dict]) -> tuple[list[dict], dict]:
+        """规则引擎兜底：基于文件类型和路径的多语言分类。"""
+        blobs = [
+            {"path": item["path"], "type": item["type"], "size": item.get("size", 0)}
+            for item in tree_items
+            if item["type"] == "blob"
+        ]
+        p0_paths, p1_paths = self._classify_by_rules(blobs)
+
+        classified: list[dict] = []
+        for b in blobs:
+            path = b["path"]
+            if path in p0_paths:
+                priority = 0
+            elif path in p1_paths:
+                priority = 1
+            else:
+                priority = 2
+            classified.append({"path": path, "priority": priority, "size": b.get("size", 0)})
+
+        llm_result = {
+            "round": 0,
+            "decision": "initial_classify_fallback",
+            "p0_count": len(p0_paths),
+            "p1_count": len(p1_paths),
+            "p2_count": len(classified) - len(p0_paths) - len(p1_paths),
+            "engine": "rules",
+        }
+        logger.info(
+            f"[_classify_by_rules_fallback] 规则引擎: P0={len(p0_paths)}, "
+            f"P1={len(p1_paths)}, P2={len(classified) - len(p0_paths) - len(p1_paths)}"
+        )
         return classified, llm_result
 
     async def _llm_decide(
@@ -666,7 +817,11 @@ class RepoLoaderAgent(BaseAgent):
         response = await llm.ainvoke(prompt_template.invoke({}))
         raw = response.content.strip()
 
-        result = _json.loads(raw)
+        try:
+            result = _json.loads(raw)
+        except (_json.JSONDecodeError, Exception):
+            logger.warning(f"[_llm_decide] LLM 返回格式异常，使用默认值")
+            return False, []
         need_more = bool(result.get("need_more", False))
         paths: list[str] = result.get("additional_paths", [])[:30]
         return need_more, paths

@@ -125,4 +125,12 @@ def get_inputs_from_state(state: SharedState) -> tuple[str, str, dict]:
 
 def has_loader_result(state: SharedState) -> bool:
     """判断 RepoLoader 是否成功执行并返回了文件内容。"""
-    return bool(state.get("loaded_files") or state.get("file_contents"))
+    # 检查 loaded_files 是否存在且非空
+    loaded = state.get("loaded_files")
+    if loaded and isinstance(loaded, dict) and len(loaded) > 0:
+        return True
+    # 也检查旧版字段 file_contents
+    contents = state.get("file_contents")
+    if contents and isinstance(contents, dict) and len(contents) > 0:
+        return True
+    return False

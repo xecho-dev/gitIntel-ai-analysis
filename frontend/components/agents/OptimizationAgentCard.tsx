@@ -121,7 +121,6 @@ export const OptimizationAgentCard = () => {
                   <button
                     onClick={() => {
                       const fix = item.code_fix;
-                      console.log('💪🐻👉 ~ OptimizationAgentCard ~ fix:', fix)
                       setCurrentSuggestion({
                         file: fix?.file || "",
                         type: (fix?.type as "replace" | "insert" | "delete") || "replace",

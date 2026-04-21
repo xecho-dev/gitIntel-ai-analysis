@@ -4,7 +4,7 @@ LangChain Prompts — 为每个分析 Agent 定义结构化的 Prompt 模板。
 这些 Prompts 与 LangChain 的 Runnable 协议兼容，可配合 .invoke() / .stream()
 使用，也可以在 Agent 内部作为 LLM 调用的模板。
 """
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 
 # ─── 全局系统提示词 ────────────────────────────────────────────────
 
@@ -62,23 +62,44 @@ def build_suggestion_prompt(
 #   轮次 2（深度决策）: 基于已加载的 P0+P1 内容，判断是否需要加载更多 P2 文件
 #   轮次 3+（按需迭代）: 如果仍然不够，LLM 可以再次要求加载指定文件，最多 3 轮
 
-REPO_LOADER_SYSTEM = """{system_context}
 
-你是一个代码分析智能助手，擅长判断哪些文件对代码分析最有价值。
-你的职责是基于仓库的文件结构和已有代码内容，决定需要加载哪些文件。
+def build_repo_loader_initial_prompt(
+    repo_path: str,
+    tree_list: str,
+    total_files: int,
+) -> ChatPromptTemplate:
+    # 避免 .format() 处理 {{}}，使用 f-string 只替换必要的变量
+    system_str = """你是一个代码仓库文件分类助手，擅长根据文件路径和类型判断文件的重要程度。
 
-【决策原则】
-1. 优先加载：入口文件、配置文件、核心业务逻辑文件
-2. 跳过加载：node_modules、build 产物、测试数据、二进制文件等无分析价值的文件
-3. 避免重复：不要重复要求加载已加载过的文件
-4. 关注价值：重点关注可能揭示项目架构、设计模式、业务逻辑的文件
-5. 适度贪婪：宁可多加载有价值的小文件，也不要错过重要的核心文件
+【你的任务】
+分析仓库文件树，将文件分为三个优先级：
+- P0（必须加载）：依赖配置文件 + 入口文件 + 核心业务逻辑源码
+- P1（值得加载）：重要源码文件 + 配置/数据/样式文件
+- P2（可跳过）：其他文件
 
-【输出格式】（严格 JSON，必须是合法的 JSON 对象，不要用 markdown 包裹）
-{{{{"need_more": true/false, "reason": "判断原因（50字以内）", "additional_paths": ["path1", "path2", ...]}}}}
+【分类规则】
+1. P0 必须是（硬性规则）：
+   - 依赖配置文件：package.json, requirements.txt, go.mod, Cargo.toml, Gemfile, composer.json, pom.xml, build.gradle 等
+   - 入口文件：app.js, main.py, index.ts, App.vue 等
+   - 核心目录：src/, lib/, components/, api/, server/, cmd/, pkg/ 等
+
+2. P1 应包含：
+   - 源码文件：.js, .ts, .jsx, .tsx, .vue, .py, .go, .rs, .java, .rb, .php, .cs 等
+   - 配置/数据文件：.json, .yaml, .yml, .toml, .xml, .ini, .html, .css, .scss 等
+   - 文档文件：README.md, CHANGELOG.md 等（排除 node_modules 中的）
+
+3. P2 包含：
+   - node_modules/, build/, dist/, .git/ 中的文件
+   - 二进制文件、图片、字体等
+   - 无分析价值的配置文件
+
+【输出格式】
+严格返回 JSON 对象，不要用 markdown 代码块包裹，不要输出其他内容。
 """
 
-REPO_LOADER_INITIAL_HUMAN = """仓库: {repo_path}
+    # 使用 {{}} 转义 JSON 中的大括号
+    json_example = '{{"p0_paths": ["path1", ...], "p1_paths": ["path2", ...], "p2_paths": ["path3", ...]}}'
+    human_str = f"""仓库: {repo_path}
 
 【依赖配置文件识别规则】（以下 manifest 文件必须全部纳入 P0；lock 文件由系统自动排除）：
 package.json, requirements.txt, requirements-dev.txt, Pipfile, pyproject.toml,
@@ -95,22 +116,11 @@ go.mod, Cargo.toml, Gemfile, composer.json, pom.xml, build.gradle
 - 可跳过（P2）：其他文件
 
 返回格式（必须是合法的 JSON 对象，不要用 markdown 包裹）：
-{{{{"p0_paths": ["path1", ...], "p1_paths": ["path2", ...], "p2_paths": ["path3", ...]}}}}
+{json_example}
 """
-
-
-def build_repo_loader_initial_prompt(
-    repo_path: str,
-    tree_list: str,
-    total_files: int,
-) -> ChatPromptTemplate:
     return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
-        ("human", REPO_LOADER_INITIAL_HUMAN.format(
-            repo_path=repo_path,
-            tree_list=tree_list,
-            total_files=total_files,
-        )),
+        ("system", system_str),
+        ("human", human_str),
     ])
 
 

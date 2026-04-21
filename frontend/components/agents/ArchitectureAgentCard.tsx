@@ -41,11 +41,21 @@ export const ArchitectureAgentCard = () => {
 
   const archDone = finishedAgents.includes("architecture");
   const archData = archEvent?.data as ArchitectureData | undefined;
-  const techData = techStackEvent?.data as { languages?: string[]; frameworks?: string[] } | undefined;
+  // 兼容 frameworks 可能是 string[] 或 [{name, ...}] 两种格式
+  const techData = techStackEvent?.data as {
+    languages?: string[];
+    frameworks?: string[] | { name: string; confidence?: number; evidence?: string[] }[];
+  } | undefined;
+
+  // 统一提取框架名称
+  const frameworkNames: string[] = (techData?.frameworks ?? []).map((f) =>
+    typeof f === "string" ? f : (f as { name: string }).name
+  );
 
   const ARCH_AGENTS = new Set([
     "fetch_tree_classify", "load_p0", "load_p1", "load_p2",
     "code_parser_p0", "code_parser_p1", "code_parser_final",
+    "react_loader", "explorer", "react_suggestion",
     "architecture", "tech_stack",
   ]);
   const archInProgress = isAnalyzing && activeAgent !== null && ARCH_AGENTS.has(activeAgent);
@@ -176,14 +186,14 @@ export const ArchitectureAgentCard = () => {
           </div>
 
           {/* 技术栈标签 */}
-          {(archData.techStack ?? techData?.languages ?? techData?.frameworks) && (
+          {(archData.techStack ?? techData?.languages ?? frameworkNames.length > 0) && (
             <div>
               <p className="text-[9px] text-slate-600 uppercase mb-1">技术栈</p>
               <div className="flex flex-wrap gap-1">
                 {[
                   ...(archData.techStack ?? []),
                   ...(techData?.languages ?? []),
-                  ...(techData?.frameworks ?? []),
+                  ...frameworkNames,
                 ]
                   .filter((v, i, a) => a.indexOf(v) === i)
                   .slice(0, 8)
