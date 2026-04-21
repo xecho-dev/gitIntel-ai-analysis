@@ -15,9 +15,6 @@ class TestSharedState:
             "finished_agents": [],
             "file_contents": {},
             "loaded_files": {},
-            "pending_files": [],
-            "llm_decision_rounds": 0,
-            "llm_decision_history": [],
         }
         assert isinstance(state, dict)
 
@@ -35,16 +32,10 @@ class TestSharedState:
             "repo_url": "https://github.com/test/repo",
             "branch": "main",
             "auth_user_id": "user123",
-            "local_path": "/tmp/repo",
             "file_contents": {"src/main.py": "def main(): pass"},
-            "repo_loader_result": {"total_loaded": 10, "sha": "abc"},
-            "repo_tree": [{"path": "README.md", "type": "blob"}],
             "repo_sha": "abc123",
-            "classified_files": [{"path": "main.py", "priority": 0}],
             "loaded_files": {"main.py": "def main(): pass"},
-            "pending_files": [{"path": "lib.py", "priority": 1}],
-            "llm_decision_rounds": 2,
-            "llm_decision_history": [{"round": 1, "need_more": True}],
+            "loaded_paths": ["main.py", "lib.py"],
             "code_parser_result": {"total_files": 5},
             "tech_stack_result": {"languages": ["Python"]},
             "quality_result": {"health_score": 85},
@@ -52,8 +43,10 @@ class TestSharedState:
             "final_result": {"quality": {}},
             "errors": ["warning: something unusual"],
             "finished_agents": ["repo_loader", "code_parser"],
+            "react_events": [],
+            "react_summary": "test",
+            "react_iterations": 1,
         }
-        assert state["llm_decision_rounds"] == 2
         assert state["quality_result"]["health_score"] == 85
         assert len(state["finished_agents"]) == 2
         assert state["final_result"] is not None

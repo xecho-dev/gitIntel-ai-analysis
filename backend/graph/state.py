@@ -1,11 +1,11 @@
 """
 SharedState — LangGraph 工作流中所有 Agent 共享的状态结构。
 
-渐进式加载流程设计：
-  1. RepoLoader 获取文件树 + AI 分类 P0/P1/P2
-  2. 加载 P0 → CodeParser 分析 → AI 决策是否需要 P1
-  3. 需要 P1 → 加载 P1 → CodeParser 分析 → AI 决策是否需要更多
-  4. 后续 Agent (TechStack, Quality, Suggestion)
+当前流程（ReAct 纯模式）：
+  1. react_loader: ReActRepoLoaderAgent 自主探索加载文件
+  2. explorer: ExplorerOrchestrator 并行驱动多个 Explorer
+  3. architecture: 基于 explorer 结果做架构评估
+  4. react_suggestion: ReActSuggestionAgent 生成优化建议
 """
 from typing import Annotated, Optional
 
@@ -18,73 +18,40 @@ class SharedState(TypedDict, total=False):
     repo_url: str
     branch: str
     auth_user_id: Optional[str]
-    # ─── Agent 模式开关 ──────────────────────────────────────
-    use_react_mode: bool  # 是否使用 ReAct 模式（默认 False，保持旧流程兼容）
 
-    # ─── Stage 1: 仓库加载 ─────────────────────────────────────
-    local_path: Optional[str]
-    file_contents: dict[str, str]
-    repo_loader_result: Optional[dict]
-    # RepoLoader 多轮决策中间状态（支持 LangGraph checkpoint 断点续传）
-    repo_tree: Optional[list[dict]]         # GitHub API 返回的原始文件树
-    repo_sha: Optional[str]                  # 当前 commit SHA
-    classified_files: Optional[list[dict]]    # 分类后的文件列表（含 priority）
-    loaded_files: dict[str, str]             # 已加载的文件内容
-    pending_files: list[dict]                 # 待加载的文件（LLM 决策后填充）
-    llm_decision_rounds: int                # LLM 决策轮次
-    llm_decision_history: list[dict]          # 历次 LLM 决策记录
+    # ─── Stage 1: 仓库加载（ReAct 模式）──────────────────────
+    file_contents: dict[str, str]          # 已加载的文件内容（path -> content）
+    loaded_files: dict[str, str]           # 同 file_contents（ReActAgent 写入）
+    loaded_paths: list[str]                # 已加载的文件路径列表
+    repo_sha: Optional[str]                 # 当前 commit SHA
 
-    # ─── 渐进式加载状态（新增）────────────────────────────────
-    current_priority: int                    # 当前加载优先级 (0=P0, 1=P1, 2=P2)
-    pending_p0: list[dict]                   # 待加载的 P0 文件
-    pending_p1: list[dict]                   # 待加载的 P1 文件
-    pending_p2: list[dict]                   # 待加载的 P2 文件
-    loaded_p0: dict[str, str]                # 已加载的 P0 文件内容
-    loaded_p1: dict[str, str]                # 已加载的 P1 文件内容
-    needs_more: bool                         # AI 决策：是否需要加载更多
-    ai_decision_reason: str                  # AI 决策原因
-    iteration_count: int                      # 渐进式迭代次数
+    # ─── ReAct 探索元数据 ─────────────────────────────────────
+    react_events: list[dict]               # 推理步骤和事件（流式透传到 SSE）
+    react_summary: str                      # ReAct 探索总结
+    react_iterations: int                  # ReAct 探索轮次
 
-    # ─── Stage 2: 代码结构解析 ─────────────────────────────────
-    code_parser_result: Optional[dict]       # {total_files, total_functions, total_classes, language_stats, largest_files}
-    code_parser_p0_result: Optional[dict]    # P0 文件的解析结果
-    code_parser_p1_result: Optional[dict]    # P1 文件的解析结果（渐进式）
+    # ─── Stage 2: 代码结构解析 ────────────────────────────────
+    code_parser_result: Optional[dict]       # CodeParserAgent 结果
 
-    # ─── Stage 3: 技术栈识别 ───────────────────────────────────
-    tech_stack_result: Optional[dict]  # {languages, frameworks, infrastructure, dev_tools, package_manager, ...}
+    # ─── Stage 3: 并行 Explorer ──────────────────────────────
+    explorer_result: Optional[dict]         # ExplorerOrchestrator 汇总结果
+    explorer_events: list[dict]             # Explorer 中间事件（流式透传）
+    tech_stack_result: Optional[dict]        # TechStackExplorer 结果
+    quality_result: Optional[dict]          # QualityExplorer 结果
+    dependency_result: Optional[dict]       # DependencyAgent 结果
 
-    # ─── Stage 4: 代码质量分析 ─────────────────────────────────
-    quality_result: Optional[dict]  # {health_score, test_coverage, complexity, maintainability, python_metrics, typescript_metrics, ...}
+    # ─── Stage 4: 架构评估 ───────────────────────────────────
+    architecture_result: Optional[dict]      # ArchitectureAgent 结果
+    architecture_events: list[dict]          # 架构评估中间事件
 
-    # ─── Stage 5: 依赖风险分析 ─────────────────────────────────
-    dependency_result: Optional[dict]  # {total, scanned, high, medium, low, risk_level, deps}
+    # ─── Stage 5: 优化建议 ───────────────────────────────────
+    suggestion_result: Optional[dict]        # 建议结果（别名：optimization_result）
+    optimization_result: Optional[dict]        # 同上（optimization agent 使用）
+    optimization_events: list[dict]          # 建议生成中间事件
 
-    # ─── Stage 6: 架构评估（LLM 驱动）─────────────────────────
-    architecture_result: Optional[dict]  # {complexity, components, techStack, maintainability, architectureStyle, keyPatterns, hotSpots, summary, llmPowered}
-    # 流式中间事件（架构 Agent 的 status/progress 进度，用于透传到 SSE 前端）
-    architecture_events: list[dict]
+    # ─── 最终聚合结果 ─────────────────────────────────────────
+    final_result: Optional[dict]            # 全部结果打包，供前端展示
 
-    # ─── Stage 7: 优化建议生成 ─────────────────────────────────
-    suggestion_result: Optional[dict]  # {suggestions, total, high_priority, medium_priority, low_priority}
-    optimization_result: Optional[dict]  # 同上，别名（optimization agent 使用）
-    # 流式中间事件（RAG 检索进度、LLM 生成进度等，用于透传到 SSE 前端）
-    optimization_events: list[dict]
-
-    # ─── ReAct 探索 ───────────────────────────────────────────
-    react_events: list[dict]   # ReAct 模式的推理步骤和事件
-    react_summary: str          # ReAct 探索总结
-    react_iterations: int       # ReAct 探索轮次
-    loaded_paths: list[str]     # ReAct 探索加载的文件路径列表
-
-    # ─── Explorer Agent ────────────────────────────────────
-    explorer_result: Optional[dict]   # 并行 Explorer Agent 的汇总结果
-    explorer_events: list[dict]       # Explorer 的中间事件
-
-    # ─── 最终聚合结果 ───────────────────────────────────────────
-    final_result: Optional[dict]  # 全部结果打包，供前端展示
-
-    # ─── 错误与元数据 ───────────────────────────────────────────
-    # Annotated + operator.add reducer：允许三个并行节点同时追加错误
-    errors: Annotated[list[str], add]
-    # finished_agents 同理，也需要支持并行追加
-    finished_agents: Annotated[list[str], add]
+    # ─── 错误与元数据 ─────────────────────────────────────────
+    errors: Annotated[list[str], add]       # 支持并行追加
+    finished_agents: Annotated[list[str], add]  # 支持并行追加

@@ -708,34 +708,43 @@ class ExplorerOrchestrator:
         Returns:
             每个 Explorer 的发现结果
         """
-        logger.info(f"[ExplorerOrchestrator] 开始串行探索: {owner}/{repo}")
+        logger.info(f"[ExplorerOrchestrator] 开始并行探索: {owner}/{repo}")
 
-        output: dict[str, dict] = {}
-        for explorer in self.explorers:
-            # 错峰：每个 Explorer 之间等待 1 秒，避免同时打满 DashScope QPS
-            await asyncio.sleep(1)
-            try:
-                result = await explorer.explore(owner, repo, branch, file_contents)
-                if isinstance(result, Exception):
-                    logger.error(f"[{explorer.__class__.__name__}] 异常: {result}")
-                    output[explorer.__class__.__name__] = {"error": str(result)}
-                else:
-                    logger.info(
-                        f"[{explorer.__class__.__name__}] 完成: "
-                        f"{result.duration_ms:.0f}ms, "
-                        f"findings={list(result.findings.keys()) if result.findings else []}"
-                    )
-                    output[explorer.__class__.__name__] = {
-                        **result.findings,
-                        "_meta": {
-                            "duration_ms": round(result.duration_ms, 1),
-                            "error": result.error,
-                            "tool_calls": len(result.tool_calls),
-                        },
-                    }
-            except Exception as e:
-                logger.error(f"[{explorer.__class__.__name__}] 执行异常: {e}")
-                output[explorer.__class__.__name__] = {"error": str(e)}
+        # 真正并行执行所有 Explorer（asyncio.gather）
+        tasks = [
+            explorer.explore(owner, repo, branch, file_contents)
+            for explorer in self.explorers
+        ]
+        results: list[tuple[str, Any]] = []
 
+        done = asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            outcomes = await done
+        except Exception as e:
+            logger.error(f"[ExplorerOrchestrator] gather 异常: {e}")
+            outcomes = []
+
+        for explorer, outcome in zip(self.explorers, outcomes):
+            name = explorer.__class__.__name__
+            if isinstance(outcome, Exception):
+                logger.error(f"[{name}] 异常: {outcome}")
+                results.append((name, {"error": str(outcome)}))
+            else:
+                result: ExplorerResult = outcome
+                logger.info(
+                    f"[{name}] 完成: "
+                    f"{result.duration_ms:.0f}ms, "
+                    f"findings={list(result.findings.keys()) if result.findings else []}"
+                )
+                results.append((name, {
+                    **result.findings,
+                    "_meta": {
+                        "duration_ms": round(result.duration_ms, 1),
+                        "error": result.error,
+                        "tool_calls": len(result.tool_calls),
+                    },
+                }))
+
+        output = dict(results)
         logger.info(f"[ExplorerOrchestrator] 全部探索完成: {list(output.keys())}")
         return output

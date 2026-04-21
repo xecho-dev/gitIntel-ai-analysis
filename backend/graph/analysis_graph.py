@@ -385,7 +385,8 @@ def node_architecture(state: SharedState) -> dict:
 
     owner, repo = parsed
     branch = state.get("branch", "main")
-    repo_tree = state.get("repo_tree") or []
+    loaded_paths = state.get("loaded_paths") or []
+    total_tree_files = len(loaded_paths)
 
     q: Any = _queue_module.Queue()
     exc_info: list = []
@@ -404,7 +405,7 @@ def node_architecture(state: SharedState) -> dict:
                     code_parser_result=state.get("code_parser_result"),
                     tech_stack_result=state.get("tech_stack_result"),
                     quality_result=state.get("quality_result"),
-                    total_tree_files=len(repo_tree),
+                    total_tree_files=total_tree_files,
                 ):
                     q.put(dict(event))
 
@@ -554,6 +555,8 @@ def node_react_suggestion(state: SharedState) -> dict:
 
 def _generate_fallback_suggestions(state: SharedState) -> dict:
     """基于已有分析数据生成兜底建议。"""
+    from agents.react.suggestion_agent import _quality_suggestions_impl, _dependency_suggestions_impl
+
     suggestions = []
     _id = [1]
 
@@ -565,18 +568,16 @@ def _generate_fallback_suggestions(state: SharedState) -> dict:
     quality_result = state.get("quality_result")
     if quality_result and isinstance(quality_result, dict):
         try:
-            from agents.legacy import SuggestionAgent
-            suggestions.extend(SuggestionAgent._quality_suggestions(quality_result, next_id))
+            suggestions.extend(_quality_suggestions_impl(quality_result, next_id))
         except Exception as e:
-            logger.warning(f"[_generate_fallback_suggestions] _quality_suggestions 失败: {e}")
+            logger.warning(f"[_generate_fallback_suggestions] _quality_suggestions_impl 失败: {e}")
 
     dependency_result = state.get("dependency_result")
     if dependency_result and isinstance(dependency_result, dict):
         try:
-            from agents.legacy import SuggestionAgent
-            suggestions.extend(SuggestionAgent._dependency_suggestions(dependency_result, next_id))
+            suggestions.extend(_dependency_suggestions_impl(dependency_result, next_id))
         except Exception as e:
-            logger.warning(f"[_generate_fallback_suggestions] _dependency_suggestions 失败: {e}")
+            logger.warning(f"[_generate_fallback_suggestions] _dependency_suggestions_impl 失败: {e}")
 
     architecture_result = state.get("architecture_result")
     if architecture_result and isinstance(architecture_result, dict):
@@ -1143,39 +1144,24 @@ def build_initial_state(
     return SharedState(
         repo_url=repo_url,
         branch=branch,
-        local_path=None,
         file_contents={},
-        repo_loader_result=None,
-        repo_tree=None,
-        repo_sha=None,
-        classified_files=None,
         loaded_files={},
-        pending_files=[],
-        llm_decision_rounds=0,
-        llm_decision_history=[],
-        current_priority=0,
-        pending_p0=[],
-        pending_p1=[],
-        pending_p2=[],
-        loaded_p0={},
-        loaded_p1={},
-        needs_more=False,
-        ai_decision_reason="",
-        iteration_count=0,
+        loaded_paths=[],
+        repo_sha=None,
         code_parser_result=None,
-        code_parser_p0_result=None,
-        code_parser_p1_result=None,
         tech_stack_result=None,
         quality_result=None,
+        dependency_result=None,
         suggestion_result=None,
+        optimization_result=None,
         final_result=None,
         errors=[],
         finished_agents=[],
-        use_react_mode=True,
         react_events=[],
         react_summary="",
         react_iterations=0,
-        loaded_paths=[],
         explorer_result=None,
         explorer_events=[],
+        architecture_result=None,
+        architecture_events=[],
     )

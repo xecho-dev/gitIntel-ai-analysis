@@ -67,7 +67,7 @@ class TestGetInputs:
         state: SharedState = {
             "loaded_files": {"a.py": "content"},
             "file_contents": {"b.py": "old"},
-            "local_path": "/path/to/repo",
+            "repo_url": "https://github.com/test/repo",
             "branch": "main",
         }
         repo_id, branch, contents = get_inputs_from_state(state)
@@ -76,21 +76,22 @@ class TestGetInputs:
     def test_get_inputs_falls_back_to_file_contents(self):
         state: SharedState = {
             "file_contents": {"b.py": "content"},
-            "local_path": "/path/to/repo",
+            "repo_url": "https://github.com/test/repo",
             "branch": "develop",
         }
         repo_id, branch, contents = get_inputs_from_state(state)
         assert contents == {"b.py": "content"}
 
-    def test_get_inputs_extracts_repo_from_loader_result(self):
+    def test_get_inputs_uses_repo_url(self):
         state: SharedState = {
             "loaded_files": {},
-            "repo_loader_result": {"repo": "myrepo", "owner": "myowner"},
+            "repo_url": "https://github.com/test/repo",
             "branch": "main",
         }
         repo_id, branch, contents = get_inputs_from_state(state)
-        assert repo_id == "myrepo"
+        assert repo_id == "https://github.com/test/repo"
         assert branch == "main"
+        assert contents == {}
 
 
 class TestBuildInitialState:
@@ -105,9 +106,6 @@ class TestBuildInitialState:
         assert state["file_contents"] == {}
         assert state["errors"] == []
         assert state["finished_agents"] == []
-        assert state["llm_decision_rounds"] == 0
-        assert state["llm_decision_history"] == []
-        assert state["use_react_mode"] is True
 
     def test_build_initial_state_defaults(self):
         state = build_initial_state("owner/repo")

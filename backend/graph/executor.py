@@ -113,12 +113,7 @@ def get_inputs_from_state(state: SharedState) -> tuple[str, str, dict]:
     """
     file_contents = state.get("loaded_files") or state.get("file_contents") or {}
 
-    repo_id = state.get("local_path", "")
-    if not repo_id:
-        rlr = state.get("repo_loader_result")
-        if rlr:
-            repo_id = rlr.get("repo", "")
-
+    repo_id = state.get("repo_url", "")
     branch = state.get("branch", "main")
     return repo_id, branch, file_contents
 

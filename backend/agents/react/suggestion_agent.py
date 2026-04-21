@@ -879,8 +879,6 @@ class ReActSuggestionAgent:
         quality_result, dependency_result, file_contents
     ) -> AsyncGenerator[dict, None]:
         """规则引擎兜底（LLM 不可用时）。"""
-        from agents.suggestion import SuggestionAgent
-
         suggestions = []
         _id = [100]
 
@@ -889,20 +887,17 @@ class ReActSuggestionAgent:
             _id[0] += 1
             return v
 
-        # 安全检查每个结果
         if quality_result and isinstance(quality_result, dict):
             try:
-                from agents.suggestion import SuggestionAgent
-                suggestions.extend(SuggestionAgent._quality_suggestions(quality_result, next_id))
+                suggestions.extend(_quality_suggestions_impl(quality_result, next_id))
             except Exception as e:
-                logger.warning(f"[ReActSuggestion] _quality_suggestions 失败: {e}")
+                logger.warning(f"[ReActSuggestion] _quality_suggestions_impl 失败: {e}")
 
         if dependency_result and isinstance(dependency_result, dict):
             try:
-                from agents.suggestion import SuggestionAgent
-                suggestions.extend(SuggestionAgent._dependency_suggestions(dependency_result, next_id))
+                suggestions.extend(_dependency_suggestions_impl(dependency_result, next_id))
             except Exception as e:
-                logger.warning(f"[ReActSuggestion] _dependency_suggestions 失败: {e}")
+                logger.warning(f"[ReActSuggestion] _dependency_suggestions_impl 失败: {e}")
 
         if not suggestions:
             suggestions.append({
@@ -936,3 +931,154 @@ def _get_suggestion_tool_index(tool_name: str) -> int:
         if t.name == tool_name:
             return i
     raise ValueError(f"未知工具: {tool_name}")
+
+
+# ─── 规则引擎：内联实现（不再依赖 legacy SuggestionAgent） ───────────────────
+
+
+def _quality_suggestions_impl(qr: dict, next_id) -> list[dict]:
+    """基于代码质量数据的规则建议（LLM 兜底，内联实现）。"""
+    suggestions: list[dict] = []
+
+    health = qr.get("health_score", 100)
+    coverage = qr.get("test_coverage", 100)
+    dup_info = qr.get("duplication", {})
+    py_metrics = qr.get("python_metrics", {})
+    ts_metrics = qr.get("typescript_metrics", {})
+
+    if health < 60:
+        suggestions.append({
+            "id": next_id(),
+            "type": "performance",
+            "title": "代码健康度偏低 (< 60)",
+            "description": f"当前健康度评分为 {health}，建议优先解决圈复杂度超标、代码重复率高等问题。",
+            "priority": "high",
+            "category": "quality",
+            "source": "rule",
+        })
+
+    if coverage < 30:
+        suggestions.append({
+            "id": next_id(),
+            "type": "performance",
+            "title": "测试覆盖率严重不足 (< 30%)",
+            "description": f"当前测试覆盖率仅 {coverage}%。建议使用 Jest/Vitest (JS) 或 pytest (Python) 补充单元测试。",
+            "priority": "high",
+            "category": "testing",
+            "source": "rule",
+        })
+    elif coverage < 60:
+        suggestions.append({
+            "id": next_id(),
+            "type": "performance",
+            "title": "测试覆盖率偏低 (< 60%)",
+            "description": f"当前测试覆盖率为 {coverage}%，建议逐步补充关键模块的测试用例。",
+            "priority": "medium",
+            "category": "testing",
+            "source": "rule",
+        })
+
+    dup_level = dup_info.get("duplication_level", "Low")
+    dup_score = dup_info.get("score", 0)
+    if dup_level == "High" or dup_score > 15:
+        suggestions.append({
+            "id": next_id(),
+            "type": "refactor",
+            "title": "代码重复率较高",
+            "description": f"重复率 {dup_score}%，建议将重复代码块抽取为公共函数。",
+            "priority": "medium",
+            "category": "readability",
+            "source": "rule",
+        })
+
+    for metrics, lang_label in [(py_metrics, "Python"), (ts_metrics, "TypeScript")]:
+        over_complex = metrics.get("over_complexity_count", 0)
+        if over_complex > 5:
+            suggestions.append({
+                "id": next_id(),
+                "type": "performance",
+                "title": f"{lang_label}: 存在 {over_complex} 个高圈复杂度函数 (> 10)",
+                "description": "建议拆分大型函数，每个函数控制在 50 行以内。",
+                "priority": "medium",
+                "category": "complexity",
+                "source": "rule",
+            })
+
+    long_funcs = py_metrics.get("long_functions", [])
+    if len(long_funcs) > 3:
+        suggestions.append({
+            "id": next_id(),
+            "type": "refactor",
+            "title": f"存在 {len(long_funcs)} 个超长 Python 函数 (> 50 行)",
+            "description": f"建议按职责拆分为更小的函数，提高可读性和可维护性。",
+            "priority": "low",
+            "category": "readability",
+            "source": "rule",
+        })
+
+    return suggestions
+
+
+def _dependency_suggestions_impl(dr: dict, next_id) -> list[dict]:
+    """基于依赖风险数据的规则建议（LLM 兜底，内联实现）。"""
+    suggestions: list[dict] = []
+
+    high = dr.get("high", 0)
+    medium = dr.get("medium", 0)
+    risk_level = dr.get("risk_level", "")
+    deps = dr.get("deps", [])
+
+    if risk_level == "高危" or high > 0:
+        suggestions.append({
+            "id": next_id(),
+            "type": "security",
+            "title": "存在高风险依赖",
+            "description": f"检测到 {high} 个高危依赖，可能包含已知安全漏洞，建议立即更新或替换。",
+            "priority": "high",
+            "category": "security",
+            "source": "rule",
+        })
+
+    if medium > 5:
+        suggestions.append({
+            "id": next_id(),
+            "type": "security",
+            "title": f"存在 {medium} 个中等风险依赖",
+            "description": "建议使用 `npm audit` / `pip-audit` / `cargo audit` 定期扫描已知漏洞。",
+            "priority": "medium",
+            "category": "dependency",
+            "source": "rule",
+        })
+
+    no_version = [d for d in deps if not d.get("version") or d["version"] == "*"]
+    if no_version:
+        suggestions.append({
+            "id": next_id(),
+            "type": "performance",
+            "title": f"存在 {len(no_version)} 个依赖未锁定版本",
+            "description": "建议使用精确版本号或语义化版本范围，避免不一致性。",
+            "priority": "medium",
+            "category": "dependency",
+            "source": "rule",
+        })
+
+    outdated_flags = {
+        "request": "request 库已废弃，建议迁移到 axios 或原生 fetch",
+        "lodash": "lodash 体积较大，建议按需引入或使用原生方法替代",
+        "moment": "moment 已停止维护，建议迁移到 dayjs 或 date-fns",
+        "jquery": "jQuery 在现代前端项目中通常可移除",
+    }
+    names = {d["name"].lower() for d in deps}
+    for pkg, desc in outdated_flags.items():
+        if pkg in names:
+            suggestions.append({
+                "id": next_id(),
+                "type": "refactor",
+                "title": f"检测到过时依赖: {pkg}",
+                "description": desc,
+                "priority": "medium",
+                "category": "dependency",
+                "source": "rule",
+            })
+
+    return suggestions
