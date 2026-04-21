@@ -117,7 +117,7 @@ class VerificationResult:
     tool_calls: list[dict] = field(default_factory=list)
     verified_files: dict[str, str] = field(default_factory=dict)
     ast_results: dict[str, dict] = field(default_factory=dict)
-    smell_results: dict[str, list] = field(default_factory=list)
+    smell_results: dict[str, list] = field(default_factory=dict)
 
 
 class ReActSuggestionAgent:
@@ -484,6 +484,27 @@ class ReActSuggestionAgent:
                 "path", "paths", "query", "language", "state", "limit"
             )})
             tool_args = effective_args
+        elif tool_name in ("parse_file_ast", "detect_code_smells",
+                           "detect_imports", "detect_dependencies"):
+            # 代码分析工具需要 content 和 language，通过 verified_files 中已读文件反查
+            effective_args: dict = {}
+            content = args.get("content", "")
+            if not content:
+                # 从已验证的文件内容中查找
+                for path_key, file_content in verification.verified_files.items():
+                    if path_key and path_key in (args.get("file_path") or ""):
+                        content = file_content
+                        break
+                if not content and verification.verified_files:
+                    content = next(iter(verification.verified_files.values()), "")
+            effective_args["content"] = content
+            effective_args["language"] = args.get("language", "")
+            effective_args["file_path"] = args.get("file_path", "")
+            if tool_name == "parse_file_ast":
+                effective_args["language"] = args.get("language", "")
+            elif tool_name == "summarize_code_file":
+                effective_args["max_lines"] = args.get("max_lines", 80)
+            tool_args = effective_args
         else:
             tool_args = args
 
@@ -508,7 +529,6 @@ class ReActSuggestionAgent:
 
         elif tool_name == "detect_code_smells":
             try:
-                # 处理多种可能的返回格式
                 raw_result = result
                 if isinstance(result, str):
                     try:
@@ -539,11 +559,18 @@ class ReActSuggestionAgent:
                         else:
                             parsed = inner
 
-                # 确保结果是列表
+                # 确保结果是列表（空列表 [] 也是合法的有效结果）
                 if isinstance(parsed, list):
-                    key = tool_args.get("file_path", "") or (tool_args.get("content", "")[:50] if tool_args.get("content") else "unknown")
+                    key = tool_args.get("file_path", "") or (
+                        tool_args.get("content", "")[:50] if tool_args.get("content") else "unknown"
+                    )
                     verification.smell_results[key] = parsed
+                elif isinstance(parsed, dict) and "smells" in parsed:
+                    # 兜底：嵌套在 smells 键下
+                    key = tool_args.get("file_path", "") or "unknown"
+                    verification.smell_results[key] = parsed["smells"]
                 else:
+                    # 其他情况（空字符串、None 等）存为空列表
                     verification.smell_results[tool_args.get("file_path", "") or "unknown"] = []
             except (json.JSONDecodeError, TypeError, KeyError) as e:
                 logger.warning(f"[ReActSuggestion] detect_code_smells 解析失败: {e}, 原始: {str(result)[:200]}")

@@ -66,15 +66,23 @@ REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分
 
 你的探索质量直接影响最终分析的深度和准确性。
 
+【重要】初始上下文已包含完整的文件树（文件树概览），请直接从中选择文件加载，
+不要重复调用 get_file_tree。
+
 工具（按需调用）：
-  - get_repo_info(owner, repo): 仓库基本信息
-  - get_file_tree(owner, repo, ref): 完整文件树
-  - read_file_content(owner, repo, path, ref): 单个文件
-  - get_file_blobs(owner, repo, paths, ref): 批量读取文件（优先使用，更高效）
-  - search_code(owner, repo, query, language): 搜索代码
+  - get_repo_info(owner, repo): 仓库基本信息（通常只需调用一次）
+  - get_file_tree(owner, repo, ref): 完整文件树（**已包含在初始上下文中**，通常无需重复调用）
+  - get_file_blobs(owner, repo, paths, ref): **批量读取多个文件（优先使用）**
+  - read_file_content(owner, repo, path, ref): 读取单个文件
+  - search_code(owner, repo, query, language): 搜索代码（谨慎使用，GitHub API 有频率限制）
   - get_commit_history(owner, repo, ref, limit): 提交历史
   - parse_file_ast(file_path, content, language): AST 结构
   - summarize_code_file(content, max_lines): 文件摘要
+
+**正确的工作流示例**：
+  1. 第一轮：直接调用 get_file_blobs 批量加载入口文件 + 配置文件
+  2. 第二轮：根据已加载的文件内容，调用 get_file_blobs 加载核心业务文件
+  3. 第三轮：如有需要，补充加载路由/模型/中间件文件，然后输出 is_sufficient=true
 
 优先级（从高到低）：
   1. 入口文件：main.py, index.ts, app.js, App.tsx, server.js, main.go
@@ -89,20 +97,22 @@ REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分
   - 纯测试文件、文档文件、二进制文件
 
 停止条件（满足任一即停止）：
-  1. 已加载文件涵盖入口、配置和主要业务逻辑（通常20-40个文件）
+  1. 已加载文件涵盖入口、配置和主要业务逻辑（通常 20-40 个文件）
   2. 总加载文件数达 45 个
   3. 迭代轮次达 8 次
-  4. Agent认为信息已足够
+  4. Agent 认为信息已足够
+
+**注意**：初始上下文已包含完整文件树，使用 get_file_blobs 直接批量加载，不要重复获取文件树。
 
 输出格式（每轮）：
   Thought: <思考>
-  Action: {"name": "工具名", "args": {"参数名": "参数值"}}
+  Action: {"name": "get_file_blobs", "args": {"owner": "...", "repo": "...", "paths": ["文件路径1", "文件路径2"], "ref": "..."}}
   Observation: <关键信息>
 
 结束时输出：
-  is_sufficient: true/false
+  is_sufficient: true
   summary: |
-    <探索总结：技术栈、主要模块及职责、关键文件清单(最多15个)、架构特点、confidence评估>"""
+    <探索总结：技术栈、主要模块及职责、关键文件清单(最多15个)、架构特点>"""
 
 
 # ─── 推理记录结构 ────────────────────────────────────────────────────────────
@@ -131,6 +141,8 @@ class ExplorationResult:
     summary: str = ""
     total_iterations: int = 0
     errors: list[str] = field(default_factory=list)
+    # 完整文件树路径集合（所有候选文件），供每轮迭代上下文使用
+    all_tree_paths: list[str] = field(default_factory=list)
 
 
 # ─── 核心 Agent ───────────────────────────────────────────────────────────────
@@ -210,8 +222,13 @@ class ReActRepoLoaderAgent:
             logger.warning(f"[ReActRepoLoader] 获取 SHA 失败: {e}，使用 branch 名")
             result.sha = branch
 
-        # 构建初始上下文
-        initial_context = await self._build_initial_context(owner, repo, branch, result.sha)
+        # 构建初始上下文（同时保存完整文件树供后续迭代使用）
+        info, tree = await asyncio.gather(
+            _get_repo_info_impl(owner, repo),
+            _get_file_tree_impl(owner, repo, result.sha or branch),
+        )
+        result.all_tree_paths = [t["path"] for t in tree if t.get("type") == "blob"]
+        initial_context = await self._build_initial_context(owner, repo, branch, result.sha, info, tree)
         messages = [
             SystemMessage(content=REACT_SYSTEM_PROMPT),
             HumanMessage(content=initial_context),
@@ -270,15 +287,12 @@ class ReActRepoLoaderAgent:
         result = await _get_default_branch_impl(owner, repo)
         return result.strip()
 
-    async def _build_initial_context(self, owner: str, repo: str, branch: str, sha: str) -> str:
-        """构建初始上下文——获取仓库基础信息和文件树。"""
+    async def _build_initial_context(
+        self, owner: str, repo: str, branch: str, sha: str,
+        info: dict, tree: list[dict],
+    ) -> str:
+        """构建初始上下文。info 和 tree 由调用方预先获取，避免重复请求。"""
         context_parts = [f"# 仓库探索任务\n目标仓库: {owner}/{repo}@{branch}\n"]
-
-        # 直接并发 await 底层 async impl（无需 run_in_executor，本函数已是 async）
-        info, tree = await asyncio.gather(
-            _get_repo_info_impl(owner, repo),
-            _get_file_tree_impl(owner, repo, sha or branch),
-        )
 
         context_parts.append(f"## 仓库基本信息\n")
         context_parts.append(f"- 默认分支: {info.get('default_branch', branch)}")
@@ -288,7 +302,7 @@ class ReActRepoLoaderAgent:
         if info.get("description"):
             context_parts.append(f"- 描述: {info.get('description')}")
 
-        # 文件树概览
+        # 文件树
         blobs = [t for t in tree if t.get("type") == "blob"]
         dirs = set()
         for t in blobs:
@@ -299,13 +313,15 @@ class ReActRepoLoaderAgent:
         context_parts.append(f"\n## 文件树概览\n")
         context_parts.append(f"- 总文件数: {len(blobs)}")
         context_parts.append(f"- 顶层目录: {', '.join(sorted(dirs)[:15])}")
-        context_parts.append(f"\n### 部分文件路径（前 50 个）:\n")
-        for t in blobs[:50]:
+        # 展示完整文件树，让 LLM 在每轮迭代时都能看到所有候选文件
+        context_parts.append(f"\n### 仓库文件清单（共 {len(blobs)} 个，全部可用）:\n")
+        for t in blobs:
             context_parts.append(f"- {t['path']}")
 
         context_parts.append(
             f"\n## 任务\n"
-            f"请开始探索这个仓库，逐步加载关键文件，理解其技术栈和架构。\n"
+            f"请从上方文件清单中选取关键文件进行加载，理解其技术栈和架构。\n"
+            f"**重要**：只能加载文件清单中列出的文件，禁止猜测不在清单中的文件路径！\n"
             f"当已了解足够信息时，输出 is_sufficient=true 和总结。"
         )
 
@@ -338,6 +354,26 @@ class ReActRepoLoaderAgent:
         messages.append(response)
 
         tool_calls = response.tool_calls or []
+        if not tool_calls:
+            # 尝试从文本 content 中解析 Action JSON（兼容不返回 tool_calls 的模型）
+            content = response.content or ""
+            parsed = self._parse_actions_from_text(content)
+            if parsed:
+                tool_calls = parsed
+                # 替换 response：补上 tool_calls，使后续 ToolMessage 能正确关联
+                response = AIMessage(
+                    content=content,
+                    tool_calls=[
+                        {"name": p["name"], "args": p["args"], "id": p["id"]}
+                        for p in parsed
+                    ],
+                )
+                messages[-1] = response  # 替换掉原来的无 tool_calls 响应
+                logger.info(
+                    f"[ReActRepoLoader] 迭代 {iteration + 1}: "
+                    f"从文本中解析到 {len(tool_calls)} 个工具调用"
+                )
+
         if not tool_calls:
             # LLM 没有调用工具，可能是结束信号
             content = response.content or ""
@@ -504,20 +540,22 @@ class ReActRepoLoaderAgent:
         self, owner: str, repo: str, sha: str,
         result: ExplorationResult, iteration: int
     ) -> str:
-        """构建每轮迭代的上下文。"""
+        """构建每轮迭代的上下文，包含完整文件树和已加载状态。"""
         parts = [f"\n## 迭代 {iteration + 1}\n"]
         parts.append(f"- 已加载文件数: {len(result.loaded_paths)} / {self.MAX_FILES}")
         parts.append(f"- 迭代轮次: {iteration + 1} / {self.MAX_ITERATIONS}")
 
-        if result.loaded_paths:
-            parts.append(f"\n### 已加载文件:\n")
-            for p in result.loaded_paths[-20:]:
-                parts.append(f"- {p}")
-            if len(result.loaded_paths) > 20:
-                parts.append(f"- ... 等 {len(result.loaded_paths)} 个文件")
+        # 完整文件树：已加载的打勾，未加载的正常列出
+        if result.all_tree_paths:
+            loaded_set = set(result.loaded_paths)
+            parts.append(f"\n### 仓库文件清单（共 {len(result.all_tree_paths)} 个）:\n")
+            for path in result.all_tree_paths:
+                marker = "✅" if path in loaded_set else "⬜"
+                parts.append(f"- {marker} {path}")
 
+        # 错误反馈
         if result.errors:
-            parts.append(f"\n### 最近的错误:\n")
+            parts.append(f"\n### 最近的错误（请注意避开这些无效路径）:\n")
             for e in result.errors[-3:]:
                 parts.append(f"- {e}")
 
@@ -564,6 +602,59 @@ class ReActRepoLoaderAgent:
         summary_msg = HumanMessage(content="\n".join(summary_lines))
         # 保留 SystemMsg + 摘要 + 最后 6 条（2 轮完整的 Human + AI(tool_calls) + Tool 三元组）
         messages[:] = [system, summary_msg] + history[-keep_count:]
+
+    @staticmethod
+    def _parse_actions_from_text(content: str) -> list[dict]:
+        """从 LLM 返回的文本内容中解析 Action JSON（兼容不返回 tool_calls 的模型）。
+
+        适配通义千问等模型在 bind_tools 时仍输出纯文本而非 structured tool_calls 的情况。
+        """
+        import json
+        import re
+
+        _KNOWN_TOOLS = {
+            "get_repo_info", "get_file_tree", "read_file_content",
+            "get_file_blobs", "search_code", "get_commit_history",
+            "get_pull_requests", "get_default_branch",
+            "parse_file_ast", "summarize_code_file",
+        }
+
+        results: list[dict] = []
+
+        # 从 "Action: {" 开始，用平衡括号解析整个 JSON 块
+        for block_match in re.finditer(r'Action:\s*\{', content):
+            brace_start = block_match.end()  # 位置在第一个 { 之后
+            count = 1
+            found_end = -1
+            for i, c in enumerate(content[brace_start:]):
+                if c == '{':
+                    count += 1
+                elif c == '}':
+                    count -= 1
+                    if count == 0:
+                        found_end = i
+                        break
+            if found_end < 0:
+                continue
+            # 提取 Action 块内容（不含首尾 { }），再包上 { } 形成完整 JSON
+            # found_end 是相对于 brace_start 的偏移量，本身已指向末尾 }
+            inner = '{' + content[brace_start:brace_start + found_end] + '}'
+            # 还原转义换行符（LLM 输出中 \n 可能被转义）
+            inner_fixed = inner.replace("\\n", "\n").replace('\\"', '"')
+            try:
+                obj = json.loads(inner_fixed)
+                name = obj.get("name", "")
+                args = obj.get("args", {})
+                if name in _KNOWN_TOOLS and isinstance(args, dict):
+                    results.append({
+                        "name": name,
+                        "args": args,
+                        "id": f"call_parsed_{len(results)}",
+                    })
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return results
 
     def _build_summary(self, result: ExplorationResult) -> str:
         """从探索过程构建总结。"""
