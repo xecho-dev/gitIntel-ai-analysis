@@ -22,6 +22,8 @@ dependencies = [
     "tree-sitter-languages>=1.10.0,<1.11",
     "aiofiles>=24.0.0",
     "reportlab>=4.0.0",
+    # 多语言代码分析
+    "lizard>=1.17.0",
 ]
 
 [project.optional-dependencies]

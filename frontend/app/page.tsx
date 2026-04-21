@@ -1,43 +1,47 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { AnalyzeInput } from "@/components/layout/AnalyzeInput";
-import { ArchitectureAgentCard } from "@/components/agents/ArchitectureAgentCard";
-import { QualityAgentCard } from "@/components/agents/QualityAgentCard";
-import { DependencyAgentCard } from "@/components/agents/DependencyAgentCard";
-import { OptimizationAgentCard } from "@/components/agents/OptimizationAgentCard";
-import { AnalysisPreview } from "@/components/layout/AnalysisPreview";
+import { useRouter } from "next/navigation";
+import {
+  LandingNavbar,
+  LandingHero,
+  LandingPartners,
+  LandingFeatures,
+  LandingLiveLab,
+  LandingPricing,
+  LandingFooter,
+} from "@/components/landing";
 
-export default function HomePage() {
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? session?.user?.sub ?? "";
+export default function LandingPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/workspace");
+    }
+  }, [status, router]);
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-[#10141a] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-400/20 rounded-full border-t-blue-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10">
-      <section className="text-center">
-        <h1 className="text-4xl font-black mb-2 tracking-tight">
-          智能分析工作台
-        </h1>
-        <p className="text-slate-400 font-light">
-          输入仓库地址，启动深度架构与风险评估
-        </p>
-        <AnalyzeInput userId={userId} />
-      </section>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <div className="xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ArchitectureAgentCard />
-          <QualityAgentCard />
-          <DependencyAgentCard />
-          <OptimizationAgentCard />
-        </div>
-
-        <div className="xl:col-span-3">
-          {/* <PricingSidebar /> */}
-          <AnalysisPreview />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#10141a]">
+      <LandingNavbar />
+      <main>
+        <LandingHero />
+        <LandingPartners />
+        <LandingFeatures />
+        <LandingLiveLab />
+        <LandingPricing />
+      </main>
+      <LandingFooter />
     </div>
   );
 }

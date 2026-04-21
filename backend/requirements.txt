@@ -16,3 +16,4 @@ aiofiles>=24.0.0
 reportlab>=4.0.0
 dashvector>=1.0.0,<2.0.0
 dashscope>=1.20.0
+lizard>=1.17.0

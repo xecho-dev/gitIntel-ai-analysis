@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "工作台", icon: LayoutDashboard },
+  { href: "/workspace", label: "工作台", icon: LayoutDashboard },
   { href: "/history", label: "历史记录", icon: History },
   { href: "/account", label: "账户中心", icon: UserCircle },
 ];
