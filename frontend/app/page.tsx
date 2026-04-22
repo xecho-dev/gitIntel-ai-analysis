@@ -9,12 +9,11 @@ import {
   LandingPartners,
   LandingFeatures,
   LandingLiveLab,
-  LandingPricing,
   LandingFooter,
 } from "@/components/landing";
 
 export default function LandingPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   useEffect(() => {

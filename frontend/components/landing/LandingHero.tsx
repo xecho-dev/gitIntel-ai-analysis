@@ -66,6 +66,7 @@ export const LandingHero = () => (
         className="mt-20 relative"
       >
         <div className="glass-card p-2 rounded-2xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://picsum.photos/seed/code-viz/1200/600"
             alt="Dashboard Preview"

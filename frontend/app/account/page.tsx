@@ -9,12 +9,7 @@ import {
   Zap,
   CreditCard,
   FileText,
-  Settings,
-  Key,
-  ArrowUpRight,
   RefreshCw,
-  Trash2,
-  Copy,
   ChevronRight,
   LogOut,
   AlertTriangle,
@@ -374,7 +369,7 @@ export default function AccountPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <GlassCard className="p-8 flex flex-col border-l-2 border-blue-400">
           <div className="flex items-center gap-2 mb-6 text-blue-400">
             <Settings size={18} />
@@ -479,7 +474,7 @@ export default function AccountPage() {
             </p>
           </div>
         </GlassCard>
-      </div>
+      </div> */}
     </motion.div>
   );
 }

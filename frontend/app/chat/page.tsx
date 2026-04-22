@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ChatSidebar, ChatArea } from "@/components/chat";
@@ -10,6 +10,7 @@ import type { ChatMessage, ChatSession } from "@/lib/types";
 export default function ChatPage() {
   const { status } = useSession();
   const router = useRouter();
+  const handleSendRef = useRef<((_content: string) => Promise<void>) | undefined>(undefined);
 
   const {
     sessions,
@@ -160,15 +161,18 @@ export default function ChatPage() {
     }
   };
 
+  // 同步 handleSend 到 ref，避免 useEffect 依赖问题
+  handleSendRef.current = handleSend;
+
   // 快速提问
   useEffect(() => {
     const handler = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      handleSend(customEvent.detail);
+      handleSendRef.current?.(customEvent.detail);
     };
     window.addEventListener("chat:quickask", handler);
     return () => window.removeEventListener("chat:quickask", handler);
-  }, [currentSessionId]);
+  }, []);
 
   if (status === "loading") {
     return (
@@ -197,7 +201,6 @@ export default function ChatPage() {
         <div className="flex-1 overflow-hidden">
           {currentSessionId ? (
             <ChatArea
-              sessionId={currentSessionId}
               onSend={handleSend}
               isLoading={isLoading}
             />

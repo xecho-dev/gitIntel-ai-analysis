@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, ChatSession, RAGSource } from "@/lib/types";
+import type { ChatMessage, ChatSession } from "@/lib/types";
 
 interface ChatState {
   // 当前会话

@@ -7,7 +7,6 @@ import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   History,
-  MessageSquare,
   UserCircle,
   LogOut,
   Github,

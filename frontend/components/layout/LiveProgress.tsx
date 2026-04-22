@@ -96,7 +96,7 @@ export const LiveProgress = () => {
         {allMessages.length === 0 ? (
           <p className="text-[10px] text-slate-600 text-center mt-4">等待分析开始...</p>
         ) : (
-          allMessages.map((msg, i) => {
+          allMessages.map((msg) => {
             const label = AGENT_LABELS[msg.agent] ?? msg.agent;
             const colorClass = AGENT_COLORS[msg.agent] ?? "text-slate-400";
             const isResult = msg.type === "result" || msg.message.includes("完成");

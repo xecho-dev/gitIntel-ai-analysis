@@ -7,12 +7,11 @@ import { ChatInput } from "./ChatInput";
 import { MessageSquarePlus } from "lucide-react";
 
 interface ChatAreaProps {
-  sessionId: string;
   onSend: (message: string) => Promise<void>;
   isLoading: boolean;
 }
 
-export const ChatArea = ({ sessionId, onSend, isLoading }: ChatAreaProps) => {
+export const ChatArea = ({ onSend, isLoading }: ChatAreaProps) => {
   const { messages } = useChatStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

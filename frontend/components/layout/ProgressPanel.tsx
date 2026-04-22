@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import React from "react";
+import { ChevronDown } from "lucide-react";
 import { LiveProgress } from "@/components/layout/LiveProgress";
 import { useAppStore } from "@/store/useAppStore";
 
@@ -10,7 +10,7 @@ interface ProgressPanelProps {
   height?: string;
 }
 
-export const ProgressPanel = ({ defaultOpen = true, height = "h-56" }: ProgressPanelProps) => {
+export const ProgressPanel = ({ height = "h-56" }: ProgressPanelProps) => {
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
 
   return (
