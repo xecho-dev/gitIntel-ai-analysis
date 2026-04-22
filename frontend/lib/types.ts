@@ -166,3 +166,31 @@ export interface UserProfile {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Chat / RAG 知识库类型 ─────────────────────────────────────────────────
+
+export interface RAGSource {
+  repo_url: string;
+  category: string;
+  title: string;
+  content: string;
+  score: number;
+  priority: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  rag_context: RAGSource[] | null;
+  analysis_id: string | null;
+  created_at: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}

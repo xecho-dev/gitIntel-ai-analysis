@@ -2,6 +2,12 @@
 from datetime import datetime
 from typing import Optional
 from supabase_client import Client
+from schemas.chat import (
+    ChatSession,
+    ChatMessage,
+    CreateSessionRequest,
+    RAGSource,
+)
 from schemas.history import (
     HistoryItem,
     HistoryStats,
@@ -795,3 +801,144 @@ def db_get_filtered_history(
             medium_risk_count=med_count,
         ),
     )
+
+
+# ─── Chat ────────────────────────────────────────────────────────────────────
+
+def create_chat_session(sb: Client, user_uuid: str, title: str | None = None) -> ChatSession:
+    """创建新的 Chat Session。"""
+    title = title or "新对话"
+    data = (
+        sb.table("chat_sessions")
+        .insert({"user_id": user_uuid, "title": title})
+        .execute()
+    ).data[0]
+    return ChatSession(
+        id=data["id"],
+        user_id=data["user_id"],
+        title=data["title"],
+        created_at=data["created_at"],
+        updated_at=data["updated_at"],
+    )
+
+
+def get_chat_sessions(sb: Client, user_uuid: str) -> list[ChatSession]:
+    """获取用户所有 Chat Sessions（按更新时间倒序）。"""
+    rows = (
+        sb.table("chat_sessions")
+        .select("*")
+        .eq("user_id", user_uuid)
+        .order("updated_at", desc=True)
+        .execute()
+    ).data
+    return [
+        ChatSession(
+            id=r["id"],
+            user_id=r["user_id"],
+            title=r["title"],
+            created_at=r["created_at"],
+            updated_at=r["updated_at"],
+        )
+        for r in rows
+    ]
+
+
+def get_chat_messages(sb: Client, session_id: str) -> list[ChatMessage]:
+    """获取某个 Session 的所有消息。"""
+    rows = (
+        sb.table("chat_messages")
+        .select("*")
+        .eq("session_id", session_id)
+        .order("created_at", asc=True)
+        .execute()
+    ).data
+
+    messages = []
+    for r in rows:
+        rag_context = None
+        if r.get("rag_context"):
+            raw_ctx = r["rag_context"]
+            if isinstance(raw_ctx, list):
+                rag_context = [RAGSource(**src) if isinstance(src, dict) else src for src in raw_ctx]
+            elif isinstance(raw_ctx, str):
+                import json as _json
+                parsed = _json.loads(raw_ctx)
+                rag_context = [RAGSource(**src) for src in parsed]
+
+        messages.append(
+            ChatMessage(
+                id=r["id"],
+                session_id=r["session_id"],
+                role=r["role"],
+                content=r["content"],
+                rag_context=rag_context,
+                analysis_id=r.get("analysis_id"),
+                created_at=r["created_at"],
+            )
+        )
+    return messages
+
+
+def save_chat_message(
+    sb: Client,
+    session_id: str,
+    role: str,
+    content: str,
+    rag_context: list[dict] | None = None,
+    analysis_id: str | None = None,
+) -> ChatMessage:
+    """保存一条消息到数据库。"""
+    import json as _json
+    insert_data: dict = {
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+    }
+    if rag_context:
+        insert_data["rag_context"] = _json.dumps(rag_context)
+    if analysis_id:
+        insert_data["analysis_id"] = analysis_id
+
+    data = (
+        sb.table("chat_messages")
+        .insert(insert_data)
+        .execute()
+    ).data[0]
+
+    rag_ctx_out = None
+    if data.get("rag_context"):
+        parsed = _json.loads(data["rag_context"]) if isinstance(data["rag_context"], str) else data["rag_context"]
+        rag_ctx_out = [RAGSource(**src) for src in parsed]
+
+    return ChatMessage(
+        id=data["id"],
+        session_id=data["session_id"],
+        role=data["role"],
+        content=data["content"],
+        rag_context=rag_ctx_out,
+        analysis_id=data.get("analysis_id"),
+        created_at=data["created_at"],
+    )
+
+
+def delete_chat_session(sb: Client, session_id: str, user_uuid: str) -> bool:
+    """删除一个 Chat Session（级联删除消息）。"""
+    result = (
+        sb.table("chat_sessions")
+        .delete()
+        .eq("id", session_id)
+        .eq("user_id", user_uuid)
+        .execute()
+    )
+    return len(result.data) > 0
+
+
+def get_session_owner(sb: Client, session_id: str) -> str | None:
+    """查询某个 session 的 owner user_uuid，用于权限校验。"""
+    rows = (
+        sb.table("chat_sessions")
+        .select("user_id")
+        .eq("id", session_id)
+        .execute()
+    ).data
+    return rows[0]["user_id"] if rows else None
