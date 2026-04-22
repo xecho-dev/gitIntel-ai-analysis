@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Rocket, Play } from "lucide-react";
+import { Rocket, Github } from "lucide-react";
 
 export const LandingHero = () => (
   <section className="relative pt-32 pb-20 overflow-hidden">
@@ -53,9 +53,9 @@ export const LandingHero = () => (
           立即开启分析
           <Rocket className="w-5 h-5" />
         </Link>
-        <button className="px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold flex items-center gap-2 hover:bg-white/10 transition-all">
-          查看 Demo
-          <Play className="w-5 h-5 fill-white" />
+        <button onClick={() => window.open("https://github.com/xecho-dev/gitIntel-ai-analysis.git", "_blank")} className="px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold flex items-center gap-2 hover:bg-white/10 transition-all">
+          GITHUB
+          <Github className="w-5 h-5 fill-white" />
         </button>
       </motion.div>
 

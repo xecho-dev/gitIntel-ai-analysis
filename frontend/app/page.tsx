@@ -39,7 +39,7 @@ export default function LandingPage() {
         <LandingPartners />
         <LandingFeatures />
         <LandingLiveLab />
-        <LandingPricing />
+        {/* <LandingPricing /> */}
       </main>
       <LandingFooter />
     </div>

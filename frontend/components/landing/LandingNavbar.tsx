@@ -16,7 +16,7 @@ export const LandingNavbar = () => (
         </Link>
         <div className="hidden md:flex items-center gap-6">
           <a href="#features" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">DOCS</a>
-          <a href="#pricing" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">PRICING</a>
+          {/* <a href="#pricing" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">PRICING</a> */}
           <a href="#labs" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">ABOUT</a>
         </div>
       </div>
