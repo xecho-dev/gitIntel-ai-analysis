@@ -130,6 +130,8 @@ def _make_chatopenai(
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         ),
         max_tokens=max_tokens,
+        max_retries=10,
+        timeout=120.0,
     )
 
 
@@ -273,6 +275,8 @@ def get_llm_with_callback(callback_handler, model: str | None = None,
             ),
             max_tokens=_resolve_max_tokens(max_tokens),
             callbacks=[callback_handler],
+            max_retries=10,
+            timeout=120.0,
         )
     except Exception:
         return None
