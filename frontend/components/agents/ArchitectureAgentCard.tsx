@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Code2, GitBranch, AlertTriangle } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -23,94 +23,28 @@ const COMPLEXITY_COLORS: Record<string, string> = {
 };
 
 export const ArchitectureAgentCard = () => {
-  const eventsVersion = useAppStore((s) => s.eventsVersion);
   const finishedAgents = useAppStore((s) => s.finishedAgents);
   const activeAgent = useAppStore((s) => s.activeAgent);
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
 
-  // 订阅单个事件（reactively read from agentEvents via eventsVersion trigger）
-  const fetchTreeEvent = useAppStore((s) => s.agentEvents["fetch_tree_classify"]);
-  const loadP0Event = useAppStore((s) => s.agentEvents["load_p0"]);
-  const loadP1Event = useAppStore((s) => s.agentEvents["load_p1"]);
-  const loadP2Event = useAppStore((s) => s.agentEvents["load_p2"]);
-  const codeParserP0Event = useAppStore((s) => s.agentEvents["code_parser_p0"]);
-  const codeParserP1Event = useAppStore((s) => s.agentEvents["code_parser_p1"]);
-  const codeParserFinalEvent = useAppStore((s) => s.agentEvents["code_parser_final"]);
   const archEvent = useAppStore((s) => s.agentEvents["architecture"]);
   const techStackEvent = useAppStore((s) => s.agentEvents["tech_stack"]);
 
   const archDone = finishedAgents.includes("architecture");
   const archData = archEvent?.data as ArchitectureData | undefined;
-  // 兼容 frameworks 可能是 string[] 或 [{name, ...}] 两种格式
   const techData = techStackEvent?.data as {
     languages?: string[];
     frameworks?: string[] | { name: string; confidence?: number; evidence?: string[] }[];
   } | undefined;
 
-  // 统一提取框架名称
   const frameworkNames: string[] = (techData?.frameworks ?? []).map((f) =>
     typeof f === "string" ? f : (f as { name: string }).name
   );
 
-  const ARCH_AGENTS = new Set([
-    "fetch_tree_classify", "load_p0", "load_p1", "load_p2",
-    "code_parser_p0", "code_parser_p1", "code_parser_final",
-    "react_loader", "explorer", "react_suggestion",
-    "architecture", "tech_stack",
-  ]);
-  const archInProgress = isAnalyzing && activeAgent !== null && ARCH_AGENTS.has(activeAgent);
-  const isScanning = archInProgress || (isAnalyzing && activeAgent === "architecture" && !archData);
-
-  // ── 累加进度日志 ──────────────────────────────────────────────
-  const linesRef = useRef<{ text: string; color: string }[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  /* eslint-disable react-hooks/exhaustive-deps */
-  useEffect(() => {
-    if (!isAnalyzing) {
-      linesRef.current = [];
-      return;
-    }
-
-    const subAgents = [
-      { event: fetchTreeEvent, key: "fetch_tree_classify", done: finishedAgents.includes("fetch_tree_classify"), doneText: "✓ 文件树获取完成" },
-      { event: loadP0Event, key: "load_p0", done: finishedAgents.includes("load_p0"), doneText: "✓ 核心文件加载完成" },
-      { event: loadP1Event, key: "load_p1", done: finishedAgents.includes("load_p1"), doneText: "✓ 次要文件加载完成" },
-      { event: loadP2Event, key: "load_p2", done: finishedAgents.includes("load_p2"), doneText: "✓ 文档文件加载完成" },
-      { event: codeParserP0Event, key: "code_parser_p0", done: finishedAgents.includes("code_parser_p0"), doneText: "✓ 核心代码结构解析完成" },
-      { event: codeParserP1Event, key: "code_parser_p1", done: finishedAgents.includes("code_parser_p1"), doneText: "✓ 次要代码结构解析完成" },
-      { event: codeParserFinalEvent, key: "code_parser_final", done: finishedAgents.includes("code_parser_final"), doneText: "✓ 架构综合分析完成" },
-      { event: techStackEvent, key: "tech_stack", done: finishedAgents.includes("tech_stack"), doneText: "✓ 技术栈识别完成" },
-      { event: archEvent, key: "architecture", done: finishedAgents.includes("architecture"), doneText: "✓ 架构评估完成" },
-    ];
-
-    for (const sub of subAgents) {
-      if (!linesRef.current.find((l) => l.text === sub.doneText)) {
-        if (sub.event?.message && !sub.done) {
-          linesRef.current = linesRef.current.filter((l) => l.text !== sub.doneText);
-          linesRef.current.push({ text: sub.event.message, color: "text-blue-400" });
-        } else if (sub.done) {
-          linesRef.current = linesRef.current.filter(
-            (l) => l.text !== sub.event?.message && l.text !== sub.doneText
-          );
-          linesRef.current.push({ text: sub.doneText, color: "text-emerald-400" });
-        }
-      }
-    }
-
-    linesRef.current = linesRef.current.slice(-20);
-
-    // 新行追加后自动滚到底部
-    requestAnimationFrame(() => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      }
-    });
-  }, [isAnalyzing, eventsVersion]);
-  /* eslint-enable react-hooks/exhaustive-deps */
+  const isScanning = isAnalyzing || activeAgent === "architecture";
 
   const statusLabel = isScanning
-    ? activeAgent === "architecture" ? "ANALYZING" : "SCANNING"
+    ? "ANALYZING"
     : archDone
     ? "DONE"
     : "IDLE";
@@ -252,38 +186,21 @@ export const ArchitectureAgentCard = () => {
           )}
         </motion.div>
       ) : (
-        /* ── 加载中 / 无数据状态 ── */
         <motion.div
-          key="idle"
+          key="loading"
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          ref={scrollRef}
-          className="bg-[#0a0e14] rounded p-4 font-mono text-[11px] h-48 overflow-y-auto border border-white/5 space-y-1 scrollbar-hide"
-          style={{ paddingBottom: "2.5rem" }}
+          className="flex flex-col items-center justify-center h-48 gap-2 text-slate-500 text-xs"
         >
-          {linesRef.current.map((line, i) => (
-            <p key={i} className={line.color}>
-              {line.text}
-            </p>
-          ))}
-          {isScanning && activeAgent === "architecture" && !archEvent?.message && (
-            <p className="text-blue-400 animate-pulse">
-              ▌ 正在分析项目架构…
-            </p>
-          )}
-          {isScanning && (
-            <p className="text-blue-400 animate-pulse">
-              ▌ {activeAgent}...
-            </p>
-          )}
-          {!isAnalyzing && linesRef.current.length === 0 && (
-            <p className="text-slate-600">等待分析开始...</p>
-          )}
-          {isAnalyzing && !isScanning && !archData && (
-            <p className="text-slate-600 animate-pulse">等待轮到架构分析...</p>
-          )}
+          <motion.div
+            animate={isScanning ? { translateY: [0, -4, 0] } : { translateY: 0 }}
+            transition={isScanning ? { repeat: Infinity, duration: 1.2, ease: "easeInOut" } : {}}
+          >
+            <Code2 size={24} className="opacity-40" />
+          </motion.div>
+          <span>{isScanning ? "正在分析项目架构..." : "等待分析开始..."}</span>
         </motion.div>
       )}
       </AnimatePresence>

@@ -26,6 +26,11 @@ interface AppState {
   // 追加单个 SSE 事件
   pushAgentEvent: (event: AgentEventData) => void;
 
+  // 实时进度日志（供 LiveProgress 组件展示）
+  progressMessages: Array<{ id: string; agent: string; message: string; time: Date; type: string }>;
+  addProgressMessage: (agent: string, message: string, type?: string) => void;
+  clearProgressMessages: () => void;
+
   // 最终聚合结果（suggestion 完成后由 analysis_graph 推送）
   finalResult: Record<string, unknown> | null;
   setFinalResult: (result: Record<string, unknown>) => void;
@@ -56,6 +61,7 @@ const initialState = {
   finalResult: null,
   analysisResult: null,
   error: null,
+  progressMessages: [],
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -78,14 +84,44 @@ export const useAppStore = create<AppState>((set) => ({
         ? (event.data as Record<string, unknown>)
         : state.finalResult;
 
+      // 记录进度日志（仅 status / progress / result 类型）
+      const newMessages = event.message
+        ? [
+            ...state.progressMessages,
+            {
+              id: `${Date.now()}-${Math.random()}`,
+              agent: event.agent,
+              message: event.message,
+              time: new Date(),
+              type: event.type,
+            },
+          ]
+        : state.progressMessages;
+
       return {
         eventsVersion: state.eventsVersion + 1,
         agentEvents: { ...state.agentEvents, [event.agent]: event },
         finishedAgents,
         finalResult,
         analysisResult: event.type === "result" ? event.data : state.analysisResult,
+        progressMessages: newMessages.slice(-50),
       };
     }),
+
+  addProgressMessage: (agent, message, type = "progress") =>
+    set((state) => ({
+      progressMessages: [
+        ...state.progressMessages,
+        { id: `${Date.now()}-${Math.random()}`, agent, message, time: new Date(), type },
+      ].slice(-50),
+      eventsVersion: state.eventsVersion + 1,
+    })),
+
+  clearProgressMessages: () =>
+    set((state) => ({
+      progressMessages: [],
+      eventsVersion: state.eventsVersion + 1,
+    })),
 
   setFinalResult: (result) => set({ finalResult: result }),
 
@@ -93,5 +129,5 @@ export const useAppStore = create<AppState>((set) => ({
 
   setError: (error) => set({ error, isAnalyzing: false }),
 
-  reset: () => set(initialState),
+  reset: () => set({ ...initialState, progressMessages: [] }),
 }));

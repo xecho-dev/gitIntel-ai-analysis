@@ -215,8 +215,8 @@ class ReActSuggestionAgent:
         try:
             def sync_rag_search():
                 return _rag_search_similar_impl(
-                    query=self._build_rag_query(tech_stack_result, quality_result),
-                    top_k=3,
+                    query=self._build_rag_query(tech_stack_result, quality_result, code_parser_result),
+                    top_k=5,
                 )
 
             rag_raw = await asyncio.get_running_loop().run_in_executor(None, sync_rag_search)
@@ -422,22 +422,59 @@ class ReActSuggestionAgent:
             logger.error(f"[ReActSuggestion] 最终建议生成失败: {e}")
             suggestions = []
 
-        # ── Step 5: 存储高优先级建议到 RAG ────────────────────────
-        if rag_available:
-            high_priority = [s for s in suggestions if s.get("priority") == "high"]
-            if high_priority:
-                try:
-                    def sync_rag_store():
-                        return _rag_store_suggestion_impl(
-                            repo_url=repo_path,
-                            category="suggestion",
-                            title=high_priority[0].get("title", ""),
-                            content=high_priority[0].get("description", ""),
-                            priority="high",
-                        )
-                    await asyncio.get_running_loop().run_in_executor(None, sync_rag_store)
-                except Exception as e:
-                    logger.warning(f"[ReActSuggestion] RAG 存储失败: {e}")
+        # ── Step 5: 存储建议到 RAG（多维度批量存储）──────────────
+        if rag_available and suggestions:
+            try:
+                def sync_rag_store():
+                    tech_stack = []
+                    languages = []
+                    if tech_stack_result and isinstance(tech_stack_result, dict):
+                        raw_fw = tech_stack_result.get("frameworks", []) or []
+                        if raw_fw:
+                            if isinstance(raw_fw[0], dict):
+                                tech_stack = [f.get("name", "") for f in raw_fw if f.get("name")]
+                            else:
+                                tech_stack = [str(f) for f in raw_fw]
+                        langs = tech_stack_result.get("languages", []) or []
+                        if langs:
+                            if isinstance(langs[0], dict):
+                                languages = [l.get("name", "") for l in langs if l.get("name")]
+                            else:
+                                languages = [str(l) for l in langs]
+
+                    total_files = 0
+                    if code_parser_result and isinstance(code_parser_result, dict):
+                        total_files = code_parser_result.get("total_files", 0)
+                    project_scale = "small" if total_files <= 100 else ("medium" if total_files <= 500 else "large")
+
+                    stored = 0
+                    for sug in suggestions:
+                        if sug.get("priority") not in ("high", "medium"):
+                            continue
+                        try:
+                            _rag_store_suggestion_impl(
+                                repo_url=repo_path,
+                                category="suggestion",
+                                title=sug.get("title", ""),
+                                content=sug.get("description", ""),
+                                priority=sug.get("priority", "medium"),
+                                tech_stack=tech_stack,
+                                languages=languages,
+                                project_scale=project_scale,
+                                code_fix=sug.get("code_fix"),
+                                verified=sug.get("verified", False),
+                                issue_type=sug.get("type", ""),
+                            )
+                            stored += 1
+                        except Exception:
+                            pass
+                    return stored
+
+                stored_count = await asyncio.get_running_loop().run_in_executor(None, sync_rag_store)
+                if stored_count > 0:
+                    logger.info(f"[ReActSuggestion] RAG 存储了 {stored_count} 条建议")
+            except Exception as e:
+                logger.warning(f"[ReActSuggestion] RAG 存储失败: {e}")
 
         # ── Step 6: 去重 + 排序 ─────────────────────────────────
         suggestions = self._dedupe_and_sort(suggestions)
@@ -688,22 +725,44 @@ class ReActSuggestionAgent:
         parts.append("请生成优化建议，对每个问题使用工具验证，并给出精确的 code_fix。")
         return "\n".join(parts)
 
-    def _build_rag_query(self, tech_stack_result, quality_result) -> str:
-        """构建 RAG 检索 query。"""
+    def _build_rag_query(self, tech_stack_result, quality_result, code_parser_result=None) -> str:
+        """构建 RAG 检索 query（找相似项目的历史经验）。
+
+        检索策略：
+          1. 技术栈（核心维度）：框架 + 语言
+          2. 项目规模：大型/中型/小型
+          3. 问题特征：高重复率、安全问题等
+        """
         query_parts = []
+
+        # 1. 技术栈（核心维度）
         if tech_stack_result and isinstance(tech_stack_result, dict):
-            # frameworks 可能是字符串列表或对象列表
             raw_fw = tech_stack_result.get("frameworks", []) or []
-            if isinstance(raw_fw, list):
-                if raw_fw and isinstance(raw_fw[0], dict):
-                    query_parts.extend([f.get('name', '') for f in raw_fw[:3] if f.get('name')])
-                else:
-                    query_parts.extend([str(f) for f in raw_fw[:3]])
+            if raw_fw and isinstance(raw_fw[0], dict):
+                query_parts.extend([f.get('name', '') for f in raw_fw[:3] if f.get('name')])
+            else:
+                query_parts.extend([str(f) for f in raw_fw[:3]])
             query_parts.extend(tech_stack_result.get("languages", [])[:2] or [])
+
+        # 2. 项目规模（补充维度）
+        if code_parser_result and isinstance(code_parser_result, dict):
+            total_files = code_parser_result.get("total_files", 0)
+            if total_files > 500:
+                query_parts.append("大型项目")
+            elif total_files > 100:
+                query_parts.append("中型项目")
+
+        # 3. 问题特征（补充维度）
         if quality_result and isinstance(quality_result, dict):
-            health = quality_result.get("health_score", "")
-            if health:
-                query_parts.append(f"健康度 {health}")
+            dup = quality_result.get("duplication", {})
+            if dup.get("score", 0) > 15:
+                query_parts.append("高重复率")
+
+            hotspots = quality_result.get("hotspots", [])
+            if hotspots:
+                issue_types = set(h.get("type", "") for h in hotspots[:5] if isinstance(h, dict))
+                query_parts.extend(list(issue_types)[:2])
+
         return " ".join(query_parts) or "代码优化建议"
 
     def _build_final_prompt(

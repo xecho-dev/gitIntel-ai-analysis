@@ -3,6 +3,7 @@
 import React from "react";
 import { useSession } from "next-auth/react";
 import { AnalyzeInput } from "@/components/layout/AnalyzeInput";
+import { ProgressPanel } from "@/components/layout/ProgressPanel";
 import { ArchitectureAgentCard } from "@/components/agents/ArchitectureAgentCard";
 import { QualityAgentCard } from "@/components/agents/QualityAgentCard";
 import { DependencyAgentCard } from "@/components/agents/DependencyAgentCard";
@@ -33,10 +34,12 @@ export default function WorkspacePage() {
           <OptimizationAgentCard />
         </div>
 
-        <div className="xl:col-span-3">
+        <div className="xl:col-span-3 grid grid-cols-1 gap-6">
+          <ProgressPanel />
           <AnalysisPreview />
         </div>
       </div>
+
     </div>
   );
 }

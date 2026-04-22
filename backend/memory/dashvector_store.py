@@ -35,21 +35,81 @@ DIMENSION = DashScopeEmbedder.DIMENSION  # 1536
 
 @dataclass
 class RAGDocument:
-    """RAG 文档：可存储到向量库的分析洞察。"""
+    """RAG 文档：可存储到向量库的分析洞察。
+
+    支持多维度检索：
+      - 按技术栈检索（React 项目、Python 项目）
+      - 按问题类型检索（安全问题、性能问题）
+      - 按场景检索（迁移经验、优化经验）
+      - 按仓库检索（同一项目的历史分析）
+    """
 
     repo_url: str
-    category: str
+    category: str  # security | performance | architecture | dependency | testing | ...
     title: str
     content: str
     priority: str = "medium"
+
+    # ── 技术栈维度（元数据）────────────────────────────────────
+    tech_stack: list[str] = field(default_factory=list)  # ["react", "typescript", "next.js"]
+    languages: list[str] = field(default_factory=list)   # ["TypeScript", "Python"]
+    project_scale: str = ""  # small | medium | large
+
+    # ── 核心价值：code_fix（精确修改方案）────────────────────
+    code_fix: dict = field(default_factory=dict)
+    # {
+    #     "file": "src/utils/auth.ts",
+    #     "type": "replace|add|remove",
+    #     "original": "const password = 'hardcoded';",
+    #     "updated": "const password = process.env.DB_PASSWORD;",
+    #     "reason": "避免硬编码密码"
+    # }
+
+    # ── 问题上下文（帮助理解适用场景）─────────────────────────
+    issue_type: str = ""      # N+1查询 | 硬编码密码 | 循环依赖 | ...
+    verified: bool = False    # 是否经过工具验证
+
+    # ── 标签与元数据 ──────────────────────────────────────────
     tags: list[str] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
 
     def to_text(self) -> str:
-        """转换为用于生成向量的文本。"""
-        parts = [f"[{self.category}] {self.title}", self.content]
+        """转换为用于生成向量的文本（保留完整语义）。"""
+        parts = []
+
+        # 1. 技术栈上下文（帮助向量检索到相似项目）
+        if self.tech_stack:
+            parts.append(f"技术栈: {', '.join(self.tech_stack)}")
+        if self.languages:
+            parts.append(f"语言: {', '.join(self.languages)}")
+        if self.project_scale:
+            parts.append(f"项目规模: {self.project_scale}")
+
+        # 2. 核心内容（category + title + content）
+        parts.append(f"[{self.category}] {self.title}")
+        parts.append(self.content)
+
+        # 3. code_fix（最有价值的部分）
+        if self.code_fix:
+            fix = self.code_fix
+            parts.append("修改方案:")
+            if fix.get("file"):
+                parts.append(f"  文件: {fix.get('file')}")
+            if fix.get("original"):
+                parts.append(f"  原代码: {fix.get('original')[:100]}")
+            if fix.get("updated"):
+                parts.append(f"  修改后: {fix.get('updated')[:100]}")
+            if fix.get("reason"):
+                parts.append(f"  原因: {fix.get('reason')}")
+
+        # 4. 问题类型（帮助检索）
+        if self.issue_type:
+            parts.append(f"问题类型: {self.issue_type}")
+
+        # 5. 标签
         if self.tags:
             parts.append(f"标签: {', '.join(self.tags)}")
+
         return "\n".join(parts)
 
     def to_dict(self) -> dict:
@@ -59,6 +119,16 @@ class RAGDocument:
             "title": self.title,
             "content": self.content,
             "priority": self.priority,
+            # 技术栈维度
+            "tech_stack": ",".join(self.tech_stack) if self.tech_stack else "",
+            "languages": ",".join(self.languages) if self.languages else "",
+            "project_scale": self.project_scale,
+            # code_fix
+            "code_fix": json.dumps(self.code_fix) if isinstance(self.code_fix, dict) else str(self.code_fix),
+            "verified": "true" if self.verified else "false",
+            # 问题上下文
+            "issue_type": self.issue_type,
+            # 标签与元数据
             "tags": ",".join(self.tags) if self.tags else "",
             "metadata": json.dumps(self.metadata) if isinstance(self.metadata, dict) else str(self.metadata),
         }
@@ -78,10 +148,43 @@ class SearchResult:
     tags: list[str]
     metadata: dict
 
+    # ── 新增字段 ──────────────────────────────────────────────
+    tech_stack: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
+    project_scale: str = ""
+    code_fix: dict = field(default_factory=dict)
+    verified: bool = False
+    issue_type: str = ""
+
     @classmethod
     def from_dashvector_doc(cls, doc: "dashvector.Doc", score: float) -> "SearchResult":
         fields = doc.fields or {}
+
+        # 解析 code_fix（可能是 JSON 字符串或字典）
+        code_fix_raw = fields.get("code_fix", "{}")
+        if isinstance(code_fix_raw, str):
+            try:
+                code_fix = json.loads(code_fix_raw)
+            except json.JSONDecodeError:
+                code_fix = {}
+        else:
+            code_fix = code_fix_raw or {}
+
+        # 解析 tags
         tags_str = fields.get("tags", "")
+        tags = tags_str.split(",") if tags_str else []
+
+        # 解析技术栈
+        tech_stack_str = fields.get("tech_stack", "")
+        tech_stack = tech_stack_str.split(",") if tech_stack_str else []
+
+        languages_str = fields.get("languages", "")
+        languages = languages_str.split(",") if languages_str else []
+
+        # 解析 verified
+        verified_str = fields.get("verified", "false")
+        verified = verified_str.lower() == "true" if isinstance(verified_str, str) else bool(verified_str)
+
         return cls(
             id=doc.id or "",
             score=score,
@@ -90,8 +193,15 @@ class SearchResult:
             title=fields.get("title", ""),
             content=fields.get("content", ""),
             priority=fields.get("priority", "medium"),
-            tags=tags_str.split(",") if tags_str else [],
+            tags=tags,
             metadata=fields.get("metadata", {}),
+            # 新增字段
+            tech_stack=tech_stack,
+            languages=languages,
+            project_scale=fields.get("project_scale", ""),
+            code_fix=code_fix,
+            verified=verified,
+            issue_type=fields.get("issue_type", ""),
         )
 
 
@@ -172,13 +282,24 @@ class DashVectorStore:
                 dimension=DIMENSION,
                 metric="cosine",
                 fields_schema={
+                    # 基础字段
                     "repo_url": "str",
                     "category": "str",
                     "title": "str",
                     "content": "str",
                     "priority": "str",
-                    "tags": "str",
-                    "metadata": "str",
+                    # 技术栈维度
+                    "tech_stack": "str",  # comma-separated: "react,typescript,next.js"
+                    "languages": "str",     # comma-separated: "TypeScript,Python"
+                    "project_scale": "str",  # small | medium | large
+                    # code_fix
+                    "code_fix": "str",     # JSON string
+                    "verified": "str",      # true | false
+                    # 问题上下文
+                    "issue_type": "str",    # N+1查询 | 硬编码密码 | ...
+                    # 标签与元数据
+                    "tags": "str",          # comma-separated
+                    "metadata": "str",      # JSON string
                 },
             )
             _logger.info(f"[DashVectorStore] Collection 创建成功: {self.collection_name}")
@@ -244,14 +365,20 @@ class DashVectorStore:
         repo_url: str,
         suggestions: list[dict],
         category: str = "suggestion",
+        tech_stack: list[str] = None,
+        languages: list[str] = None,
+        project_scale: str = "",
     ) -> int:
         """
-        便捷方法：将分析建议存储为 RAG 文档。
+        便捷方法：将分析建议存储为 RAG 文档（支持多维度）。
 
         Args:
             repo_url: 仓库 URL
             suggestions: SuggestionAgent 返回的 suggestions 列表
             category: 文档类别，默认 suggestion
+            tech_stack: 技术栈列表（如 ["react", "typescript"]）
+            languages: 语言列表（如 ["TypeScript", "Python"]）
+            project_scale: 项目规模（small | medium | large）
 
         Returns:
             成功存储的数量
@@ -267,6 +394,16 @@ class DashVectorStore:
                 title=sug.get("title", f"Suggestion {idx}"),
                 content=sug.get("description", ""),
                 priority=sug.get("priority", "medium"),
+                # 技术栈维度
+                tech_stack=tech_stack or [],
+                languages=languages or [],
+                project_scale=project_scale,
+                # code_fix（核心价值）
+                code_fix=sug.get("code_fix", {}),
+                verified=sug.get("verified", False),
+                # 问题上下文
+                issue_type=sug.get("type", ""),
+                # 标签
                 tags=[sug.get("category", ""), sug.get("type", "")],
                 metadata={
                     "id": sug.get("id"),
@@ -278,6 +415,261 @@ class DashVectorStore:
             docs.append(doc)
 
         return self.upsert_documents(docs)
+
+    def store_analysis_result(
+        self,
+        repo_url: str,
+        analysis_result: dict,
+    ) -> dict:
+        """
+        综合存储完整分析结果（多维度批量存储）。
+
+        存储内容：
+          1. 优化建议（suggestion）— 每条建议独立存储
+          2. 架构洞察（architecture）— concerns + patterns
+          3. 依赖风险（dependency）— 高危依赖信息
+          4. 技术栈特征（tech_stack）— 框架+语言+基础设施
+
+        Args:
+            repo_url: 仓库 URL
+            analysis_result: final_result 完整分析结果
+
+        Returns:
+            {"success": bool, "counts": {"suggestions": int, "architecture": int, ...}}
+        """
+        total_stored = 0
+        counts = {"suggestions": 0, "architecture": 0, "dependency": 0, "tech_stack": 0}
+
+        # 提取元数据（各类型文档共用）
+        tech_stack_data = analysis_result.get("tech_stack", {}) or {}
+        code_parser_data = analysis_result.get("code_parser", {}) or {}
+
+        # 解析技术栈
+        tech_stack = self._extract_tech_stack(tech_stack_data)
+        languages = tech_stack_data.get("languages", []) or []
+        if isinstance(languages, list) and languages and not isinstance(languages[0], str):
+            languages = [l.get("name", "") for l in languages if l.get("name")]
+
+        # 项目规模
+        total_files = code_parser_data.get("total_files", 0)
+        project_scale = self._calc_project_scale(total_files)
+
+        # ── 1. 存储优化建议 ──────────────────────────────────────
+        suggestion_data = analysis_result.get("suggestion", {}) or {}
+        suggestions = suggestion_data.get("suggestions", [])
+        if suggestions:
+            for sug in suggestions:
+                sug_copy = dict(sug)
+                sug_copy["_tech_stack"] = tech_stack
+                sug_copy["_languages"] = languages
+                sug_copy["_project_scale"] = project_scale
+            stored = self.store_suggestions(
+                repo_url=repo_url,
+                suggestions=suggestions,
+                category="suggestion",
+                tech_stack=tech_stack,
+                languages=languages,
+                project_scale=project_scale,
+            )
+            counts["suggestions"] = stored
+            total_stored += stored
+
+        # ── 2. 存储架构洞察 ─────────────────────────────────────
+        arch_data = analysis_result.get("architecture", {}) or {}
+        if arch_data:
+            arch_docs = self._extract_architecture_insights(
+                repo_url, arch_data, tech_stack, project_scale
+            )
+            if arch_docs:
+                stored = self.upsert_documents(arch_docs)
+                counts["architecture"] = stored
+                total_stored += stored
+
+        # ── 3. 存储依赖风险 ─────────────────────────────────────
+        dep_data = analysis_result.get("dependency", {}) or {}
+        if dep_data:
+            dep_docs = self._extract_dependency_insights(
+                repo_url, dep_data, tech_stack, languages, project_scale
+            )
+            if dep_docs:
+                stored = self.upsert_documents(dep_docs)
+                counts["dependency"] = stored
+                total_stored += stored
+
+        _logger.info(f"[DashVectorStore] 综合存储完成: repo={repo_url}, 共 {total_stored} 条")
+        return {"success": True, "counts": counts, "total": total_stored}
+
+    # ─── 辅助方法 ─────────────────────────────────────────────────────────────
+
+    def _extract_tech_stack(self, tech_stack_result: dict) -> list[str]:
+        """从 tech_stack_result 提取技术栈列表。"""
+        techs = []
+        # frameworks
+        frameworks = tech_stack_result.get("frameworks", []) or []
+        if frameworks and isinstance(frameworks[0], dict):
+            techs.extend([f.get("name", "") for f in frameworks if f.get("name")])
+        else:
+            techs.extend([str(f) for f in frameworks if f])
+
+        # infrastructure
+        infra = tech_stack_result.get("infrastructure", []) or []
+        if isinstance(infra, list) and infra:
+            if isinstance(infra[0], dict):
+                techs.extend([i.get("name", "") for i in infra if i.get("name")])
+            else:
+                techs.extend([str(i) for i in infra if i])
+
+        return [t for t in techs if t]
+
+    def _calc_project_scale(self, total_files: int) -> str:
+        """根据文件数量计算项目规模。"""
+        if total_files > 500:
+            return "large"
+        elif total_files > 100:
+            return "medium"
+        else:
+            return "small"
+
+    def _extract_architecture_insights(
+        self,
+        repo_url: str,
+        arch_data: dict,
+        tech_stack: list[str],
+        project_scale: str,
+    ) -> list[RAGDocument]:
+        """从架构分析结果中提取可存储的洞察。"""
+        docs = []
+
+        # 存储架构关注点
+        concerns = arch_data.get("concerns", []) or []
+        for concern in concerns:
+            if isinstance(concern, str):
+                title = concern[:50] if len(concern) > 50 else concern
+                content = concern
+            elif isinstance(concern, dict):
+                title = concern.get("title", concern.get("description", ""))[:50]
+                content = concern.get("description", str(concern))
+            else:
+                continue
+
+            if len(content) > 10:  # 过滤空内容
+                docs.append(RAGDocument(
+                    repo_url=repo_url,
+                    category="architecture",
+                    title=f"架构问题: {title}",
+                    content=content,
+                    priority="medium",
+                    tech_stack=tech_stack,
+                    project_scale=project_scale,
+                    issue_type="architecture",
+                    verified=True,
+                    tags=["architecture", "concern"],
+                    metadata={"source": "architecture_analysis"},
+                ))
+
+        # 存储架构模式
+        patterns = arch_data.get("patterns", []) or []
+        for pattern in patterns:
+            if isinstance(pattern, str):
+                title = pattern[:50]
+                content = pattern
+            elif isinstance(pattern, dict):
+                title = pattern.get("name", pattern.get("title", ""))[:50]
+                content = pattern.get("description", str(pattern))
+            else:
+                continue
+
+            if len(content) > 10:
+                docs.append(RAGDocument(
+                    repo_url=repo_url,
+                    category="architecture",
+                    title=f"架构模式: {title}",
+                    content=content,
+                    priority="low",
+                    tech_stack=tech_stack,
+                    project_scale=project_scale,
+                    issue_type="pattern",
+                    verified=True,
+                    tags=["architecture", "pattern"],
+                    metadata={"source": "architecture_analysis"},
+                ))
+
+        return docs
+
+    def _extract_dependency_insights(
+        self,
+        repo_url: str,
+        dep_data: dict,
+        tech_stack: list[str],
+        languages: list[str],
+        project_scale: str,
+    ) -> list[RAGDocument]:
+        """从依赖分析结果中提取可存储的洞察。"""
+        docs = []
+
+        # 存储高危依赖
+        risky_deps = dep_data.get("risky_deps", []) or []
+        if not risky_deps:
+            # 尝试从 deps 列表中筛选高危的
+            all_deps = dep_data.get("deps", []) or []
+            risky_deps = [
+                d for d in all_deps
+                if isinstance(d, dict) and d.get("risk_level") in ("high", "高危")
+            ]
+
+        for dep in risky_deps[:5]:  # 最多存5个
+            if isinstance(dep, dict):
+                name = dep.get("name", "unknown")
+                version = dep.get("version", "*")
+                risk = dep.get("risk_level", "unknown")
+                reason = dep.get("reason", dep.get("description", ""))
+
+                docs.append(RAGDocument(
+                    repo_url=repo_url,
+                    category="dependency",
+                    title=f"高危依赖: {name}@{version}",
+                    content=f"依赖 {name}@{version} 被标记为 {risk}。{reason}",
+                    priority="high" if risk in ("high", "高危") else "medium",
+                    tech_stack=tech_stack,
+                    languages=languages,
+                    project_scale=project_scale,
+                    issue_type="vulnerable_dependency",
+                    verified=True,
+                    tags=["dependency", "security", "vulnerability"],
+                    metadata={
+                        "package": name,
+                        "version": version,
+                        "risk_level": risk,
+                        "source": "dependency_analysis",
+                    },
+                ))
+
+        # 存储过时依赖警告
+        outdated_deps = dep_data.get("outdated_deps", []) or []
+        for dep in outdated_deps[:3]:
+            if isinstance(dep, dict):
+                name = dep.get("name", "")
+                suggestion = dep.get("suggestion", dep.get("alternative", ""))
+
+                docs.append(RAGDocument(
+                    repo_url=repo_url,
+                    category="dependency",
+                    title=f"过时依赖: {name}",
+                    content=f"依赖 {name} 已过时。迁移建议: {suggestion}",
+                    priority="medium",
+                    tech_stack=tech_stack,
+                    languages=languages,
+                    project_scale=project_scale,
+                    issue_type="outdated_dependency",
+                    verified=True,
+                    tags=["dependency", "outdated", "migration"],
+                    metadata={
+                        "package": name,
+                        "source": "dependency_analysis",
+                    },
+                ))
+
+        return docs
 
     # ─── 检索 ─────────────────────────────────────────────────────────────────
 
@@ -314,7 +706,12 @@ class DashVectorStore:
                 vector=query_vector,
                 topk=top_k,
                 filter=filter_expr,
-                output_fields=["repo_url", "category", "title", "content", "priority", "tags", "metadata"],
+                output_fields=[
+                    "repo_url", "category", "title", "content", "priority",
+                    "tech_stack", "languages", "project_scale",
+                    "code_fix", "verified", "issue_type",
+                    "tags", "metadata",
+                ],
             )
 
             results = []
