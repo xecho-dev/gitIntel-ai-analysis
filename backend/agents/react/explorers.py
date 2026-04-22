@@ -798,7 +798,6 @@ class BaseExplorerAgent:
         markers = []
         if "'" in evidence or '"' in evidence:
             # 可能是搜索词
-            import re
             quoted = re.findall(r"['\"]([^'\"]+)['\"]", evidence)
             markers.extend([m.lower() for m in quoted])
         if " in " in evidence_lower:
