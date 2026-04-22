@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "GitIntel Team", url: "https://gitintel.ai" }],
   creator: "GitIntel",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://gitintel.ai"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "http://gitintel.top"),
   alternates: {
     canonical: "/",
     languages: {

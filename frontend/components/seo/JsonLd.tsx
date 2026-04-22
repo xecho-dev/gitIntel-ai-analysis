@@ -20,7 +20,7 @@ function JsonLd({ data }: JsonLdProps) {
   );
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://gitintel.ai";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://gitintel.top";
 
 export function WebSiteJsonLd() {
   return (
