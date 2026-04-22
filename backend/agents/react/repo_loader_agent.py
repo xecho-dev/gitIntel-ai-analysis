@@ -302,7 +302,8 @@ class ReActRepoLoaderAgent:
         if info.get("description"):
             context_parts.append(f"- 描述: {info.get('description')}")
 
-        # 文件树
+        # 文件树 — 只展示顶层目录结构，不展开所有文件路径
+        # 完整文件树太大（如 facebook/react 有 7000+ 文件），直接塞入上下文会爆 token
         blobs = [t for t in tree if t.get("type") == "blob"]
         dirs = set()
         for t in blobs:
@@ -312,16 +313,20 @@ class ReActRepoLoaderAgent:
 
         context_parts.append(f"\n## 文件树概览\n")
         context_parts.append(f"- 总文件数: {len(blobs)}")
-        context_parts.append(f"- 顶层目录: {', '.join(sorted(dirs)[:15])}")
-        # 展示完整文件树，让 LLM 在每轮迭代时都能看到所有候选文件
-        context_parts.append(f"\n### 仓库文件清单（共 {len(blobs)} 个，全部可用）:\n")
-        for t in blobs:
+        context_parts.append(f"- 顶层目录: {', '.join(sorted(dirs)[:20])}")
+
+        # 按目录分组，只展示前 100 条完整路径示例（防止 token 爆炸）
+        # 已加载的完整路径在每轮迭代的 _build_iteration_context 中通过 loaded_paths 追踪
+        context_parts.append(f"\n### 文件路径示例（前 100 个）:\n")
+        for i, t in enumerate(blobs[:100]):
             context_parts.append(f"- {t['path']}")
+        if len(blobs) > 100:
+            context_parts.append(f"- ... 等共 {len(blobs)} 个文件（完整清单见已加载记录）")
 
         context_parts.append(
             f"\n## 任务\n"
-            f"请从上方文件清单中选取关键文件进行加载，理解其技术栈和架构。\n"
-            f"**重要**：只能加载文件清单中列出的文件，禁止猜测不在清单中的文件路径！\n"
+            f"请从上方文件路径示例中选取关键文件进行加载，理解其技术栈和架构。\n"
+            f"**重要**：只能加载文件路径示例中列出的文件，禁止猜测不在清单中的文件路径！\n"
             f"当已了解足够信息时，输出 is_sufficient=true 和总结。"
         )
 
@@ -345,9 +350,11 @@ class ReActRepoLoaderAgent:
         messages.append(HumanMessage(content=context))
 
         # LLM 生成工具调用
+        # strict=False 适配 DashScope 代码模型（不支持严格的 function.arguments JSON 校验）
         llm_with_tools = self.llm.bind_tools(
             REACT_TOOLS,
             parallel_tool_calls=False,  # 一次只调用一个工具（更可控）
+            strict=False,
         )
 
         response = await llm_with_tools.ainvoke(messages)

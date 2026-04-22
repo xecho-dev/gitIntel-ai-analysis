@@ -55,7 +55,7 @@ const initialState = {
   isAnalyzing: false,
   eventsVersion: 0,
   activeAgent: null,
-  repoUrl: "https://github.com/xecho-dev/test.git",
+  repoUrl: "https://github.com/facebook/react.git",
   agentEvents: {},
   finishedAgents: [],
   finalResult: null,

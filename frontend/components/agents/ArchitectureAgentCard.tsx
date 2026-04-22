@@ -129,7 +129,8 @@ export const ArchitectureAgentCard = () => {
                   ...(techData?.languages ?? []),
                   ...frameworkNames,
                 ]
-                  .filter((v, i, a) => a.indexOf(v) === i)
+                  .map((item) => typeof item === "string" ? item : (item as { name?: string }).name ?? JSON.stringify(item))
+                  .filter((v, i, a) => v && a.indexOf(v) === i)
                   .slice(0, 8)
                   .map((tag) => (
                     <span

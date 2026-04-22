@@ -204,9 +204,15 @@ class LLMWithTracking:
         self._callback = TokenTrackingCallback(agent_name=agent_name)
 
     def bind_tools(self, tools: list, **kwargs: Any):
-        """绑定工具（支持 function calling）。"""
+        """绑定工具（支持 function calling）。
+
+        Args:
+            tools: LangChain tool 列表
+            **kwargs: 透传给 bind_tools（如 strict=False 适配 DashScope 代码模型）
+        """
         if self._llm is None:
             raise RuntimeError("LLM 不可用")
+        kwargs.setdefault("strict", False)
         return self._llm.bind_tools(tools, **kwargs).with_config(
             callbacks=[self._callback]
         )

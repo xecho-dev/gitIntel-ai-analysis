@@ -278,9 +278,11 @@ class ReActSuggestionAgent:
             logger.debug(f"[ReActSuggestion] 迭代 {iteration} 开始，消息数={len(messages)}, 结构={msg_summary}, dangling={has_dangling}")
 
             # LLM 生成建议（带工具调用）
+            # strict=False 适配 DashScope 代码模型（不支持严格的 function.arguments JSON 校验）
             llm_with_tools = self.llm.bind_tools(
                 SUGGESTION_TOOLS,
                 parallel_tool_calls=True,  # 允许多个工具并行调用
+                strict=False,
             )
 
             try:
@@ -631,7 +633,11 @@ class ReActSuggestionAgent:
         # 技术栈
         if tech_stack_result and isinstance(tech_stack_result, dict):
             parts.append("【技术栈】")
-            languages = tech_stack_result.get('languages', []) or []
+            raw_langs = tech_stack_result.get('languages', []) or []
+            if raw_langs and isinstance(raw_langs[0], dict):
+                languages = [l.get('name', '') for l in raw_langs if l.get('name')]
+            else:
+                languages = [str(l) for l in raw_langs]
             parts.append(f"  语言: {', '.join(languages) if languages else '未知'}")
             # frameworks 可能是字符串列表（_rule_based_fallback）或对象列表（LLM 输出）
             raw_fw = tech_stack_result.get('frameworks', []) or []
@@ -641,7 +647,15 @@ class ReActSuggestionAgent:
                 fw_names = list(raw_fw) if isinstance(raw_fw, list) else []
             parts.append(f"  框架: {', '.join(fw_names) or '无'}")
             infra = tech_stack_result.get('infrastructure', []) or []
-            parts.append(f"  基础设施: {', '.join(infra) if infra else '无'}")
+            if infra and isinstance(infra[0], dict):
+                infra = [i.get('name', '') for i in infra if i.get('name')]
+            parts.append(f"  基础设施: {', '.join(str(i) for i in infra) if infra else '无'}")
+            dev_tools = tech_stack_result.get('dev_tools', []) or []
+            parts.append(f"  开发工具: {', '.join(str(d) for d in dev_tools) if dev_tools else '无'}")
+            deployment = tech_stack_result.get('deployment', []) or []
+            parts.append(f"  部署方式: {', '.join(str(d) for d in deployment) if deployment else '无'}")
+            config_files = tech_stack_result.get('config_files_found', []) or []
+            parts.append(f"  配置文件: {', '.join(str(c) for c in config_files) if config_files else '无'}")
             parts.append("")
 
         # 代码质量

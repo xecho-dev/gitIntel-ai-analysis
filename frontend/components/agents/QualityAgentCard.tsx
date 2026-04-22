@@ -138,10 +138,18 @@ export const QualityAgentCard = () => {
                       fontSize: 11,
                     }}
                     cursor={{ fill: "rgba(0,226,151,0.05)" }}
-                    formatter={(value, name) => [
-                      value,
-                      barData.find(d => d.name === name)?.label ?? name,
-                    ]}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length > 0) {
+                        const item = barData.find(d => d.value === payload[0].value);
+                        return (
+                          <div className="bg-[#1c2026] border border-white/5 rounded px-2 py-1.5 text-[11px]">
+                            <p className="text-slate-300 font-medium">{item?.name ?? '--'}（{item?.label ?? '--'}）</p>
+                            <p className="text-emerald-400">{payload[0].value}分</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
                   <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                     {barData.map((_, index) => (
@@ -153,6 +161,24 @@ export const QualityAgentCard = () => {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+
+              <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] text-slate-500">
+                <div className="bg-[#31353c] rounded p-2 text-center">
+                  <p className="uppercase text-slate-600 mb-1">复杂度</p>
+                  <p className={
+                    complexity === "Low" ? "text-emerald-400" :
+                    complexity === "High" ? "text-rose-400" : "text-yellow-400"
+                  }>{complexity}</p>
+                </div>
+                <div className="bg-[#31353c] rounded p-2 text-center">
+                  <p className="uppercase text-slate-600 mb-1">可维护性</p>
+                  <p className="text-slate-300">{maintainability}</p>
+                </div>
+                <div className="bg-[#31353c] rounded p-2 text-center">
+                  <p className="uppercase text-slate-600 mb-1">测试覆盖</p>
+                  <p className="text-emerald-400">{raw?.test_coverage ? `${raw.test_coverage}%` : "—"}</p>
+                </div>
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -174,23 +200,7 @@ export const QualityAgentCard = () => {
           )}
         </AnimatePresence>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] text-slate-500">
-        <div className="bg-[#31353c] rounded p-2 text-center">
-          <p className="uppercase text-slate-600 mb-1">复杂度</p>
-          <p className={
-            complexity === "Low" ? "text-emerald-400" :
-            complexity === "High" ? "text-rose-400" : "text-yellow-400"
-          }>{complexity}</p>
-        </div>
-        <div className="bg-[#31353c] rounded p-2 text-center">
-          <p className="uppercase text-slate-600 mb-1">可维护性</p>
-          <p className="text-slate-300">{maintainability}</p>
-        </div>
-        <div className="bg-[#31353c] rounded p-2 text-center">
-          <p className="uppercase text-slate-600 mb-1">测试覆盖</p>
-          <p className="text-emerald-400">{raw?.test_coverage ? `${raw.test_coverage}%` : "—"}</p>
-        </div>
-      </div>
+
       {(pyMetrics?.over_complexity_count ?? 0) > 0 && (
         <p className="mt-2 text-[10px] text-rose-400">
           ⚠ {pyMetrics?.over_complexity_count} 个高圈复杂度 Python 函数

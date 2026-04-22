@@ -10,7 +10,7 @@ import { analyzeRepo } from "@/lib/api";
 export const AnalyzeInput = ({ userId }: { userId: string }) => {
   const router = useRouter();
   const { data: session } = useSession();
-  const [localRepoUrl, setLocalRepoUrl] = useState("https://github.com/xecho-dev/test.git");
+  const [localRepoUrl, setLocalRepoUrl] = useState("https://github.com/facebook/react.git");
   const isAnalyzing = useAppStore((s) => s.isAnalyzing);
   const error = useAppStore((s) => s.error);
 
