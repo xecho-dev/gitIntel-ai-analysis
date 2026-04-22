@@ -545,13 +545,11 @@ class ReActRepoLoaderAgent:
         parts.append(f"- 已加载文件数: {len(result.loaded_paths)} / {self.MAX_FILES}")
         parts.append(f"- 迭代轮次: {iteration + 1} / {self.MAX_ITERATIONS}")
 
-        # 完整文件树：已加载的打勾，未加载的正常列出
-        if result.all_tree_paths:
-            loaded_set = set(result.loaded_paths)
-            parts.append(f"\n### 仓库文件清单（共 {len(result.all_tree_paths)} 个）:\n")
-            for path in result.all_tree_paths:
-                marker = "✅" if path in loaded_set else "⬜"
-                parts.append(f"- {marker} {path}")
+        # 仅列出已加载的文件，避免 token 浪费
+        if result.loaded_paths:
+            parts.append(f"\n### 已加载文件清单（共 {len(result.loaded_paths)} 个）:\n")
+            for path in result.loaded_paths:
+                parts.append(f"- {path}")
 
         # 错误反馈
         if result.errors:
