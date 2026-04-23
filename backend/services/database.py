@@ -917,7 +917,7 @@ def get_chat_messages(sb: Client, session_id: str) -> list[ChatMessage]:
         sb.table("chat_messages")
         .select("*")
         .eq("session_id", session_id)
-        .order("created_at", asc=True)
+        .order("created_at", desc=False)
         .execute()
     ).data
 

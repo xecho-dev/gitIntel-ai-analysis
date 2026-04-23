@@ -19,8 +19,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@@/*": ["src/.umi/*"],
-      "@gitintel/types": ["../packages/types/index.ts"],
-      "@gitintel/types/*": ["../packages/types/*"]
+      "@gitintel/types": ["../../packages/types/index.ts"],
+      "@gitintel/types/*": ["../../packages/types/*"]
     }
   },
   "include": ["src", ".umirc.ts"]

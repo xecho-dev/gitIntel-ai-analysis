@@ -64,6 +64,7 @@ jobs:
 
     outputs:
       frontend_image: ${{ steps.meta-frontend.outputs.tags }}
+      admin_image: ${{ steps.meta-admin.outputs.tags }}
       backend_image: ${{ steps.meta-backend.outputs.tags }}
       commit_short: ${{ steps.vars.outputs.commit_short }}
 
@@ -110,6 +111,26 @@ jobs:
             AUTH_GITHUB_SECRET=${{ secrets.AUTH_GITHUB_SECRET }}
             AUTH_SECRET=${{ secrets.AUTH_SECRET }}
             AUTH_URL=${{ secrets.FRONTEND_URL }}
+
+      # --- Admin 镜像构建 ---
+      - name: Extract metadata (admin)
+        id: meta-admin
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/admin
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push admin
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile.admin
+          tags: ${{ steps.meta-admin.outputs.tags }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/admin:buildcache
 
       # --- 后端镜像构建 ---
       - name: Extract metadata (backend)
@@ -212,6 +233,7 @@ jobs:
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           FRONTEND_IMAGE="${{ env.REGISTRY }}/${REPO_LOWER}/frontend:latest"
+          ADMIN_IMAGE="${{ env.REGISTRY }}/${REPO_LOWER}/admin:latest"
           BACKEND_IMAGE="${{ env.REGISTRY }}/${REPO_LOWER}/backend:latest"
           SERVER_USER="${{ secrets.SERVER_USER }}"
           SERVER_HOST="${{ secrets.SERVER_HOST }}"
@@ -270,6 +292,23 @@ jobs:
                 retries: 3
                 start_period: 40s
 
+            admin:
+              image: ADMIN_IMAGE_PLACEHOLDER
+              container_name: gitintel-admin
+              restart: unless-stopped
+              ports:
+                - "3001:3001"
+              environment:
+                NODE_ENV: production
+              networks:
+                - gitintel-net
+              healthcheck:
+                test: ["CMD", "curl", "-sf", "http://localhost:3001"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 30s
+
             backend:
               image: BACKEND_IMAGE_PLACEHOLDER
               container_name: gitintel-backend
@@ -303,6 +342,7 @@ jobs:
           DOCKERCOMPOSE
 
           sed -i "s|FRONTEND_IMAGE_PLACEHOLDER|$FRONTEND_IMAGE|g" docker-compose.yml
+          sed -i "s|ADMIN_IMAGE_PLACEHOLDER|$ADMIN_IMAGE|g" docker-compose.yml
           sed -i "s|BACKEND_IMAGE_PLACEHOLDER|$BACKEND_IMAGE|g" docker-compose.yml
           sed -i "s|FRONTEND_URL_PLACEHOLDER|$FRONTEND_URL|g" docker-compose.yml
           sed -i "s|AUTH_URL_PLACEHOLDER|$AUTH_URL|g" docker-compose.yml
@@ -330,12 +370,12 @@ jobs:
           sudo nginx -t && sudo nginx -s reload
           echo "Nginx 配置完成"
 
-          echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin
+          echo "REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin
           echo "正在拉取镜像..."
           docker-compose pull
           echo "正在清理旧容器..."
-          docker stop gitintel-frontend gitintel-backend 2>/dev/null || true
-          docker rm gitintel-frontend gitintel-backend 2>/dev/null || true
+          docker stop gitintel-frontend gitintel-admin gitintel-backend 2>/dev/null || true
+          docker rm gitintel-frontend gitintel-admin gitintel-backend 2>/dev/null || true
           echo "正在启动服务..."
           docker-compose up -d
           sleep 10
@@ -345,15 +385,18 @@ jobs:
           docker-compose ps
 
           FRONTEND_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' gitintel-frontend 2>/dev/null)
+          ADMIN_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' gitintel-admin 2>/dev/null)
           BACKEND_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' gitintel-backend 2>/dev/null)
           FRONTEND_HEALTH=${FRONTEND_HEALTH:-unknown}
+          ADMIN_HEALTH=${ADMIN_HEALTH:-unknown}
           BACKEND_HEALTH=${BACKEND_HEALTH:-unknown}
 
           echo ""
           echo "Frontend 健康状态: $FRONTEND_HEALTH"
+          echo "Admin   健康状态: $ADMIN_HEALTH"
           echo "Backend 健康状态: $BACKEND_HEALTH"
 
-          if [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$BACKEND_HEALTH" = "healthy" ]; then
+          if [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$ADMIN_HEALTH" = "healthy" ] && [ "$BACKEND_HEALTH" = "healthy" ]; then
             echo ""
             echo "✅ 部署成功！"
           else

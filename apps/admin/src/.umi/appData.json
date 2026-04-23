@@ -1,5 +1,5 @@
 {
-  "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+  "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
   "pkg": {
     "name": "@gitintel/admin",
     "private": true,
@@ -38,10 +38,10 @@
       "typescript": "~5.6.3"
     }
   },
-  "pkgPath": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/package.json",
+  "pkgPath": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/package.json",
   "plugins": {
     "@umijs/core/dist/service/servicePlugin": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "preset",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+core@4.6.42/node_modules/@umijs/core/dist/service/servicePlugin.js",
       "id": "@umijs/core/dist/service/servicePlugin",
@@ -54,7 +54,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "preset",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/index.js",
       "id": "@umijs/preset-umi",
@@ -62,12 +62,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 12
+        "register": 10
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/registerMethods": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/registerMethods.js",
       "id": "@umijs/preset-umi/dist/registerMethods",
@@ -76,7 +76,7 @@
       "time": {
         "hooks": {
           "onStart": [
-            0
+            14
           ]
         },
         "register": 3
@@ -84,7 +84,7 @@
       "enableBy": "register"
     },
     "@umijs/did-you-know": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+did-you-know@1.0.4/node_modules/@umijs/did-you-know/dist/plugin.js",
       "id": "@umijs/did-you-know",
@@ -101,7 +101,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/404/404": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/404/404.js",
       "id": "@umijs/preset-umi/dist/features/404/404",
@@ -113,12 +113,12 @@
             0
           ]
         },
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/aiDev/aiDev": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/aiDev/aiDev.js",
       "id": "@umijs/preset-umi/dist/features/aiDev/aiDev",
@@ -131,7 +131,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/appData/appData": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/appData/appData.js",
       "id": "@umijs/preset-umi/dist/features/appData/appData",
@@ -140,15 +140,15 @@
       "time": {
         "hooks": {
           "modifyAppData": [
-            8
+            7
           ]
         },
-        "register": 17
+        "register": 21
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/appData/umiInfo": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/appData/umiInfo.js",
       "id": "@umijs/preset-umi/dist/features/appData/umiInfo",
@@ -161,7 +161,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/check/check": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/check/check.js",
       "id": "@umijs/preset-umi/dist/features/check/check",
@@ -181,7 +181,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/check/babel722": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/check/babel722.js",
       "id": "@umijs/preset-umi/dist/features/check/babel722",
@@ -190,15 +190,15 @@
       "time": {
         "hooks": {
           "onCheck": [
-            0
+            1
           ]
         },
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/codeSplitting/codeSplitting": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/codeSplitting/codeSplitting.js",
       "id": "@umijs/preset-umi/dist/features/codeSplitting/codeSplitting",
@@ -206,12 +206,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/configPlugins/configPlugins": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/configPlugins/configPlugins.js",
       "id": "@umijs/preset-umi/dist/features/configPlugins/configPlugins",
@@ -223,7 +223,7 @@
             0
           ]
         },
-        "register": 7
+        "register": 8
       },
       "enableBy": "register"
     },
@@ -1053,8 +1053,8 @@
       "config": {
         "default": {
           "umi": "@@/exports",
-          "react": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react",
-          "react-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react-dom",
+          "react": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/node_modules/react",
+          "react-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/node_modules/react-dom",
           "react-router": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router@6.3.0_react@18.3.1/node_modules/react-router",
           "react-router-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router-dom@6.3.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/react-router-dom"
         }
@@ -1067,7 +1067,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/crossorigin/crossorigin": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/crossorigin/crossorigin.js",
       "id": "@umijs/preset-umi/dist/features/crossorigin/crossorigin",
@@ -1075,12 +1075,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand.js",
       "id": "@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand",
@@ -1092,12 +1092,12 @@
             0
           ]
         },
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/devTool/devTool": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/devTool/devTool.js",
       "id": "@umijs/preset-umi/dist/features/devTool/devTool",
@@ -1110,7 +1110,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker.js",
       "id": "@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker",
@@ -1118,12 +1118,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 62
+        "register": 68
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/esmi/esmi": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/esmi/esmi.js",
       "id": "@umijs/preset-umi/dist/features/esmi/esmi",
@@ -1131,12 +1131,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 46
+        "register": 34
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/exportStatic/exportStatic": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/exportStatic/exportStatic.js",
       "id": "@umijs/preset-umi/dist/features/exportStatic/exportStatic",
@@ -1149,7 +1149,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/favicons/favicons": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/favicons/favicons.js",
       "id": "@umijs/preset-umi/dist/features/favicons/favicons",
@@ -1161,12 +1161,12 @@
             0
           ]
         },
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/helmet/helmet": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/helmet/helmet.js",
       "id": "@umijs/preset-umi/dist/features/helmet/helmet",
@@ -1174,12 +1174,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/icons/icons": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/icons/icons.js",
       "id": "@umijs/preset-umi/dist/features/icons/icons",
@@ -1187,12 +1187,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/mock/mock": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mock/mock.js",
       "id": "@umijs/preset-umi/dist/features/mock/mock",
@@ -1204,11 +1204,11 @@
             1
           ]
         },
-        "register": 28
+        "register": 30
       }
     },
     "@umijs/preset-umi/dist/features/mpa/mpa": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mpa/mpa.js",
       "id": "@umijs/preset-umi/dist/features/mpa/mpa",
@@ -1221,7 +1221,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/okam/okam": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/okam/okam.js",
       "id": "@umijs/preset-umi/dist/features/okam/okam",
@@ -1233,7 +1233,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/overrides/overrides": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/overrides/overrides.js",
       "id": "@umijs/preset-umi/dist/features/overrides/overrides",
@@ -1241,12 +1241,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/phantomDependency/phantomDependency": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/phantomDependency/phantomDependency.js",
       "id": "@umijs/preset-umi/dist/features/phantomDependency/phantomDependency",
@@ -1254,12 +1254,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/polyfill/polyfill": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/polyfill/polyfill.js",
       "id": "@umijs/preset-umi/dist/features/polyfill/polyfill",
@@ -1275,7 +1275,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill.js",
       "id": "@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill",
@@ -1283,12 +1283,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/prepare/prepare": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/prepare/prepare.js",
       "id": "@umijs/preset-umi/dist/features/prepare/prepare",
@@ -1296,12 +1296,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/routePrefetch/routePrefetch": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routePrefetch/routePrefetch.js",
       "id": "@umijs/preset-umi/dist/features/routePrefetch/routePrefetch",
@@ -1309,12 +1309,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/stagewise/stagewise": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/stagewise/stagewise.js",
       "id": "@umijs/preset-umi/dist/features/stagewise/stagewise",
@@ -1322,12 +1322,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/terminal/terminal": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/terminal/terminal.js",
       "id": "@umijs/preset-umi/dist/features/terminal/terminal",
@@ -1335,12 +1335,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/tmpFiles/tmpFiles": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/tmpFiles/tmpFiles.js",
       "id": "@umijs/preset-umi/dist/features/tmpFiles/tmpFiles",
@@ -1348,12 +1348,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 4
+        "register": 3
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/clientLoader/clientLoader": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/clientLoader/clientLoader.js",
       "id": "@umijs/preset-umi/dist/features/clientLoader/clientLoader",
@@ -1361,12 +1361,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/routeProps/routeProps": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routeProps/routeProps.js",
       "id": "@umijs/preset-umi/dist/features/routeProps/routeProps",
@@ -1378,7 +1378,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/ssr/ssr": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/ssr/ssr.js",
       "id": "@umijs/preset-umi/dist/features/ssr/ssr",
@@ -1391,7 +1391,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/tmpFiles/configTypes": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/tmpFiles/configTypes.js",
       "id": "@umijs/preset-umi/dist/features/tmpFiles/configTypes",
@@ -1399,12 +1399,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 3
+        "register": 2
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/transform/transform": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/transform/transform.js",
       "id": "@umijs/preset-umi/dist/features/transform/transform",
@@ -1412,12 +1412,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 3
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/lowImport/lowImport": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/lowImport/lowImport.js",
       "id": "@umijs/preset-umi/dist/features/lowImport/lowImport",
@@ -1425,12 +1425,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 4
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/vite/vite": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/vite/vite.js",
       "id": "@umijs/preset-umi/dist/features/vite/vite",
@@ -1438,12 +1438,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/apiRoute/apiRoute": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/apiRoute/apiRoute.js",
       "id": "@umijs/preset-umi/dist/features/apiRoute/apiRoute",
@@ -1451,11 +1451,11 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 3
+        "register": 4
       }
     },
     "@umijs/preset-umi/dist/features/monorepo/redirect": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/monorepo/redirect.js",
       "id": "@umijs/preset-umi/dist/features/monorepo/redirect",
@@ -1463,12 +1463,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 16
+        "register": 18
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/test/test": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/test/test.js",
       "id": "@umijs/preset-umi/dist/features/test/test",
@@ -1476,11 +1476,11 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       }
     },
     "@umijs/preset-umi/dist/features/clickToComponent/clickToComponent": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/clickToComponent/clickToComponent.js",
       "id": "@umijs/preset-umi/dist/features/clickToComponent/clickToComponent",
@@ -1493,7 +1493,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/legacy/legacy": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/legacy/legacy.js",
       "id": "@umijs/preset-umi/dist/features/legacy/legacy",
@@ -1506,7 +1506,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose.js",
       "id": "@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose",
@@ -1519,7 +1519,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/webpack/webpack": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/webpack/webpack.js",
       "id": "@umijs/preset-umi/dist/features/webpack/webpack",
@@ -1531,7 +1531,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/swc/swc": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/swc/swc.js",
       "id": "@umijs/preset-umi/dist/features/swc/swc",
@@ -1548,7 +1548,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/ui/ui": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/ui/ui.js",
       "id": "@umijs/preset-umi/dist/features/ui/ui",
@@ -1560,7 +1560,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/mako/mako": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mako/mako.js",
       "id": "@umijs/preset-umi/dist/features/mako/mako",
@@ -1573,7 +1573,7 @@
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/utoopack/utoopack": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/utoopack/utoopack.js",
       "id": "@umijs/preset-umi/dist/features/utoopack/utoopack",
@@ -1581,11 +1581,11 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       }
     },
     "@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian.js",
       "id": "@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian",
@@ -1597,7 +1597,7 @@
       }
     },
     "@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad.js",
       "id": "@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad",
@@ -1605,11 +1605,11 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 18
+        "register": 23
       }
     },
     "@umijs/preset-umi/dist/features/forget/forget": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/forget/forget.js",
       "id": "@umijs/preset-umi/dist/features/forget/forget",
@@ -1617,12 +1617,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/bundler/bundler": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/bundler/bundler.js",
       "id": "@umijs/preset-umi/dist/features/bundler/bundler",
@@ -1635,7 +1635,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/build": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/build.js",
       "id": "@umijs/preset-umi/dist/commands/build",
@@ -1643,12 +1643,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 3
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/config/config": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/config/config.js",
       "id": "@umijs/preset-umi/dist/commands/config/config",
@@ -1656,12 +1656,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 35
+        "register": 31
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/dev/dev": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/dev/dev.js",
       "id": "@umijs/preset-umi/dist/commands/dev/dev",
@@ -1670,14 +1670,14 @@
       "time": {
         "hooks": {
           "modifyAppData": [
-            10
+            11
           ]
         },
-        "register": 34
+        "register": 22
       }
     },
     "@umijs/preset-umi/dist/commands/help": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/help.js",
       "id": "@umijs/preset-umi/dist/commands/help",
@@ -1690,7 +1690,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/lint": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/lint.js",
       "id": "@umijs/preset-umi/dist/commands/lint",
@@ -1703,7 +1703,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/setup": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/setup.js",
       "id": "@umijs/preset-umi/dist/commands/setup",
@@ -1711,12 +1711,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/deadcode": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/deadcode.js",
       "id": "@umijs/preset-umi/dist/commands/deadcode",
@@ -1724,12 +1724,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/version": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/version.js",
       "id": "@umijs/preset-umi/dist/commands/version",
@@ -1737,12 +1737,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/page": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/page.js",
       "id": "@umijs/preset-umi/dist/commands/generators/page",
@@ -1755,7 +1755,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/prettier": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/prettier.js",
       "id": "@umijs/preset-umi/dist/commands/generators/prettier",
@@ -1763,12 +1763,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/tsconfig": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/tsconfig.js",
       "id": "@umijs/preset-umi/dist/commands/generators/tsconfig",
@@ -1776,12 +1776,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/jest": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/jest.js",
       "id": "@umijs/preset-umi/dist/commands/generators/jest",
@@ -1789,12 +1789,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/tailwindcss": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/tailwindcss.js",
       "id": "@umijs/preset-umi/dist/commands/generators/tailwindcss",
@@ -1807,7 +1807,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/dva": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/dva.js",
       "id": "@umijs/preset-umi/dist/commands/generators/dva",
@@ -1815,12 +1815,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 3
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/component": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/component.js",
       "id": "@umijs/preset-umi/dist/commands/generators/component",
@@ -1828,12 +1828,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/mock": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/mock.js",
       "id": "@umijs/preset-umi/dist/commands/generators/mock",
@@ -1846,7 +1846,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/cypress": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/cypress.js",
       "id": "@umijs/preset-umi/dist/commands/generators/cypress",
@@ -1859,7 +1859,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/api": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/api.js",
       "id": "@umijs/preset-umi/dist/commands/generators/api",
@@ -1872,7 +1872,7 @@
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/generators/precommit": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/precommit.js",
       "id": "@umijs/preset-umi/dist/commands/generators/precommit",
@@ -1880,12 +1880,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/plugin": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/plugin.js",
       "id": "@umijs/preset-umi/dist/commands/plugin",
@@ -1893,12 +1893,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/verify-commit": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/verify-commit.js",
       "id": "@umijs/preset-umi/dist/commands/verify-commit",
@@ -1906,12 +1906,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/preview": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/preview.js",
       "id": "@umijs/preset-umi/dist/commands/preview",
@@ -1919,12 +1919,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 16
+        "register": 18
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/mfsu/mfsu": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/mfsu/mfsu.js",
       "id": "@umijs/preset-umi/dist/commands/mfsu/mfsu",
@@ -1937,7 +1937,7 @@
       "enableBy": "register"
     },
     "@umijs/plugin-run": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+plugin-run@4.6.42/node_modules/@umijs/plugin-run/dist/index.js",
       "id": "@umijs/plugin-run",
@@ -1945,12 +1945,12 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 5
+        "register": 2
       },
       "enableBy": "register"
     },
     "@umijs/core/dist/service/generatePlugin": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/admin",
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
       "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+core@4.6.42/node_modules/@umijs/core/dist/service/generatePlugin.js",
       "id": "@umijs/core/dist/service/generatePlugin",
@@ -1958,7 +1958,7 @@
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     }
@@ -2003,7 +2003,7 @@
       }
     ],
     "alias": {
-      "@": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src"
+      "@": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src"
     },
     "styles": [
       "@/src/tailwind.css"
@@ -2015,7 +2015,7 @@
       }
     }
   },
-  "mainConfigFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/.umirc.ts",
+  "mainConfigFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/.umirc.ts",
   "config": {
     "routeLoader": {
       "moduleType": "esm"
@@ -2035,12 +2035,12 @@
     "autoCSSModules": true,
     "alias": {
       "umi": "@@/exports",
-      "react": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react",
-      "react-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react-dom",
+      "react": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/node_modules/react",
+      "react-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/node_modules/react-dom",
       "react-router": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router@6.3.0_react@18.3.1/node_modules/react-router",
       "react-router-dom": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/react-router-dom@6.3.0_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/react-router-dom",
-      "@": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src",
-      "@@": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/.umi",
+      "@": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src",
+      "@@": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/.umi",
       "regenerator-runtime": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/regenerator-runtime@0.13.11/node_modules/regenerator-runtime"
     },
     "npmClient": "pnpm",
@@ -2097,7 +2097,7 @@
       "absPath": "/",
       "__content": "import React, { useState } from 'react';\nimport { Link, useLocation, Outlet } from 'umi';\nimport { Layout, Menu, Button, Dropdown, Avatar, Space, Typography, ConfigProvider, App as AntApp } from 'antd';\nimport zhCN from 'antd/locale/zh_CN';\nimport type { MenuProps } from 'antd';\nimport {\n  DashboardOutlined,\n  UserOutlined,\n  AuditOutlined,\n  SettingOutlined,\n  BellOutlined,\n  QuestionCircleOutlined,\n  BranchesOutlined,\n  HistoryOutlined,\n} from '@ant-design/icons';\nimport dayjs from 'dayjs';\nimport 'dayjs/locale/zh-cn';\n\ndayjs.locale('zh-cn');\n\nconst lightTheme: React.ComponentProps<typeof ConfigProvider>['theme'] = {\n  token: {\n    colorPrimary: '#3b82f6',\n    colorBgLayout: '#f5f5f5',\n    colorBgContainer: '#ffffff',\n    colorTextBase: '#1a1a1a',\n    colorTextSecondary: '#6b7280',\n    colorBorder: '#e5e7eb',\n    colorBorderSecondary: '#f3f4f6',\n    borderRadius: 8,\n    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',\n  },\n  components: {\n    Layout: {\n      siderBg: '#ffffff',\n      headerBg: '#ffffff',\n      bodyBg: '#f5f5f5',\n    },\n    Menu: {\n      itemBg: 'transparent',\n      itemSelectedBg: '#eff6ff',\n      itemSelectedColor: '#3b82f6',\n      itemHoverBg: '#f9fafb',\n    },\n    Card: {\n      colorBgContainer: '#ffffff',\n    },\n  },\n};\n\nconst { Sider, Content, Header } = Layout;\nconst { Text } = Typography;\n\nconst menuItems = [\n  { key: '/dashboard', icon: <DashboardOutlined />, label: <Link to=\"/dashboard\">全局概览</Link> },\n  { key: '/analysis-history', icon: <HistoryOutlined />, label: <Link to=\"/analysis-history\">分析记录</Link> },\n  { key: '/users', icon: <UserOutlined />, label: <Link to=\"/users\">用户管理</Link> },\n  { key: '/audit', icon: <AuditOutlined />, label: <Link to=\"/audit\">分析审计</Link> },\n  { key: '/settings', icon: <SettingOutlined />, label: <Link to=\"/settings\">系统设置</Link> },\n];\n\nconst userMenuItems: MenuProps['items'] = [\n  { key: 'profile', label: '个人中心' },\n  { key: 'settings', label: '账户设置' },\n  { type: 'divider' },\n  { key: 'logout', label: '退出登录', danger: true },\n];\n\nfunction AdminLayout() {\n  const location = useLocation();\n  const [collapsed, setCollapsed] = useState(false);\n\n  return (\n    <ConfigProvider theme={lightTheme} locale={zhCN}>\n      <AntApp>\n        <Layout style={{ minHeight: '100vh' }}>\n          <Sider\n            width={220}\n            collapsible\n            collapsed={collapsed}\n            onCollapse={setCollapsed}\n            style={{\n              background: '#ffffff',\n              boxShadow: '1px 0 0 #e5e7eb',\n              position: 'fixed',\n              left: 0,\n              top: 0,\n              bottom: 0,\n              zIndex: 100,\n              borderRight: '1px solid #e5e7eb',\n            }}\n          >\n            {/* Logo 区域 */}\n            <div\n              style={{\n                height: 64,\n                display: 'flex',\n                alignItems: 'center',\n                justifyContent: collapsed ? 'center' : 'flex-start',\n                padding: collapsed ? 0 : '0 20px',\n                borderBottom: '1px solid #f3f4f6',\n                cursor: 'pointer',\n              }}\n            >\n              <div\n                style={{\n                  width: 32,\n                  height: 32,\n                  borderRadius: 8,\n                  background: '#3b82f6',\n                  display: 'flex',\n                  alignItems: 'center',\n                  justifyContent: 'center',\n                }}\n              >\n                <BranchesOutlined style={{ color: '#fff', fontSize: 16 }} />\n              </div>\n              {!collapsed && (\n                <span\n                  style={{\n                    marginLeft: 10,\n                    color: '#1a1a1a',\n                    fontSize: 16,\n                    fontWeight: 700,\n                    letterSpacing: '-0.01em',\n                  }}\n                >\n                  GitIntel\n                </span>\n              )}\n            </div>\n\n            {/* 菜单 */}\n            <Menu\n              mode=\"inline\"\n              selectedKeys={[location.pathname]}\n              defaultSelectedKeys={['/dashboard']}\n              items={menuItems}\n              style={{\n                background: 'transparent',\n                border: 'none',\n                marginTop: 8,\n              }}\n              theme=\"light\"\n            />\n\n            {/* 底部信息 */}\n            {!collapsed && (\n              <div\n                style={{\n                  position: 'absolute',\n                  bottom: 0,\n                  left: 0,\n                  right: 0,\n                  padding: '16px 20px',\n                  borderTop: '1px solid #f3f4f6',\n                }}\n              >\n                <Space direction=\"vertical\" size={2}>\n                  <Text style={{ color: '#9ca3af', fontSize: 11 }}>\n                    GitIntel Admin v1.0.0\n                  </Text>\n                  <Text style={{ color: '#d1d5db', fontSize: 10 }}>\n                    Powered by AI\n                  </Text>\n                </Space>\n              </div>\n            )}\n          </Sider>\n\n          <Layout style={{ marginLeft: collapsed ? 64 : 220, transition: 'margin-left 0.2s' }}>\n            {/* 顶部导航栏 */}\n            <Header\n              style={{\n                background: '#ffffff',\n                padding: '0 24px',\n                display: 'flex',\n                alignItems: 'center',\n                justifyContent: 'flex-end',\n                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',\n                position: 'sticky',\n                top: 0,\n                zIndex: 99,\n                height: 60,\n                borderBottom: '1px solid #f3f4f6',\n              }}\n            >\n              <Space size={12}>\n                <Button type=\"text\" icon={<QuestionCircleOutlined />} />\n                <Button type=\"text\" icon={<BellOutlined />} badge={{ count: 3 }} />\n                <Dropdown menu={{ items: userMenuItems }} placement=\"bottomRight\">\n                  <Space style={{ cursor: 'pointer' }}>\n                    <Avatar size={32} style={{ background: '#3b82f6' }}>\n                      A\n                    </Avatar>\n                    <Text strong style={{ fontSize: 14 }}>Admin</Text>\n                  </Space>\n                </Dropdown>\n              </Space>\n            </Header>\n\n            {/* 内容区域 */}\n            <Content\n              style={{\n                padding: 24,\n                background: '#f5f5f5',\n                minHeight: 'calc(100vh - 60px)',\n              }}\n            >\n              <Outlet />\n            </Content>\n          </Layout>\n        </Layout>\n      </AntApp>\n    </ConfigProvider>\n  );\n}\n\nexport default AdminLayout;\nexport { AdminLayout };\n",
       "__isJSFile": true,
-      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/layouts/AdminLayout.tsx"
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/layouts/AdminLayout.tsx"
     },
     "2": {
       "path": "/",
@@ -2114,7 +2114,7 @@
       "absPath": "/dashboard",
       "__content": "import { useEffect, useState } from 'react';\nimport { Card, Statistic, Row, Col, Table, Tag, Progress, Timeline, Typography, Space } from 'antd';\nimport {\n  BarChartOutlined,\n  CheckCircleOutlined,\n  ClockCircleOutlined,\n  CloseCircleOutlined,\n  RiseOutlined,\n  ArrowUpOutlined,\n} from '@ant-design/icons';\nimport type { ColumnsType } from 'antd/es/table';\n\nconst { Title, Text } = Typography;\n\ninterface Analysis {\n  id: string;\n  repo: string;\n  owner: string;\n  status: 'completed' | 'pending' | 'failed' | 'running';\n  date: string;\n  score: number;\n}\n\nexport default function Dashboard() {\n  const [analyses] = useState<Analysis[]>([\n    { id: '1', repo: 'react', owner: 'facebook', status: 'completed', date: '2026-04-10', score: 92 },\n    { id: '2', repo: 'vscode', owner: 'microsoft', status: 'completed', date: '2026-04-11', score: 88 },\n    { id: '3', repo: 'next.js', owner: 'vercel', status: 'running', date: '2026-04-12', score: 0 },\n    { id: '4', repo: 'tensorflow', owner: 'tensorflow', status: 'pending', date: '2026-04-12', score: 0 },\n    { id: '5', repo: 'rust', owner: 'rust-lang', status: 'completed', date: '2026-04-09', score: 95 },\n    { id: '6', repo: 'golang', owner: 'golang', status: 'failed', date: '2026-04-08', score: 0 },\n  ]);\n\n  const statusMap = {\n    completed: { color: 'success', text: '已完成', icon: <CheckCircleOutlined /> },\n    pending: { color: 'processing', text: '排队中', icon: <ClockCircleOutlined /> },\n    running: { color: 'warning', text: '进行中', icon: <BarChartOutlined /> },\n    failed: { color: 'error', text: '失败', icon: <CloseCircleOutlined /> },\n  };\n\n  const columns: ColumnsType<Analysis> = [\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <Space>\n          <Text strong>{record.owner}/{record.repo}</Text>\n        </Space>\n      ),\n    },\n    {\n      title: '日期',\n      dataIndex: 'date',\n      key: 'date',\n    },\n    {\n      title: '状态',\n      dataIndex: 'status',\n      key: 'status',\n      render: (status: keyof typeof statusMap) => (\n        <Tag color={statusMap[status].color} icon={statusMap[status].icon}>\n          {statusMap[status].text}\n        </Tag>\n      ),\n    },\n    {\n      title: '质量评分',\n      dataIndex: 'score',\n      key: 'score',\n      render: (score: number) =>\n        score > 0 ? (\n          <Progress\n            percent={score}\n            size=\"small\"\n            strokeColor={score >= 90 ? '#52c41a' : score >= 70 ? '#1677ff' : '#faad14'}\n          />\n        ) : (\n          <Text type=\"secondary\">-</Text>\n        ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>仪表盘</Title>\n        <Text type=\"secondary\">查看系统运行状态和数据分析概览</Text>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">总分析数</Text>}\n              value={156}\n              prefix={<BarChartOutlined style={{ color: '#1677ff' }} />}\n              suffix={\n                <Text type=\"success\" style={{ fontSize: 14 }}>\n                  <ArrowUpOutlined /> 12%\n                </Text>\n              }\n            />\n          </Card>\n        </Col>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">已完成</Text>}\n              value={144}\n              prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}\n              valueStyle={{ color: '#52c41a' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">进行中</Text>}\n              value={8}\n              prefix={<ClockCircleOutlined style={{ color: '#faad14' }} />}\n              valueStyle={{ color: '#faad14' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={24} sm={12} lg={6}>\n          <Card bordered={false}>\n            <Statistic\n              title={<Text type=\"secondary\">失败</Text>}\n              value={4}\n              prefix={<CloseCircleOutlined style={{ color: '#ff4d4f' }} />}\n              valueStyle={{ color: '#ff4d4f' }}\n            />\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 图表和分析列表 */}\n      <Row gutter={[16, 16]}>\n        <Col xs={24} lg={16}>\n          <Card\n            title=\"最近分析\"\n            extra={<Text type=\"secondary\">共 {analyses.length} 条记录</Text>}\n            bordered={false}\n          >\n            <Table\n              dataSource={analyses}\n              columns={columns}\n              rowKey=\"id\"\n              pagination={false}\n              size=\"middle\"\n            />\n          </Card>\n        </Col>\n        <Col xs={24} lg={8}>\n          <Card title=\"系统状态\" bordered={false} style={{ marginBottom: 16 }}>\n            <Space direction=\"vertical\" style={{ width: '100%' }} size={16}>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>API 服务</Text>\n                  <Tag color=\"success\">在线</Tag>\n                </Row>\n              </div>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>数据库</Text>\n                  <Tag color=\"success\">正常</Tag>\n                </Row>\n              </div>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>AI 模型</Text>\n                  <Tag color=\"success\">就绪</Tag>\n                </Row>\n              </div>\n              <div>\n                <Row justify=\"space-between\">\n                  <Text>队列任务</Text>\n                  <Tag color=\"processing\">3 个运行中</Tag>\n                </Row>\n              </div>\n            </Space>\n          </Card>\n\n          <Card title=\"最近活动\" bordered={false}>\n            <Timeline\n              items={[\n                { color: 'green', children: '分析 facebook/react 完成' },\n                { color: 'green', children: '分析 microsoft/vscode 完成' },\n                { color: 'blue', children: '开始分析 vercel/next.js' },\n                { color: 'gray', children: '系统维护完成' },\n              ]}\n            />\n          </Card>\n        </Col>\n      </Row>\n    </div>\n  );\n}\n",
       "__isJSFile": true,
-      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/dashboard.tsx"
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/pages/dashboard.tsx"
     },
     "4": {
       "path": "/analysis-history",
@@ -2124,7 +2124,7 @@
       "absPath": "/analysis-history",
       "__content": "import { useState, useEffect, useCallback } from 'react';\nimport {\n  Card,\n  Table,\n  Tag,\n  Button,\n  Space,\n  Input,\n  Select,\n  DatePicker,\n  Row,\n  Col,\n  Typography,\n  Statistic,\n  Avatar,\n  Progress,\n  Modal,\n  message,\n  Badge,\n} from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  SearchOutlined,\n  ReloadOutlined,\n  DeleteOutlined,\n  EyeOutlined,\n  BarChartOutlined,\n  SafetyCertificateOutlined,\n  AlertOutlined,\n  UserOutlined,\n  StarOutlined,\n  ForkOutlined,\n  ClockCircleOutlined,\n} from '@ant-design/icons';\nimport dayjs from 'dayjs';\nimport { getFilteredHistory, deleteAnalysisRecord, getHistoryDetail } from '@/services/admin';\nimport type { AdminAnalysisItem, AdminHistoryListResponse, HistoryFilterParams } from '@/types';\nimport AnalysisDetailDrawer from '@/components/AnalysisDetailDrawer';\n\nconst { Title, Text } = Typography;\nconst { RangePicker } = DatePicker;\nconst { confirm } = Modal;\n\nconst riskLevelMap: Record<string, { color: string; text: string }> = {\n  高危: { color: '#ff4d4f', text: '高危' },\n  中等: { color: '#722ed1', text: '中等' },\n  极低: { color: '#52c41a', text: '极低' },\n};\n\nexport default function AnalysisHistoryPage() {\n  const [loading, setLoading] = useState(false);\n  const [data, setData] = useState<AdminHistoryListResponse | null>(null);\n  const [filters, setFilters] = useState<HistoryFilterParams>({\n    page: 1,\n    pageSize: 10,\n  });\n  const [detailOpen, setDetailOpen] = useState(false);\n  const [detailLoading, setDetailLoading] = useState(false);\n  const [detailData, setDetailData] = useState<import('@/types').AdminHistoryDetailResponse | null>(null);\n  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);\n\n  const fetchData = useCallback(async () => {\n    setLoading(true);\n    try {\n      const res = await getFilteredHistory(filters);\n      setData(res);\n    } catch (err) {\n      message.error('加载数据失败');\n    } finally {\n      setLoading(false);\n    }\n  }, [filters]);\n\n  useEffect(() => {\n    fetchData();\n  }, [fetchData]);\n\n  const handlePageChange = (page: number, pageSize: number) => {\n    setFilters((prev) => ({ ...prev, page, pageSize }));\n  };\n\n  const handleFilterChange = (key: keyof HistoryFilterParams, value: unknown) => {\n    setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));\n  };\n\n  const handleReset = () => {\n    setFilters({ page: 1, pageSize: 10 });\n  };\n\n  const handleDelete = (record: AdminAnalysisItem) => {\n    confirm({\n      title: '确认删除',\n      content: `确定要删除 \"${record.repo_name}\" 的分析记录吗？此操作不可恢复。`,\n      okText: '确认删除',\n      okType: 'danger',\n      cancelText: '取消',\n      onOk: async () => {\n        try {\n          await deleteAnalysisRecord(record.id);\n          message.success('删除成功');\n          fetchData();\n        } catch {\n          message.error('删除失败');\n        }\n      },\n    });\n  };\n\n  const handleViewDetail = async (record: AdminAnalysisItem) => {\n    setSelectedRecordId(record.id);\n    setDetailOpen(true);\n    setDetailData(null);\n    setDetailLoading(true);\n    try {\n      const res = await getHistoryDetail(record.id);\n      setDetailData(res);\n    } catch {\n      message.error('加载详情失败');\n      setDetailOpen(false);\n    } finally {\n      setDetailLoading(false);\n    }\n  };\n\n  const columns: ColumnsType<AdminAnalysisItem> = [\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <div>\n          <a\n            href={record.repo_url}\n            target=\"_blank\"\n            rel=\"noopener noreferrer\"\n            style={{ fontWeight: 500 }}\n          >\n            {record.repo_name}\n          </a>\n          <div>\n            <Tag icon={<ForkOutlined />} style={{ fontSize: 11, marginTop: 2 }}>\n              {record.branch || 'main'}\n            </Tag>\n            <Text type=\"secondary\" style={{ fontSize: 11, marginLeft: 6 }}>\n              <ClockCircleOutlined style={{ marginRight: 3 }} />\n              {dayjs(record.created_at).format('YYYY-MM-DD HH:mm')}\n            </Text>\n          </div>\n        </div>\n      ),\n    },\n    {\n      title: '用户',\n      key: 'user',\n      width: 160,\n      render: (_, record) => (\n        <Space>\n          <Avatar size=\"small\" style={{ background: '#1677ff', fontSize: 11 }}>\n            {record.user_id?.slice(0, 2).toUpperCase() || 'U'}\n          </Avatar>\n          <Text style={{ fontSize: 12 }} type=\"secondary\">{record.user_id?.slice(0, 8)}...</Text>\n        </Space>\n      ),\n    },\n    {\n      title: '健康分',\n      dataIndex: 'health_score',\n      key: 'health_score',\n      width: 120,\n      sorter: (a, b) => (a.health_score ?? 0) - (b.health_score ?? 0),\n      render: (score: number | null) => (\n        score !== null && score !== undefined ? (\n          <Progress\n            percent={score}\n            size=\"small\"\n            strokeColor={\n              score >= 85 ? '#52c41a' : score >= 60 ? '#faad14' : '#ff4d4f'\n            }\n            format={(p) => <span style={{ fontSize: 11 }}>{p}</span>}\n          />\n        ) : <Text type=\"secondary\">-</Text>\n      ),\n    },\n    {\n      title: '质量',\n      dataIndex: 'quality_score',\n      key: 'quality_score',\n      width: 70,\n      render: (score: string | null) => {\n        const scoreColors: Record<string, string> = {\n          'A+': '#52c41a', 'A': '#73d13d', 'B+': '#1677ff', 'B': '#4096ff',\n          'C': '#faad14', 'C-': '#ff7a45', 'D': '#ff4d4f',\n        };\n        return (\n          <Tag\n            color={scoreColors[score || ''] || 'default'}\n            style={{ fontWeight: 700, minWidth: 36, textAlign: 'center' }}\n          >\n            {score || '-'}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '风险',\n      dataIndex: 'risk_level',\n      key: 'risk_level',\n      width: 80,\n      render: (level: string | null) => {\n        const cfg = riskLevelMap[level || ''] || { color: '#8b909f', text: '-' };\n        return <Tag style={{ color: cfg.color, borderColor: cfg.color }}>{cfg.text}</Tag>;\n      },\n    },\n    {\n      title: '分析内容',\n      key: 'result_preview',\n      width: 200,\n      render: (_, record) => {\n        const result = record.result_data as Record<string, unknown> | undefined;\n        const agents = result ? Object.keys(result) : [];\n        return (\n          <Space wrap size={[4, 4]}>\n            {agents.map((a) => (\n              <Tag key={a} style={{ fontSize: 11 }}>{a}</Tag>\n            ))}\n            {!agents.length && <Text type=\"secondary\">-</Text>}\n          </Space>\n        );\n      },\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 120,\n      fixed: 'right',\n      render: (_, record) => (\n        <Space size=\"small\">\n          <Button\n            type=\"text\"\n            size=\"small\"\n            icon={<EyeOutlined />}\n            onClick={() => handleViewDetail(record)}\n          >\n            详情\n          </Button>\n          <Button\n            type=\"text\"\n            size=\"small\"\n            danger\n            icon={<DeleteOutlined />}\n            onClick={() => handleDelete(record)}\n          />\n        </Space>\n      ),\n    },\n  ];\n\n  const stats = data?.stats;\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>分析记录</Title>\n        <Text type=\"secondary\">查看所有用户的完整分析记录和结果</Text>\n      </div>\n\n      {/* 统计卡片 */}\n      {stats && (\n        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>\n          <Col xs={12} lg={6}>\n            <Card bordered={false} size=\"small\">\n              <Statistic\n                title={<Text type=\"secondary\">总分析次数</Text>}\n                value={stats.total_scans}\n                prefix={<BarChartOutlined style={{ color: '#1677ff' }} />}\n              />\n            </Card>\n          </Col>\n          <Col xs={12} lg={6}>\n            <Card bordered={false} size=\"small\">\n              <Statistic\n                title={<Text type=\"secondary\">平均健康分</Text>}\n                value={stats.avg_health_score}\n                suffix=\"%\"\n                prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />}\n                valueStyle={{ color: stats.avg_health_score >= 85 ? '#52c41a' : '#faad14' }}\n              />\n            </Card>\n          </Col>\n          <Col xs={12} lg={6}>\n            <Card bordered={false} size=\"small\">\n              <Statistic\n                title={<Text type=\"secondary\">高危项目</Text>}\n                value={stats.high_risk_count}\n                prefix={<AlertOutlined style={{ color: '#ff4d4f' }} />}\n                valueStyle={{ color: '#ff4d4f' }}\n              />\n            </Card>\n          </Col>\n          <Col xs={12} lg={6}>\n            <Card bordered={false} size=\"small\">\n              <Statistic\n                title={<Text type=\"secondary\">中等风险</Text>}\n                value={stats.medium_risk_count}\n                prefix={<AlertOutlined style={{ color: '#722ed1' }} />}\n                valueStyle={{ color: '#722ed1' }}\n              />\n            </Card>\n          </Col>\n        </Row>\n      )}\n\n      {/* 高级筛选器 */}\n      <Card bordered={false} style={{ marginBottom: 16 }}>\n        <Row gutter={[12, 12]} align=\"middle\">\n          <Col xs={24} sm={12} lg={6}>\n            <Input\n              placeholder=\"搜索仓库名...\"\n              prefix={<SearchOutlined />}\n              allowClear\n              value={filters.repo_name || ''}\n              onChange={(e) => handleFilterChange('repo_name', e.target.value || undefined)}\n            />\n          </Col>\n          <Col xs={12} sm={8} lg={3}>\n            <Select\n              placeholder=\"风险等级\"\n              allowClear\n              style={{ width: '100%' }}\n              value={filters.risk_level}\n              onChange={(v) => handleFilterChange('risk_level', v)}\n              options={[\n                { value: '高危', label: '高危' },\n                { value: '中等', label: '中等' },\n                { value: '极低', label: '极低' },\n              ]}\n            />\n          </Col>\n          <Col xs={12} sm={8} lg={4}>\n            <Select\n              placeholder=\"质量评分\"\n              allowClear\n              style={{ width: '100%' }}\n              value={filters.quality_score_max !== undefined ? String(filters.quality_score_max) : undefined}\n              onChange={(v) => {\n                if (v) {\n                  const maxMap: Record<string, number> = { 'A+': 100, 'A': 85, 'B+': 75, 'B': 65, 'C': 55, 'C-': 45, 'D': 0 };\n                  handleFilterChange('quality_score_max', maxMap[v]);\n                } else {\n                  handleFilterChange('quality_score_max', undefined);\n                }\n              }}\n              options={[\n                { value: 'A+', label: 'A+ (>=85)' },\n                { value: 'A', label: 'A (>=75)' },\n                { value: 'B+', label: 'B+ (>=65)' },\n                { value: 'B', label: 'B (>=55)' },\n                { value: 'C', label: 'C (>=45)' },\n                { value: 'D', label: 'D (<45)' },\n              ]}\n            />\n          </Col>\n          <Col xs={24} lg={8}>\n            <RangePicker\n              style={{ width: '100%' }}\n              value={[\n                filters.date_from ? dayjs(filters.date_from) : null,\n                filters.date_to ? dayjs(filters.date_to) : null,\n              ]}\n              onChange={(dates) => {\n                handleFilterChange('date_from', dates?.[0]?.format('YYYY-MM-DD') || undefined);\n                handleFilterChange('date_to', dates?.[1]?.format('YYYY-MM-DD') || undefined);\n              }}\n              placeholder={['开始日期', '结束日期']}\n            />\n          </Col>\n          <Col xs={24} lg={24}>\n            <Space style={{ float: 'right' }}>\n              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>\n              <Button type=\"primary\" icon={<SearchOutlined />} onClick={fetchData}>搜索</Button>\n            </Space>\n          </Col>\n        </Row>\n      </Card>\n\n      {/* 表格 */}\n      <Card bordered={false}>\n        <Table\n          dataSource={data?.items || []}\n          columns={columns}\n          rowKey=\"id\"\n          size=\"middle\"\n          loading={loading}\n          scroll={{ x: 900 }}\n          pagination={{\n            current: data?.page || 1,\n            pageSize: data?.pageSize || 10,\n            total: data?.total || 0,\n            showSizeChanger: true,\n            showQuickJumper: true,\n            showTotal: (total) => `共 ${total} 条记录`,\n            onChange: handlePageChange,\n          }}\n        />\n      </Card>\n\n      {/* 详情抽屉 */}\n      <AnalysisDetailDrawer\n        open={detailOpen}\n        loading={detailLoading}\n        data={detailData}\n        onClose={() => {\n          setDetailOpen(false);\n          setDetailData(null);\n          setSelectedRecordId(null);\n        }}\n      />\n    </div>\n  );\n}\n",
       "__isJSFile": true,
-      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/analysis-history.tsx"
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/pages/analysis-history.tsx"
     },
     "5": {
       "path": "/users",
@@ -2134,7 +2134,7 @@
       "absPath": "/users",
       "__content": "import { useState, useEffect, useCallback } from 'react';\nimport {\n  Table,\n  Tag,\n  Button,\n  Space,\n  Avatar,\n  Input,\n  Card,\n  Row,\n  Col,\n  Typography,\n  Modal,\n  message,\n  Spin,\n  Drawer,\n  Tooltip,\n} from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  UserAddOutlined,\n  SearchOutlined,\n  EditOutlined,\n  DeleteOutlined,\n  MailOutlined,\n  CheckCircleOutlined,\n  StopOutlined,\n  StarOutlined,\n  ForkOutlined,\n  HistoryOutlined,\n  EyeOutlined,\n} from '@ant-design/icons';\nimport dayjs from 'dayjs';\nimport { getUserList, updateUser } from '@/services/admin';\nimport type { AdminUserItem, AdminUserListResponse, AdminHistoryListResponse } from '@/types';\nimport AnalysisDetailDrawer from '@/components/AnalysisDetailDrawer';\n\nconst { Title, Text } = Typography;\nconst { confirm } = Modal;\n\nexport default function Users() {\n  const [loading, setLoading] = useState(false);\n  const [users, setUsers] = useState<AdminUserListResponse | null>(null);\n  const [search, setSearch] = useState('');\n  const [page, setPage] = useState(1);\n  const [pageSize, setPageSize] = useState(10);\n\n  // 用户分析历史抽屉\n  const [historyOpen, setHistoryOpen] = useState(false);\n  const [historyLoading, setHistoryLoading] = useState(false);\n  const [historyData, setHistoryData] = useState<{\n    user: AdminUserItem;\n    history: AdminHistoryListResponse;\n  } | null>(null);\n  const [historyPage, setHistoryPage] = useState(1);\n  const [historyPageSize, setHistoryPageSize] = useState(10);\n\n  // 详情抽屉\n  const [detailOpen, setDetailOpen] = useState(false);\n  const [detailLoading, setDetailLoading] = useState(false);\n  const [detailData, setDetailData] = useState<import('@/types').AdminHistoryDetailResponse | null>(null);\n\n  const fetchUsers = useCallback(async () => {\n    setLoading(true);\n    try {\n      const res = await getUserList({ page, pageSize, search: search || undefined });\n      setUsers(res);\n    } catch {\n      message.error('加载用户列表失败');\n    } finally {\n      setLoading(false);\n    }\n  }, [page, pageSize, search]);\n\n  useEffect(() => {\n    fetchUsers();\n  }, [fetchUsers]);\n\n  const handleSearch = () => {\n    setPage(1);\n    fetchUsers();\n  };\n\n  const handlePageChange = (newPage: number, newPageSize: number) => {\n    if (newPageSize !== pageSize) {\n      setPageSize(newPageSize);\n      setPage(1);\n    } else {\n      setPage(newPage);\n    }\n  };\n\n  const handleViewUserHistory = async (user: AdminUserItem) => {\n    setHistoryOpen(true);\n    setHistoryPage(1);\n    setHistoryPageSize(10);\n    setHistoryLoading(true);\n    try {\n      const { getUserHistory } = await import('@/services/admin');\n      const res = await getUserHistory(user.id, { page: 1, pageSize: 10 });\n      setHistoryData(res);\n    } catch {\n      message.error('加载用户分析历史失败');\n      setHistoryOpen(false);\n    } finally {\n      setHistoryLoading(false);\n    }\n  };\n\n  const handleHistoryPageChange = async (newPage: number, newPageSize: number) => {\n    if (!historyData) return;\n    setHistoryPage(newPage);\n    setHistoryPageSize(newPageSize);\n    setHistoryLoading(true);\n    try {\n      const { getUserHistory } = await import('@/services/admin');\n      const res = await getUserHistory(historyData.user.id, {\n        page: newPage,\n        pageSize: newPageSize,\n      });\n      setHistoryData(res);\n    } catch {\n      message.error('加载失败');\n    } finally {\n      setHistoryLoading(false);\n    }\n  };\n\n  const handleViewDetail = async (recordId: string) => {\n    setDetailOpen(true);\n    setDetailLoading(true);\n    setDetailData(null);\n    try {\n      const { getHistoryDetail } = await import('@/services/admin');\n      const res = await getHistoryDetail(recordId);\n      setDetailData(res);\n    } catch {\n      message.error('加载详情失败');\n      setDetailOpen(false);\n    } finally {\n      setDetailLoading(false);\n    }\n  };\n\n  const userColumns: ColumnsType<AdminUserItem> = [\n    {\n      title: '用户',\n      key: 'user',\n      render: (_, record) => (\n        <Space>\n          <Avatar\n            src={record.avatar_url || undefined}\n            style={{ background: '#1677ff' }}\n          >\n            {record.login?.slice(0, 1).toUpperCase() || 'U'}\n          </Avatar>\n          <div>\n            <Text strong>{record.login}</Text>\n            {record.name && (\n              <Text type=\"secondary\" style={{ display: 'block', fontSize: 11 }}>\n                {record.name}\n              </Text>\n            )}\n            {record.email && (\n              <Text type=\"secondary\" style={{ display: 'block', fontSize: 11 }}>\n                <MailOutlined style={{ marginRight: 3 }} />\n                {record.email}\n              </Text>\n            )}\n          </div>\n        </Space>\n      ),\n    },\n    {\n      title: 'GitHub 统计',\n      key: 'github_stats',\n      width: 180,\n      render: (_, record) => (\n        <Space size=\"middle\">\n          <Tooltip title=\"公开仓库\">\n            <span>\n              <ForkOutlined style={{ color: '#8b909f', marginRight: 3 }} />\n              <Text style={{ fontSize: 12 }}>{record.public_repos}</Text>\n            </span>\n          </Tooltip>\n          <Tooltip title=\"Followers\">\n            <span>\n              <StarOutlined style={{ color: '#8b909f', marginRight: 3 }} />\n              <Text style={{ fontSize: 12 }}>{record.followers}</Text>\n            </span>\n          </Tooltip>\n          <Tooltip title=\"Following\">\n            <span>\n              <Text style={{ fontSize: 12 }}>{record.following}</Text>\n              <Text type=\"secondary\" style={{ fontSize: 11 }}> following</Text>\n            </span>\n          </Tooltip>\n        </Space>\n      ),\n    },\n    {\n      title: '位置',\n      dataIndex: 'location',\n      key: 'location',\n      width: 120,\n      render: (loc: string | null) => loc || <Text type=\"secondary\">-</Text>,\n    },\n    {\n      title: '注册时间',\n      dataIndex: 'created_at',\n      key: 'created_at',\n      width: 160,\n      render: (ts: string) => (\n        <Text style={{ fontSize: 12 }} type=\"secondary\">\n          {dayjs(ts).format('YYYY-MM-DD HH:mm')}\n        </Text>\n      ),\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 180,\n      render: (_, record) => (\n        <Space size=\"small\">\n          <Button\n            type=\"text\"\n            size=\"small\"\n            icon={<HistoryOutlined />}\n            onClick={() => handleViewUserHistory(record)}\n          >\n            分析记录\n          </Button>\n          <Button type=\"text\" size=\"small\" icon={<EditOutlined />}>\n            编辑\n          </Button>\n        </Space>\n      ),\n    },\n  ];\n\n  const historyColumns: ColumnsType<import('@/types').AdminAnalysisItem> = [\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <div>\n          <a\n            href={record.repo_url}\n            target=\"_blank\"\n            rel=\"noopener noreferrer\"\n            style={{ fontWeight: 500 }}\n          >\n            {record.repo_name}\n          </a>\n          <div>\n            <Tag style={{ fontSize: 10 }}>{record.branch || 'main'}</Tag>\n            <Text type=\"secondary\" style={{ fontSize: 11 }}>\n              {dayjs(record.created_at).format('YYYY-MM-DD HH:mm')}\n            </Text>\n          </div>\n        </div>\n      ),\n    },\n    {\n      title: '健康分',\n      dataIndex: 'health_score',\n      key: 'health_score',\n      width: 80,\n      render: (s: number | null) => {\n        if (s === null) return <Text type=\"secondary\">-</Text>;\n        const color = s >= 85 ? '#52c41a' : s >= 60 ? '#faad14' : '#ff4d4f';\n        return <Tag color={s >= 85 ? 'success' : s >= 60 ? 'warning' : 'error'}>{s}%</Tag>;\n      },\n    },\n    {\n      title: '质量',\n      dataIndex: 'quality_score',\n      key: 'quality_score',\n      width: 60,\n      render: (score: string | null) => {\n        const sc: Record<string, string> = {\n          'A+': '#52c41a', 'A': '#73d13d', 'B+': '#1677ff', 'B': '#4096ff',\n          'C': '#faad14', 'C-': '#ff7a45', 'D': '#ff4d4f',\n        };\n        return (\n          <Tag style={{ color: sc[score || ''] || '#8b909f', fontWeight: 700 }}>\n            {score || '-'}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '风险',\n      dataIndex: 'risk_level',\n      key: 'risk_level',\n      width: 70,\n      render: (level: string | null) => {\n        const cfg: Record<string, { color: string; text: string }> = {\n          高危: { color: '#ff4d4f', text: '高危' },\n          中等: { color: '#722ed1', text: '中等' },\n          极低: { color: '#52c41a', text: '极低' },\n        };\n        const c = cfg[level || ''] || { color: '#8b909f', text: level || '-' };\n        return <Tag style={{ color: c.color, borderColor: c.color }}>{c.text}</Tag>;\n      },\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 80,\n      render: (_, record) => (\n        <Button\n          type=\"text\"\n          size=\"small\"\n          icon={<EyeOutlined />}\n          onClick={() => handleViewDetail(record.id)}\n        >\n          详情\n        </Button>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Row justify=\"space-between\" align=\"middle\">\n          <Col>\n            <Title level={4} style={{ margin: 0 }}>用户管理</Title>\n            <Text type=\"secondary\">管理系统用户和权限</Text>\n          </Col>\n          <Col>\n            <Button type=\"primary\" icon={<UserAddOutlined />}>\n              添加用户\n            </Button>\n          </Col>\n        </Row>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={16} style={{ marginBottom: 24 }}>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总用户数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#1677ff' }}>\n              {users?.total || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">活跃用户</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#52c41a' }}>\n              {users?.items.filter((u) => u.email).length || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总仓库数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#fa8c16' }}>\n              {users?.items.reduce((acc, u) => acc + u.public_repos, 0) || 0}\n            </div>\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Text type=\"secondary\">总关注者数</Text>\n            <div style={{ fontSize: 24, fontWeight: 600, color: '#722ed1' }}>\n              {users?.items.reduce((acc, u) => acc + u.followers, 0) || 0}\n            </div>\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 用户表格 */}\n      <Card bordered={false}>\n        <div style={{ marginBottom: 16 }}>\n          <Space>\n            <Input\n              placeholder=\"搜索用户名或邮箱...\"\n              prefix={<SearchOutlined />}\n              style={{ width: 300 }}\n              value={search}\n              onChange={(e) => setSearch(e.target.value)}\n              onPressEnter={handleSearch}\n              allowClear\n            />\n            <Button type=\"primary\" onClick={handleSearch}>搜索</Button>\n          </Space>\n        </div>\n        <Spin spinning={loading}>\n          <Table\n            dataSource={users?.items || []}\n            columns={userColumns}\n            rowKey=\"id\"\n            size=\"middle\"\n            pagination={{\n              current: page,\n              pageSize: pageSize,\n              total: users?.total || 0,\n              showSizeChanger: true,\n              showQuickJumper: true,\n              showTotal: (total) => `共 ${total} 条记录`,\n              onChange: handlePageChange,\n            }}\n          />\n        </Spin>\n      </Card>\n\n      {/* 用户分析历史抽屉 */}\n      <Drawer\n        title={\n          historyData ? (\n            <Space>\n              <Avatar\n                src={historyData.user.avatar_url || undefined}\n                style={{ background: '#1677ff' }}\n              >\n                {historyData.user.login?.slice(0, 1).toUpperCase()}\n              </Avatar>\n              <span>{historyData.user.login} 的分析记录</span>\n            </Space>\n          ) : '用户分析记录'\n        }\n        placement=\"right\"\n        width={900}\n        open={historyOpen}\n        onClose={() => setHistoryOpen(false)}\n        styles={{ body: { padding: 0 } }}\n      >\n        <Spin spinning={historyLoading} tip=\"加载中...\">\n          {historyData && (\n            <>\n              {/* 用户基本信息 */}\n              <div style={{ padding: '12px 24px', borderBottom: '1px solid #f3f4f6', background: '#fafafa' }}>\n                <Space wrap>\n                  {historyData.user.name && <Text>{historyData.user.name}</Text>}\n                  {historyData.user.email && (\n                    <Text type=\"secondary\">\n                      <MailOutlined style={{ marginRight: 4 }} />\n                      {historyData.user.email}\n                    </Text>\n                  )}\n                  {historyData.user.location && (\n                    <Text type=\"secondary\">{historyData.user.location}</Text>\n                  )}\n                  <Text type=\"secondary\">\n                    <ForkOutlined style={{ marginRight: 3 }} />\n                    {historyData.user.public_repos} 仓库\n                  </Text>\n                  <Text type=\"secondary\">\n                    <StarOutlined style={{ marginRight: 3 }} />\n                    {historyData.user.followers} followers\n                  </Text>\n                  {historyData.user.blog && (\n                    <a href={historyData.user.blog} target=\"_blank\" rel=\"noopener noreferrer\">\n                      <Text type=\"secondary\">{historyData.user.blog}</Text>\n                    </a>\n                  )}\n                </Space>\n                {/* 历史统计 */}\n                <Row gutter={[16, 8]} style={{ marginTop: 8 }}>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      总分析: <strong style={{ color: '#1677ff' }}>{historyData.history.stats.total_scans}</strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      平均健康分:{' '}\n                      <strong style={{ color: historyData.history.stats.avg_health_score >= 85 ? '#52c41a' : '#faad14' }}>\n                        {historyData.history.stats.avg_health_score}%\n                      </strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      高危: <strong style={{ color: '#ff4d4f' }}>{historyData.history.stats.high_risk_count}</strong>\n                    </Text>\n                  </Col>\n                  <Col>\n                    <Text type=\"secondary\" style={{ fontSize: 11 }}>\n                      中等: <strong style={{ color: '#722ed1' }}>{historyData.history.stats.medium_risk_count}</strong>\n                    </Text>\n                  </Col>\n                </Row>\n              </div>\n\n              {/* 历史表格 */}\n              <div style={{ padding: '16px 24px' }}>\n                <Table\n                  dataSource={historyData.history.items}\n                  columns={historyColumns}\n                  rowKey=\"id\"\n                  size=\"small\"\n                  pagination={{\n                    current: historyPage,\n                    pageSize: historyPageSize,\n                    total: historyData.history.total,\n                    showSizeChanger: true,\n                    showTotal: (total) => `共 ${total} 条记录`,\n                    onChange: handleHistoryPageChange,\n                  }}\n                />\n              </div>\n            </>\n          )}\n        </Spin>\n      </Drawer>\n\n      {/* 详情抽屉 */}\n      <AnalysisDetailDrawer\n        open={detailOpen}\n        loading={detailLoading}\n        data={detailData}\n        onClose={() => {\n          setDetailOpen(false);\n          setDetailData(null);\n        }}\n      />\n    </div>\n  );\n}\n",
       "__isJSFile": true,
-      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/users.tsx"
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/pages/users.tsx"
     },
     "6": {
       "path": "/audit",
@@ -2144,7 +2144,7 @@
       "absPath": "/audit",
       "__content": "import { useState, useEffect, useCallback } from 'react';\nimport {\n  Table,\n  Tag,\n  Input,\n  Card,\n  Row,\n  Col,\n  Typography,\n  Select,\n  DatePicker,\n  Space,\n  Button,\n  Statistic,\n  Avatar,\n  Modal,\n  message,\n  Spin,\n  Tooltip,\n} from 'antd';\nimport type { ColumnsType } from 'antd/es/table';\nimport {\n  SearchOutlined,\n  ReloadOutlined,\n  CheckCircleOutlined,\n  CloseCircleOutlined,\n  ClockCircleOutlined,\n  DownloadOutlined,\n  UserOutlined,\n  StarOutlined,\n  ForkOutlined,\n  EyeOutlined,\n  SafetyCertificateOutlined,\n  AlertOutlined,\n  BarChartOutlined,\n} from '@ant-design/icons';\nimport dayjs from 'dayjs';\nimport { getFilteredHistory, deleteAnalysisRecord, getHistoryDetail } from '@/services/admin';\nimport type { AdminAnalysisItem, AdminHistoryListResponse, HistoryFilterParams } from '@/types';\nimport AnalysisDetailDrawer from '@/components/AnalysisDetailDrawer';\n\nconst { Title, Text } = Typography;\nconst { RangePicker } = DatePicker;\nconst { confirm } = Modal;\n\nconst riskLevelMap: Record<string, { color: string; text: string }> = {\n  高危: { color: '#ff4d4f', text: '高危' },\n  中等: { color: '#722ed1', text: '中等' },\n  极低: { color: '#52c41a', text: '极低' },\n};\n\nexport default function Audit() {\n  const [loading, setLoading] = useState(false);\n  const [data, setData] = useState<AdminHistoryListResponse | null>(null);\n  const [filters, setFilters] = useState<HistoryFilterParams>({\n    page: 1,\n    pageSize: 10,\n  });\n\n  // 筛选器状态\n  const [searchText, setSearchText] = useState('');\n  const [riskLevel, setRiskLevel] = useState<string | undefined>();\n  const [qualityFilter, setQualityFilter] = useState<string | undefined>();\n  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);\n  const [selectedStatus, setSelectedStatus] = useState<string>('all');\n\n  // 详情抽屉\n  const [detailOpen, setDetailOpen] = useState(false);\n  const [detailLoading, setDetailLoading] = useState(false);\n  const [detailData, setDetailData] = useState<import('@/types').AdminHistoryDetailResponse | null>(null);\n\n  const fetchData = useCallback(async () => {\n    setLoading(true);\n    try {\n      const res = await getFilteredHistory(filters);\n      setData(res);\n    } catch {\n      message.error('加载数据失败');\n    } finally {\n      setLoading(false);\n    }\n  }, [filters]);\n\n  useEffect(() => {\n    fetchData();\n  }, [fetchData]);\n\n  const handleSearch = () => {\n    const newFilters: HistoryFilterParams = {\n      page: 1,\n      pageSize: filters.pageSize || 10,\n      search: searchText || undefined,\n      risk_level: riskLevel,\n      repo_name: searchText || undefined,\n      date_from: dateRange?.[0]?.format('YYYY-MM-DD'),\n      date_to: dateRange?.[1]?.format('YYYY-MM-DD'),\n    };\n\n    if (qualityFilter) {\n      const maxMap: Record<string, number> = {\n        'A+': 100, 'A': 85, 'B+': 75, 'B': 65, 'C': 55, 'C-': 45, 'D': 0,\n      };\n      newFilters.quality_score_max = maxMap[qualityFilter];\n    }\n\n    setFilters(newFilters);\n  };\n\n  const handleReset = () => {\n    setSearchText('');\n    setRiskLevel(undefined);\n    setQualityFilter(undefined);\n    setDateRange(null);\n    setSelectedStatus('all');\n    setFilters({ page: 1, pageSize: 10 });\n  };\n\n  const handlePageChange = (page: number, pageSize: number) => {\n    setFilters((prev) => ({ ...prev, page, pageSize }));\n  };\n\n  const handleViewDetail = async (record: AdminAnalysisItem) => {\n    setDetailOpen(true);\n    setDetailLoading(true);\n    setDetailData(null);\n    try {\n      const res = await getHistoryDetail(record.id);\n      setDetailData(res);\n    } catch {\n      message.error('加载详情失败');\n      setDetailOpen(false);\n    } finally {\n      setDetailLoading(false);\n    }\n  };\n\n  const handleDelete = (record: AdminAnalysisItem) => {\n    confirm({\n      title: '确认删除',\n      content: `确定要删除 \"${record.repo_name}\" 的分析记录吗？此操作不可恢复。`,\n      okText: '确认删除',\n      okType: 'danger',\n      cancelText: '取消',\n      onOk: async () => {\n        try {\n          await deleteAnalysisRecord(record.id);\n          message.success('删除成功');\n          fetchData();\n        } catch {\n          message.error('删除失败');\n        }\n      },\n    });\n  };\n\n  const stats = data?.stats;\n  const items = data?.items || [];\n\n  // 计算筛选后的统计数据（基于当前数据）\n  const filteredStats = {\n    total: items.length,\n    successCount: items.filter((i) => i.health_score !== null && i.health_score !== undefined).length,\n    failedCount: items.filter((i) => i.health_score === null).length,\n  };\n\n  const columns: ColumnsType<AdminAnalysisItem> = [\n    {\n      title: '时间',\n      dataIndex: 'created_at',\n      key: 'created_at',\n      width: 170,\n      render: (ts: string) => (\n        <Space>\n          <ClockCircleOutlined style={{ color: '#8b909f', fontSize: 12 }} />\n          <Text style={{ fontSize: 12 }}>{dayjs(ts).format('YYYY-MM-DD HH:mm:ss')}</Text>\n        </Space>\n      ),\n    },\n    {\n      title: '用户',\n      key: 'user',\n      width: 150,\n      render: (_, record) => (\n        <Space>\n          <Avatar\n            size=\"small\"\n            style={{ background: '#1677ff', fontSize: 10, minWidth: 24 }}\n          >\n            {record.user_id?.slice(0, 2).toUpperCase() || 'U'}\n          </Avatar>\n          <Tooltip title={record.user_id}>\n            <Text style={{ fontSize: 12 }} type=\"secondary\">\n              {record.user_id?.slice(0, 8)}...\n            </Text>\n          </Tooltip>\n        </Space>\n      ),\n    },\n    {\n      title: '仓库',\n      key: 'repo',\n      render: (_, record) => (\n        <div>\n          <a\n            href={record.repo_url}\n            target=\"_blank\"\n            rel=\"noopener noreferrer\"\n            style={{ fontWeight: 500, fontSize: 13 }}\n          >\n            {record.repo_name}\n          </a>\n          <div style={{ marginTop: 2 }}>\n            <Tag icon={<ForkOutlined />} style={{ fontSize: 10 }}>\n              {record.branch || 'main'}\n            </Tag>\n          </div>\n        </div>\n      ),\n    },\n    {\n      title: '健康分',\n      dataIndex: 'health_score',\n      key: 'health_score',\n      width: 90,\n      sorter: (a, b) => (a.health_score ?? 0) - (b.health_score ?? 0),\n      render: (score: number | null) => {\n        if (score === null || score === undefined) return <Text type=\"secondary\">-</Text>;\n        const color = score >= 85 ? '#52c41a' : score >= 60 ? '#faad14' : '#ff4d4f';\n        return (\n          <Tag color={score >= 85 ? 'success' : score >= 60 ? 'warning' : 'error'}>\n            {score}%\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '质量',\n      dataIndex: 'quality_score',\n      key: 'quality_score',\n      width: 70,\n      render: (score: string | null) => {\n        const scoreColors: Record<string, string> = {\n          'A+': '#52c41a', 'A': '#73d13d', 'B+': '#1677ff', 'B': '#4096ff',\n          'C': '#faad14', 'C-': '#ff7a45', 'D': '#ff4d4f',\n        };\n        return (\n          <Tag\n            style={{\n              color: scoreColors[score || ''] || '#8b909f',\n              borderColor: scoreColors[score || ''] || '#8b909f',\n              fontWeight: 700,\n              minWidth: 36,\n              textAlign: 'center',\n            }}\n          >\n            {score || '-'}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '风险等级',\n      dataIndex: 'risk_level',\n      key: 'risk_level',\n      width: 90,\n      render: (level: string | null) => {\n        const cfg = riskLevelMap[level || ''] || { color: '#8b909f', text: '-' };\n        return (\n          <Tag\n            style={{\n              color: cfg.color,\n              borderColor: cfg.color,\n              background: `${cfg.color}15`,\n            }}\n          >\n            {cfg.text}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '状态',\n      dataIndex: 'health_score',\n      key: 'status',\n      width: 90,\n      render: (score: number | null) => {\n        const cfg = score !== null\n          ? { color: 'success', text: '成功', icon: <CheckCircleOutlined /> }\n          : { color: 'error', text: '失败', icon: <CloseCircleOutlined /> };\n        return (\n          <Tag color={cfg.color} icon={cfg.icon}>\n            {cfg.text}\n          </Tag>\n        );\n      },\n    },\n    {\n      title: '操作',\n      key: 'action',\n      width: 140,\n      render: (_, record) => (\n        <Space size=\"small\">\n          <Button\n            type=\"text\"\n            size=\"small\"\n            icon={<EyeOutlined />}\n            onClick={() => handleViewDetail(record)}\n          >\n            详情\n          </Button>\n          <Button\n            type=\"text\"\n            size=\"small\"\n            danger\n            icon={<CloseCircleOutlined />}\n            onClick={() => handleDelete(record)}\n          />\n        </Space>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>分析审计</Title>\n        <Text type=\"secondary\">追踪所有用户操作和系统事件</Text>\n      </div>\n\n      {/* 统计卡片 */}\n      <Row gutter={16} style={{ marginBottom: 24 }}>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic\n              title={<Text type=\"secondary\">总分析次数</Text>}\n              value={stats?.total_scans || 0}\n              prefix={<BarChartOutlined style={{ color: '#1677ff' }} />}\n            />\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic\n              title={<Text type=\"secondary\">成功操作</Text>}\n              value={filteredStats.successCount}\n              prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />}\n              valueStyle={{ color: '#52c41a' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic\n              title={<Text type=\"secondary\">高危项目</Text>}\n              value={stats?.high_risk_count || 0}\n              prefix={<AlertOutlined style={{ color: '#ff4d4f' }} />}\n              valueStyle={{ color: '#ff4d4f' }}\n            />\n          </Card>\n        </Col>\n        <Col xs={12} lg={6}>\n          <Card bordered={false} size=\"small\">\n            <Statistic\n              title={<Text type=\"secondary\">中等风险</Text>}\n              value={stats?.medium_risk_count || 0}\n              prefix={<AlertOutlined style={{ color: '#722ed1' }} />}\n              valueStyle={{ color: '#722ed1' }}\n            />\n          </Card>\n        </Col>\n      </Row>\n\n      {/* 筛选器 */}\n      <Card bordered={false} style={{ marginBottom: 16 }}>\n        <Row gutter={[12, 12]} align=\"middle\">\n          <Col xs={24} sm={12} lg={6}>\n            <Input\n              placeholder=\"搜索仓库名...\"\n              prefix={<SearchOutlined />}\n              allowClear\n              value={searchText}\n              onChange={(e) => setSearchText(e.target.value)}\n              onPressEnter={handleSearch}\n            />\n          </Col>\n          <Col xs={12} sm={8} lg={3}>\n            <Select\n              placeholder=\"风险等级\"\n              allowClear\n              style={{ width: '100%' }}\n              value={riskLevel}\n              onChange={setRiskLevel}\n              options={[\n                { value: '高危', label: '高危' },\n                { value: '中等', label: '中等' },\n                { value: '极低', label: '极低' },\n              ]}\n            />\n          </Col>\n          <Col xs={12} sm={8} lg={4}>\n            <Select\n              placeholder=\"质量评分\"\n              allowClear\n              style={{ width: '100%' }}\n              value={qualityFilter}\n              onChange={setQualityFilter}\n              options={[\n                { value: 'A+', label: 'A+ (>=85)' },\n                { value: 'A', label: 'A (>=75)' },\n                { value: 'B+', label: 'B+ (>=65)' },\n                { value: 'B', label: 'B (>=55)' },\n                { value: 'C', label: 'C (>=45)' },\n                { value: 'D', label: 'D (<45)' },\n              ]}\n            />\n          </Col>\n          <Col xs={24} lg={8}>\n            <RangePicker\n              style={{ width: '100%' }}\n              value={dateRange}\n              onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}\n              placeholder={['开始日期', '结束日期']}\n            />\n          </Col>\n          <Col xs={24} lg={3}>\n            <Space style={{ width: '100%', justifyContent: 'flex-end' }}>\n              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>\n              <Button type=\"primary\" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>\n            </Space>\n          </Col>\n        </Row>\n      </Card>\n\n      {/* 日志表格 */}\n      <Card bordered={false}>\n        <Spin spinning={loading}>\n          <Table\n            dataSource={items}\n            columns={columns}\n            rowKey=\"id\"\n            size=\"middle\"\n            scroll={{ x: 1000 }}\n            pagination={{\n              current: data?.page || 1,\n              pageSize: data?.pageSize || 10,\n              total: data?.total || 0,\n              showSizeChanger: true,\n              showQuickJumper: true,\n              showTotal: (total) => `共 ${total} 条记录`,\n              onChange: handlePageChange,\n            }}\n          />\n        </Spin>\n      </Card>\n\n      {/* 详情抽屉 */}\n      <AnalysisDetailDrawer\n        open={detailOpen}\n        loading={detailLoading}\n        data={detailData}\n        onClose={() => {\n          setDetailOpen(false);\n          setDetailData(null);\n        }}\n      />\n    </div>\n  );\n}\n",
       "__isJSFile": true,
-      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/audit.tsx"
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/pages/audit.tsx"
     },
     "7": {
       "path": "/settings",
@@ -2154,7 +2154,7 @@
       "absPath": "/settings",
       "__content": "import { Card, Form, Input, Switch, Button, Space, Divider, Row, Col, Typography, Tabs, message, Alert } from 'antd';\nimport {\n  SaveOutlined,\n  GlobalOutlined,\n  LockOutlined,\n  BellOutlined,\n  RobotOutlined,\n  DatabaseOutlined,\n  ApiOutlined,\n} from '@ant-design/icons';\n\nconst { Title, Text } = Typography;\n\nexport default function Settings() {\n  const [form] = Form.useForm();\n\n  const handleSave = async () => {\n    try {\n      const values = await form.validateFields();\n      console.log('保存设置:', values);\n      message.success('设置已保存');\n    } catch (error) {\n      console.error('验证失败:', error);\n    }\n  };\n\n  const items = [\n    {\n      key: 'basic',\n      label: (\n        <span>\n          <GlobalOutlined />\n          基础配置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form form={form} layout=\"vertical\" initialValues={{\n            systemName: 'GitIntel Admin',\n            apiBaseUrl: 'http://localhost:8000',\n            timeout: 30,\n          }}>\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item\n                  name=\"systemName\"\n                  label=\"系统名称\"\n                  rules={[{ required: true, message: '请输入系统名称' }]}\n                >\n                  <Input placeholder=\"GitIntel Admin\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item\n                  name=\"apiBaseUrl\"\n                  label=\"API 基础地址\"\n                  rules={[{ required: true, message: '请输入 API 地址' }]}\n                >\n                  <Input placeholder=\"http://localhost:8000\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item name=\"timeout\" label=\"请求超时时间（秒）\">\n                  <Input type=\"number\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item name=\"maxRetries\" label=\"最大重试次数\">\n                  <Input type=\"number\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'features',\n      label: (\n        <span>\n          <RobotOutlined />\n          功能开关\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Form.Item\n              label={\n                <Space>\n                  <Text>启用分析功能</Text>\n                  <Text type=\"secondary\">(允许用户创建新的代码分析任务)</Text>\n                </Space>\n              }\n            >\n              <Switch defaultChecked />\n            </Form.Item>\n            <Divider />\n            <Form.Item\n              label={\n                <Space>\n                  <Text>启用通知</Text>\n                  <Text type=\"secondary\">(分析完成时发送邮件通知)</Text>\n                </Space>\n              }\n            >\n              <Switch defaultChecked />\n            </Form.Item>\n            <Divider />\n            <Form.Item\n              label={\n                <Space>\n                  <Text>启用审计日志</Text>\n                  <Text type=\"secondary\">(记录所有用户操作)</Text>\n                </Space>\n              }\n            >\n              <Switch defaultChecked />\n            </Form.Item>\n            <Divider />\n            <Form.Item\n              label={\n                <Space>\n                  <Text>调试模式</Text>\n                  <Text type=\"secondary\">(显示详细的调试信息)</Text>\n                </Space>\n              }\n            >\n              <Switch />\n            </Form.Item>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'security',\n      label: (\n        <span>\n          <LockOutlined />\n          安全设置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Alert\n              message=\"安全建议\"\n              description=\"建议定期更换密码，启用双因素认证，并限制 API 访问频率。\"\n              type=\"info\"\n              showIcon\n              style={{ marginBottom: 24 }}\n            />\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"会话超时（分钟）\">\n                  <Input type=\"number\" placeholder=\"60\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"密码最小长度\">\n                  <Input type=\"number\" placeholder=\"8\" />\n                </Form.Item>\n              </Col>\n            </Row>\n            <Form.Item label=\"启用双因素认证\">\n              <Space direction=\"vertical\">\n                <Switch />\n                <Text type=\"secondary\">启用后，用户登录时需要输入手机验证码</Text>\n              </Space>\n            </Form.Item>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'notifications',\n      label: (\n        <span>\n          <BellOutlined />\n          通知设置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Form.Item label=\"邮件通知\">\n              <Switch defaultChecked />\n            </Form.Item>\n            <Form.Item label=\"SMTP 服务器\">\n              <Input placeholder=\"smtp.example.com\" />\n            </Form.Item>\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"邮箱地址\">\n                  <Input placeholder=\"noreply@example.com\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"邮箱密码\">\n                  <Input.Password placeholder=\"••••••••\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'database',\n      label: (\n        <span>\n          <DatabaseOutlined />\n          数据库\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Alert\n            message=\"数据库配置\"\n            description=\"修改数据库配置前请确保服务已停止，避免数据丢失。\"\n            type=\"warning\"\n            showIcon\n            style={{ marginBottom: 24 }}\n          />\n          <Form layout=\"vertical\">\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"数据库类型\">\n                  <Input value=\"PostgreSQL\" disabled />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"连接地址\">\n                  <Input placeholder=\"localhost:5432\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"数据库名称\">\n                  <Input placeholder=\"gitintel\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"连接池大小\">\n                  <Input type=\"number\" placeholder=\"10\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n    {\n      key: 'api',\n      label: (\n        <span>\n          <ApiOutlined />\n          API 配置\n        </span>\n      ),\n      children: (\n        <Card bordered={false}>\n          <Form layout=\"vertical\">\n            <Row gutter={24}>\n              <Col span={12}>\n                <Form.Item label=\"AI 模型\">\n                  <Input placeholder=\"gpt-4\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"API Key\">\n                  <Input.Password placeholder=\"sk-...\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"最大 Token 数\">\n                  <Input type=\"number\" placeholder=\"4000\" />\n                </Form.Item>\n              </Col>\n              <Col span={12}>\n                <Form.Item label=\"Temperature\">\n                  <Input type=\"number\" placeholder=\"0.7\" step=\"0.1\" />\n                </Form.Item>\n              </Col>\n            </Row>\n          </Form>\n        </Card>\n      ),\n    },\n  ];\n\n  return (\n    <div>\n      {/* 页面标题 */}\n      <div style={{ marginBottom: 24 }}>\n        <Title level={4} style={{ margin: 0 }}>系统设置</Title>\n        <Text type=\"secondary\">配置系统参数和功能选项</Text>\n      </div>\n\n      <Tabs\n        tabPosition=\"left\"\n        style={{ minHeight: 600 }}\n        items={items}\n        tabBarStyle={{ width: 180 }}\n      />\n\n      <div style={{ marginTop: 24, textAlign: 'right' }}>\n        <Space>\n          <Button>重置</Button>\n          <Button type=\"primary\" icon={<SaveOutlined />} onClick={handleSave}>\n            保存设置\n          </Button>\n        </Space>\n      </div>\n    </div>\n  );\n}\n",
       "__isJSFile": true,
-      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/src/pages/settings.tsx"
+      "__absFile": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/src/pages/settings.tsx"
     }
   },
   "apiRoutes": {},
@@ -2174,11 +2174,11 @@
   },
   "react": {
     "version": "18.3.1",
-    "path": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react"
+    "path": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/node_modules/react"
   },
   "react-dom": {
     "version": "18.3.1",
-    "path": "/Users/xecho/Downloads/gitintel-ai-analysis/admin/node_modules/react-dom"
+    "path": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin/node_modules/react-dom"
   },
   "appJS": null,
   "locale": "zh-CN",
@@ -2187,7 +2187,7 @@
   "overridesCSS": [],
   "bundler": "webpack",
   "git": {
-    "originUrl": "https://github.com/xecho-dev/gitIntel-ai-analysis.git"
+    "originUrl": "git@github.com:xecho-dev/gitIntel-ai-analysis.git"
   },
   "framework": "react",
   "typescript": {
@@ -2197,5 +2197,5 @@
   "faviconFiles": [],
   "port": 3001,
   "host": "0.0.0.0",
-  "ip": "192.168.20.122"
+  "ip": "192.168.1.4"
 }

@@ -12,7 +12,11 @@
     "test:coverage": "pnpm exec jest --coverage"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.12.25",
+    "@assistant-ui/react-markdown": "^0.12.9",
     "@auth/core": "^0.38.0",
+    "@gitintel/assistant-ui": "workspace:*",
+    "@gitintel/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.49.0",
     "clsx": "^2.1.1",
@@ -21,11 +25,14 @@
     "motion": "^12.23.24",
     "next": "^15.0.0",
     "next-auth": "5.0.0-beta.25",
+    "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-resizable-panels": "^4.10.0",
     "recharts": "^3.8.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
-    "zustand": "^5.0.0"
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

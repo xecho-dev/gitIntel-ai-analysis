@@ -30,6 +30,18 @@ services:
       NODE_ENV: production
       AUTH_TRUST_HOST: "true"
 
+  # ── Admin — Umi.js ───────────────────────────────────────────
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: gitintel-admin
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+
   # ── Backend — FastAPI Agent Layer ────────────────────────────
   backend:
     build:

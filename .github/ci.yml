@@ -21,14 +21,14 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
-  # ==================== 前端 CI ====================
+  # ==================== Frontend CI ====================
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: frontend
+        working-directory: apps/frontend
 
     steps:
       - name: Checkout code
@@ -63,7 +63,39 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key
 
-  # ==================== 后端 CI ====================
+  # ==================== Admin CI ====================
+  admin-ci:
+    name: Admin CI
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/admin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+  # ==================== Backend CI ====================
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest
@@ -110,7 +142,7 @@ jobs:
   build-check:
     name: Build Check
     runs-on: ubuntu-latest
-    needs: [frontend-ci, backend-ci]
+    needs: [frontend-ci, admin-ci, backend-ci]
 
     steps:
       - name: Checkout code
@@ -149,8 +181,13 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-key \
             .
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+      - name: Build admin Docker image
+        run: |
+          docker build \
+            --file Dockerfile.admin \
+            --tag gitintel-admin:build-test \
+            .
 
       - name: Build backend Docker image
         run: |
@@ -162,4 +199,5 @@ jobs:
       - name: Docker images health check
         run: |
           docker images gitintel-frontend:build-test
+          docker images gitintel-admin:build-test
           docker images gitintel-backend:build-test

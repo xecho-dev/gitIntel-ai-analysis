@@ -3,13 +3,11 @@ description: 项目整体架构与目录结构规范
 alwaysApply: true
 ---
 
-# GitIntel 项目架构规范
-
 ## 技术架构
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        前端 (Next.js)                        │
+│                   前端 (Next.js)                             │
 │              Next.js App Router + Tailwind CSS               │
 │                     Zustand 状态管理                         │
 │                      端口: 3000                              │
@@ -17,8 +15,8 @@ alwaysApply: true
                           │ HTTP / SSE 流式响应
                           ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                  BFF 层 (Next.js Route Handler)               │
-│               frontend/app/api/**/route.ts                    │
+│                   BFF 层 (Next.js Route Handler)             │
+│               apps/frontend/app/api/**/route.ts              │
 └─────────────────────────┬────────────────────────────────────┘
                           │ HTTP
                           ▼
@@ -34,54 +32,70 @@ alwaysApply: true
 ```
 gitintel-ai-analysis/          # 根目录 (pnpm workspace)
 │
-├── frontend/                   # Next.js 前端（独立部署到 Vercel）
-│   ├── app/                    # Next.js App Router
-│   │   ├── page.tsx            # 主页面
-│   │   ├── layout.tsx          # 根布局
-│   │   ├── globals.css
-│   │   └── api/                # BFF Route Handler（代理 Agent 层）
-│   │       └── analyze/
-│   │           └── route.ts
-│   ├── components/             # React 组件
-│   │   ├── agents/             # Agent 结果展示组件
-│   │   └── ui/                 # 通用 UI 组件
-│   ├── lib/                    # 前端工具库
-│   │   ├── utils.ts
-│   │   └── api.ts              # 统一 API 调用封装（含 SSE 消费）
-│   ├── store/                  # Zustand 状态管理
-│   │   └── useAppStore.ts
-│   ├── package.json
-│   ├── tailwind.config.ts
-│   ├── next.config.ts
-│   └── tsconfig.json
+├── apps/                       # 应用层（各服务独立部署）
+│   ├── frontend/               # Next.js 前端（独立部署）
+│   │   ├── app/               # Next.js App Router
+│   │   │   ├── page.tsx       # 主页面
+│   │   │   ├── layout.tsx     # 根布局
+│   │   │   ├── globals.css
+│   │   │   └── api/           # BFF Route Handler（代理 Agent 层）
+│   │   │       └── analyze/
+│   │   │           └── route.ts
+│   │   ├── components/        # React 组件
+│   │   │   ├── agents/        # Agent 结果展示组件
+│   │   │   └── ui/            # 通用 UI 组件
+│   │   ├── lib/               # 前端工具库
+│   │   │   ├── utils.ts
+│   │   │   └── api.ts         # 统一 API 调用封装（含 SSE 消费）
+│   │   ├── store/             # Zustand 状态管理
+│   │   │   └── useAppStore.ts
+│   │   ├── package.json
+│   │   ├── tailwind.config.ts
+│   │   ├── next.config.ts
+│   │   └── tsconfig.json
+│   │
+│   └── admin/                 # Umi.js 管理后台（独立部署）
+│       ├── src/               # 源码
+│       ├── package.json
+│       └── .umirc.ts
 │
 ├── backend/                    # FastAPI Agent 层（独立部署）
-│   ├── agents/                 # Agent 实现
+│   ├── agents/                # Agent 实现
 │   │   ├── __init__.py
-│   │   ├── base_agent.py       # Agent 基类
-│   │   ├── architecture.py      # 架构分析 Agent
-│   │   ├── quality.py           # 代码质量 Agent
-│   │   ├── dependency.py        # 依赖风险 Agent
-│   │   └── optimization.py     # 优化建议 Agent
-│   ├── graph/                  # LangGraph 工作流
-│   │   ├── state.py             # SharedState 定义
-│   │   └── analysis_graph.py   # 主工作流编排
-│   ├── tools/                  # Agent 可用工具
-│   ├── schemas/                # Pydantic 数据模型
+│   │   ├── base_agent.py     # Agent 基类
+│   │   ├── architecture.py   # 架构分析 Agent
+│   │   ├── quality.py        # 代码质量 Agent
+│   │   ├── dependency.py     # 依赖风险 Agent
+│   │   └── optimization.py   # 优化建议 Agent
+│   ├── graph/                 # LangGraph 工作流
+│   │   ├── state.py          # SharedState 定义
+│   │   └── analysis_graph.py # 主工作流编排
+│   ├── tools/                 # Agent 可用工具
+│   ├── schemas/               # Pydantic 数据模型
 │   │   ├── request.py
 │   │   └── response.py
-│   ├── main.py                 # FastAPI 入口
-│   ├── pyproject.toml          # Python 依赖管理
+│   ├── main.py               # FastAPI 入口
+│   ├── pyproject.toml        # Python 依赖管理
 │   └── requirements.txt
 │
-├── packages/
-│   └── types/                  # 共享类型（前后端共用）
-│       └── index.ts            # AgentEvent, AnalyzeRequest, Result 等
+├── packages/                   # 共享包（workspace）
+│   ├── types/                 # 共享类型（前后端共用）
+│   │   └── index.ts          # AgentEvent, AnalyzeRequest, Result 等
+│   └── assistant-ui/          # Assistant UI 组件库
 │
-├── pnpm-workspace.yaml         # pnpm workspace 配置
-├── turbo.json                  # Turborepo 流水线配置
-├── package.json                # 根 package.json（workspace 元信息）
-└── tsconfig.json                # 根 tsconfig（base 配置）
+├── deploy/                     # 部署配置
+│   ├── nginx.conf            # Nginx 反向代理配置
+│   ├── init-server.sh        # 服务器初始化脚本
+│   └── DEPLOY.md             # 部署文档
+│
+├── Dockerfile.frontend        # Frontend 构建镜像
+├── Dockerfile.admin           # Admin 构建镜像
+├── Dockerfile.backend         # Backend 构建镜像
+├── docker-compose.yml         # 本地开发 / 生产部署
+├── pnpm-workspace.yaml        # pnpm workspace 配置
+├── turbo.json                 # Turborepo 流水线配置
+├── package.json               # 根 package.json（workspace 元信息）
+└── tsconfig.json             # 根 tsconfig（base 配置）
 ```
 
 ## 共享类型规范
@@ -104,6 +118,9 @@ pnpm install
 
 # 启动前端开发服务器（端口 3000）
 pnpm dev:frontend
+
+# 启动管理后台开发服务器（端口 3001）
+pnpm dev:admin
 
 # 启动后端开发服务器（端口 8000）
 pnpm dev:backend

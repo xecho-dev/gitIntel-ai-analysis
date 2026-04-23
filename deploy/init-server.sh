@@ -114,6 +114,7 @@ if command -v firewall-cmd &> /dev/null; then
     firewall-cmd --permanent --add-port=80/tcp
     firewall-cmd --permanent --add-port=443/tcp
     firewall-cmd --permanent --add-port=3000/tcp
+    firewall-cmd --permanent --add-port=3001/tcp
     firewall-cmd --permanent --add-port=8000/tcp
 
     # 重载防火墙
@@ -126,6 +127,7 @@ elif command -v ufw &> /dev/null; then
         "80/tcp"
         "443/tcp"
         "3000/tcp"
+        "3001/tcp"
         "8000/tcp"
     )
     for rule in "${UFW_rules[@]}"; do
@@ -170,6 +172,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  admin:
+    image: ghcr.io/YOUR_USERNAME/gitintel-ai-analysis/admin:latest
+    container_name: gitintel-admin
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+    networks:
+      - gitintel-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   backend:
     image: ghcr.io/YOUR_USERNAME/gitintel-ai-analysis/backend:latest
@@ -238,12 +257,26 @@ upstream gitintel_frontend {
     keepalive 32;
 }
 
+upstream gitintel_admin {
+    server 127.0.0.1:3001;
+    keepalive 32;
+}
+
 server {
     listen 80;
     server_name _;
 
     location / {
         proxy_pass http://gitintel_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /admin/ {
+        proxy_pass http://gitintel_admin;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
