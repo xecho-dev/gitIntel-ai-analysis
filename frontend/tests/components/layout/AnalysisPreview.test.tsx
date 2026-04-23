@@ -59,9 +59,9 @@ describe("AnalysisPreview", () => {
         finalResult: {
           quality: {
             health_score: 85,
-            complexity: "Medium",
+            qualityComplexity: "Medium",
             test_coverage: 60,
-            maintainability: "A",
+            qualityMaintainability: "A",
           },
           code_parser: {
             total_files: 150,
@@ -83,9 +83,9 @@ describe("AnalysisPreview", () => {
         finalResult: {
           quality: {
             health_score: 85,
-            complexity: "Low",
+            qualityComplexity: "Low",
             test_coverage: 80,
-            maintainability: "A",
+            qualityMaintainability: "A",
           },
           code_parser: { total_files: 50 },
         },
@@ -104,7 +104,7 @@ describe("AnalysisPreview", () => {
     mockUseAppStore.mockImplementation((selector) => {
       const state = {
         finalResult: {
-          quality: { health_score: 40, complexity: "High", test_coverage: 20, maintainability: "C" },
+          quality: { health_score: 40, qualityComplexity: "High", test_coverage: 20, qualityMaintainability: "C" },
           code_parser: {},
         },
         isAnalyzing: false,
@@ -121,7 +121,7 @@ describe("AnalysisPreview", () => {
     mockUseAppStore.mockImplementation((selector) => {
       const state = {
         finalResult: {
-          quality: { health_score: 70, complexity: "Medium", test_coverage: 50, maintainability: "B+" },
+          quality: { health_score: 70, qualityComplexity: "Medium", test_coverage: 50, qualityMaintainability: "B+" },
           code_parser: {},
         },
         isAnalyzing: false,
@@ -138,7 +138,7 @@ describe("AnalysisPreview", () => {
     mockUseAppStore.mockImplementation((selector) => {
       const state = {
         finalResult: {
-          quality: { health_score: 90, complexity: "Low", test_coverage: 80, maintainability: "A+" },
+          quality: { health_score: 90, qualityComplexity: "Low", test_coverage: 80, qualityMaintainability: "A+" },
           code_parser: {},
         },
         isAnalyzing: false,
@@ -155,7 +155,7 @@ describe("AnalysisPreview", () => {
     mockUseAppStore.mockImplementation((selector) => {
       const state = {
         finalResult: {
-          quality: { health_score: 80, complexity: "Low", test_coverage: 60, maintainability: "A" },
+          quality: { health_score: 80, qualityComplexity: "Low", test_coverage: 60, qualityMaintainability: "A" },
           code_parser: { total_files: 200, total_functions: 150 },
         },
         isAnalyzing: false,

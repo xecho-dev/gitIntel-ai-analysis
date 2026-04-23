@@ -85,7 +85,7 @@ def _build_headers() -> dict:
 def _get_llm():
     """懒加载 LangChain LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
     from utils.llm_factory import get_llm
-    return get_llm(temperature=0.3)
+    return get_llm(temperature=0.0)
 
 
 # ─── URL 解析 ────────────────────────────────────────────────────────

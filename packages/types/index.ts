@@ -59,8 +59,8 @@ export interface ArchitectureResult {
 export interface QualityResult {
   healthScore: number;
   testCoverage: number;
-  complexity: "Low" | "Medium" | "High";
-  maintainability: string;
+  qualityComplexity: "Low" | "Medium" | "High";
+  qualityMaintainability: string;
   duplication: {
     score: number;
     duplication_level: "Low" | "Medium" | "High";

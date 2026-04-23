@@ -145,7 +145,7 @@ def _resolve_max_tokens(max_tokens: int | None) -> int | None:
 @lru_cache
 def get_llm(
     model: str | None = None,
-    temperature: float = 0.2,
+    temperature: float = 0.0,
     base_url: str | None = None,
     max_tokens: int | None = None,
 ):
@@ -184,7 +184,7 @@ class LLMWithTracking:
         self,
         agent_name: str,
         model: str | None = None,
-        temperature: float = 0.2,
+        temperature: float = 0.0,
         base_url: str | None = None,
         max_tokens: int | None = None,
     ):
@@ -231,7 +231,7 @@ class LLMWithTracking:
 def get_llm_with_tracking(
     agent_name: str,
     model: str | None = None,
-    temperature: float = 0.2,
+    temperature: float = 0.0,
     base_url: str | None = None,
     max_tokens: int | None = None,
 ):
@@ -254,7 +254,7 @@ def get_llm_with_tracking(
 
 
 def get_llm_with_callback(callback_handler, model: str | None = None,
-                            temperature: float = 0.2, max_tokens: int | None = None):
+                            temperature: float = 0.0, max_tokens: int | None = None):
     """创建带自定义 callback 的 LLM 实例。"""
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:

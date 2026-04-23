@@ -14,8 +14,8 @@ interface CodeParserData {
 interface QualityData {
   health_score?: number;
   test_coverage?: number;
-  complexity?: string;
-  maintainability?: string;
+  qualityComplexity?: string;
+  qualityMaintainability?: string;
 }
 
 interface ArchitectureData {
@@ -44,7 +44,7 @@ export const AnalysisPreview = () => {
   const codeData = codeParserEvent?.data as CodeParserData | undefined;
 
   // 实时从 agentEvents 拿数据，不等 finalResult
-  const complexity = archData?.complexity ?? qualityData?.complexity ?? "—";
+  const complexity = archData?.complexity ?? qualityData?.qualityComplexity ?? "—";
   const healthScore = qualityData?.health_score ?? 0;
   const totalFiles = codeData?.total_files ?? codeData?.parsed_files ?? 0;
   const totalFunctions = codeData?.total_functions ?? 0;

@@ -82,7 +82,7 @@ def _q_load_parser(language: str):
 def _get_llm():
     """懒加载 LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
     from utils.llm_factory import get_llm
-    return get_llm(temperature=0.2)
+    return get_llm(temperature=0.0)
 
 
 def _build_quality_context(

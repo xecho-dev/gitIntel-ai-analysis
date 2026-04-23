@@ -663,8 +663,8 @@ class ReActSuggestionAgent:
             parts.append("【代码质量】")
             parts.append(f"  健康度: {quality_result.get('health_score', '?')}/100")
             parts.append(f"  测试覆盖率: {quality_result.get('test_coverage', '?')}%")
-            parts.append(f"  复杂度: {quality_result.get('complexity', '?')}")
-            parts.append(f"  可维护性: {quality_result.get('maintainability', '?')}")
+            parts.append(f"  代码质量复杂度: {quality_result.get('qualityComplexity', '?')}")
+            parts.append(f"  可维护性: {quality_result.get('qualityMaintainability', '?')}")
             dup = quality_result.get("duplication")
             if dup and isinstance(dup, dict):
                 parts.append(f"  重复率: {dup.get('score', 0)}% ({dup.get('duplication_level', '?')})")

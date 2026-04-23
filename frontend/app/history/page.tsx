@@ -148,8 +148,8 @@ function DetailModal({ item, onClose }: DetailModalProps) {
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <DetailRow label="健康分" value={result.quality.healthScore} suffix=" / 100" />
               <DetailRow label="测试覆盖率" value={result.quality.testCoverage} suffix="%" />
-              <DetailRow label="复杂度" value={result.quality.complexity} />
-              <DetailRow label="可维护性" value={result.quality.maintainability} />
+              <DetailRow label="代码质量复杂度" value={result.quality.qualityComplexity} />
+              <DetailRow label="可维护性" value={result.quality.qualityMaintainability} />
             </div>
           </DetailSection>
         )}

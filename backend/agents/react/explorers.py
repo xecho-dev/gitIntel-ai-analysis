@@ -138,6 +138,14 @@ _TECH_STACK_EXPLORER_INSTRUCTIONS = """## 你的角色
    - 配置文件中有但代码中从未出现 → confidence ≤ 0.4
    - 只有 Dockerfile 提到但无代码 → confidence = 0.3（可能是遗留配置）
 
+6. **⚠️ 输出格式必须完全一致**：
+   - `languages` 始终为数组，缺省时为空数组 `[]`
+   - `frameworks` 始终为数组，缺省时为空数组 `[]`
+   - `infrastructure`、`dev_tools`、`deployment` 始终存在，缺省时为空数组 `[]`
+   - `overall_confidence` 必须是 0.0-1.0 的数字，不能省略
+   - JSON 中不允许出现 null
+   - `languages` 和 `frameworks` 始终按 confidence 降序排列
+
 ## 输出格式
 先输出推理过程，再输出 JSON：
 
@@ -229,6 +237,19 @@ _QUALITY_EXPLORER_INSTRUCTIONS = """## 你的角色
 3. **无证据不声称**：工具没有返回文件路径，不要声称发现了问题
 4. **positive_patterns 必填**：即使没发现问题，也要列出做得好的地方
 5. **每个 iteration 必须调用至少 1 次工具，总计至少 3 次**
+6. **⚠️ 证据驱动评分（最重要）**：
+   - `qualityComplexity` 和 `qualityMaintainability` 的判断必须严格基于工具返回的测量数据：
+     - 高重复率（dup_score > 15%）→ `qualityComplexity` 至少 Medium
+     - 高圈复杂度函数多（avg_complexity > 10）→ `qualityComplexity` 至少 Medium
+     - 测试覆盖率低（< 30%）→ `qualityMaintainability` 至少 Low
+     - 三项指标都好（低重复、低圈复杂度、高测试覆盖）→ 才给 Low + High
+   - **禁止主观臆断**：不能因为"感觉代码复杂"就给 High，必须有工具数据支撑
+7. **⚠️ 输出格式必须完全一致**：
+   - `qualityComplexity` 只允许："Low"、"Medium"、"High"（精确字符串，首字母大写）
+   - `qualityMaintainability` 只允许："Low"、"Medium"、"High"（精确字符串）
+   - `hotspots` 如果没有发现问题，必须返回空数组 `[]`，不能省略
+   - JSON 中不允许出现 null，必须用具体值或省略字段
+   - 每次输出结果必须排序：hotspots 按 severity 降序，main_concerns 和 positive_patterns 固定 3 条
 
 ## 输出格式
 先输出推理过程，再输出 JSON：
@@ -269,8 +290,8 @@ _QUALITY_EXPLORER_INSTRUCTIONS = """## 你的角色
   "test_coverage_estimate": "low|medium|high",
   "main_concerns": ["最关心的 3 个问题"],
   "positive_patterns": ["做得好的 3 件事"],
-  "complexity": "Low|Medium|High",
-  "maintainability": "Low|Medium|High",
+  "qualityComplexity": "Low|Medium|High",
+  "qualityMaintainability": "Low|Medium|High",
   "llmPowered": true,
   "maint_score": 0-100,
   "comp_score": 0-100,
@@ -346,6 +367,18 @@ _ARCHITECTURE_EXPLORER_INSTRUCTIONS = """## 你的角色
 4. **信息不足标注 unknown**：不要猜测架构风格
 5. **必须有 strengths 和 concerns**：每个架构都有优点和缺点
 6. **每个 iteration 必须调用至少 1 次工具，总计至少 3 次**
+7. **⚠️ 证据驱动评分（最重要）**：
+   - `complexity` 必须基于工具发现的实际数据：文件数量、模块数量、循环依赖、跨层直接调用等
+   - `maintainability` 必须基于：模块化程度（依赖链清晰度）、是否有循环依赖、配置集中度
+   - 有循环依赖或跨层乱序调用 → `complexity` 至少 Medium，maintainability 至少 C
+   - **禁止主观臆断**：不能因为"架构看起来复杂"就给 High，必须有工具数据支撑
+8. **⚠️ 输出格式必须完全一致**：
+   - `complexity` 只允许："Low"、"Medium"、"High"（精确字符串）
+   - `maintainability` 只允许："A"、"B"、"C"、"D"、"E"（精确字符串）
+   - `components` 始终返回数组，如果没有发现组件则返回 `[]`，不能省略
+   - `design_patterns`、`layers`、`strengths`、`concerns` 始终存在，缺省时为空数组 `[]`
+   - JSON 中不允许出现 null
+   - `strengths` 和 `concerns` 固定各 3 条，不足时补充 "无法确定"
 
 ## 输出格式
 先输出推理过程，再输出 JSON：

@@ -16,8 +16,8 @@ import { useAppStore } from "@/store/useAppStore";
 interface QualityData {
   health_score?: number;
   test_coverage?: number;
-  complexity?: string;
-  maintainability?: string;
+  qualityComplexity?: string;
+  qualityMaintainability?: string;
   duplication?: {
     score?: number;
     duplication_level?: string;
@@ -53,8 +53,8 @@ export const QualityAgentCard = () => {
   const isScanning = isAnalyzing || activeAgent === "quality";
 
   const raw = qualityEvent?.data as QualityData | undefined;
-  const complexity = raw?.complexity ?? "—";
-  const maintainability = raw?.maintainability ?? "—";
+  const qualityComplexity = raw?.qualityComplexity ?? '—';
+  const qualityMaintainability = raw?.qualityMaintainability ?? '—';
   const pyMetrics = raw?.python_metrics;
   const tsMetrics = raw?.typescript_metrics;
 
@@ -90,7 +90,9 @@ export const QualityAgentCard = () => {
 
   return (
     <GlassCard className="p-5 relative" glow={isScanning}>
-      {isScanning && <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent animate-pulse" />}
+      {isScanning && (
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent animate-pulse" />
+      )}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded bg-emerald-500/10 flex items-center justify-center text-emerald-400">
@@ -106,10 +108,10 @@ export const QualityAgentCard = () => {
         <span
           className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
             isScanning
-              ? "bg-emerald-500/30 text-emerald-400 animate-pulse"
+              ? 'bg-emerald-500/30 text-emerald-400 animate-pulse'
               : qualityDone
-              ? "bg-emerald-500/20 text-emerald-400"
-              : "bg-slate-700 text-slate-500"
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : 'bg-slate-700 text-slate-500'
           }`}
         >
           {statusLabel}
@@ -128,22 +130,24 @@ export const QualityAgentCard = () => {
             >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748b" }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} />
                   <YAxis hide domain={[0, 100]} />
                   <Tooltip
                     contentStyle={{
-                      background: "#1c2026",
-                      border: "1px solid rgba(255,255,255,0.05)",
+                      background: '#1c2026',
+                      border: '1px solid rgba(255,255,255,0.05)',
                       borderRadius: 6,
                       fontSize: 11,
                     }}
-                    cursor={{ fill: "rgba(0,226,151,0.05)" }}
+                    cursor={{ fill: 'rgba(0,226,151,0.05)' }}
                     content={({ active, payload }) => {
                       if (active && payload && payload.length > 0) {
-                        const item = barData.find(d => d.value === payload[0].value);
+                        const item = barData.find((d) => d.value === payload[0].value);
                         return (
                           <div className="bg-[#1c2026] border border-white/5 rounded px-2 py-1.5 text-[11px]">
-                            <p className="text-slate-300 font-medium">{item?.name ?? '--'}（{item?.label ?? '--'}）</p>
+                            <p className="text-slate-300 font-medium">
+                              {item?.name ?? '--'}（{item?.label ?? '--'}）
+                            </p>
                             <p className="text-emerald-400">{payload[0].value}分</p>
                           </div>
                         );
@@ -155,7 +159,7 @@ export const QualityAgentCard = () => {
                     {barData.map((_, index) => (
                       <Cell
                         key={`cell-${index}`}
-                        fill={index === peakIndex ? "#00e297" : "#00e29733"}
+                        fill={index === peakIndex ? '#00e297' : '#00e29733'}
                       />
                     ))}
                   </Bar>
@@ -164,19 +168,28 @@ export const QualityAgentCard = () => {
 
               <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] text-slate-500">
                 <div className="bg-[#31353c] rounded p-2 text-center">
-                  <p className="uppercase text-slate-600 mb-1">复杂度</p>
-                  <p className={
-                    complexity === "Low" ? "text-emerald-400" :
-                    complexity === "High" ? "text-rose-400" : "text-yellow-400"
-                  }>{complexity}</p>
+                  <p className="uppercase text-slate-600 mb-1">代码质量复杂度</p>
+                  <p
+                    className={
+                      qualityComplexity === 'Low'
+                        ? 'text-emerald-400'
+                        : qualityComplexity === 'High'
+                          ? 'text-rose-400'
+                          : 'text-yellow-400'
+                    }
+                  >
+                    {qualityComplexity}
+                  </p>
                 </div>
                 <div className="bg-[#31353c] rounded p-2 text-center">
-                  <p className="uppercase text-slate-600 mb-1">可维护性</p>
-                  <p className="text-slate-300">{maintainability}</p>
+                  <p className="uppercase text-slate-600 mb-1">代码可维护性</p>
+                  <p className="text-slate-300">{qualityMaintainability}</p>
                 </div>
                 <div className="bg-[#31353c] rounded p-2 text-center">
-                  <p className="uppercase text-slate-600 mb-1">测试覆盖</p>
-                  <p className="text-emerald-400">{raw?.test_coverage ? `${raw.test_coverage}%` : "—"}</p>
+                  <p className="uppercase text-slate-600 mb-1">代码测试覆盖</p>
+                  <p className="text-emerald-400">
+                    {raw?.test_coverage ? `${raw.test_coverage}%` : '—'}
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -189,13 +202,15 @@ export const QualityAgentCard = () => {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="flex flex-col items-center justify-center h-full text-slate-500 text-xs gap-2"
             >
-            <motion.div
-              animate={isScanning ? { scale: [1, 1.2, 1] } : { scale: 1 }}
-              transition={isScanning ? { repeat: Infinity, duration: 1.2, ease: "easeInOut" } : {}}
-            >
-              <BarChart3 size={24} className="opacity-50" />
-            </motion.div>
-              <span>{isScanning ? "正在生成质量评分..." : "等待分析开始..."}</span>
+              <motion.div
+                animate={isScanning ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                transition={
+                  isScanning ? { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } : {}
+                }
+              >
+                <BarChart3 size={24} className="opacity-50" />
+              </motion.div>
+              <span>{isScanning ? '正在生成质量评分...' : '等待分析开始...'}</span>
             </motion.div>
           )}
         </AnimatePresence>

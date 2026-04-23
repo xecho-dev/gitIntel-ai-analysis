@@ -520,7 +520,7 @@ def _render_quality(
     score = quality.get("health_score", "—")
     raw_grade = quality.get("grade")
     if raw_grade is None or (isinstance(raw_grade, str) and not str(raw_grade).strip()):
-        raw_grade = quality.get("maintainability")
+        raw_grade = quality.get("qualityMaintainability")
     grade_str = str(raw_grade).strip() if raw_grade is not None else ""
     issues = quality.get("issues") or []
 
