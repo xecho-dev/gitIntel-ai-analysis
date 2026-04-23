@@ -7,6 +7,13 @@ import { Search, Zap, Loader2 } from "lucide-react";
 import { useAppStore, AgentEventData } from "@/store/useAppStore";
 import { analyzeRepo } from "@/lib/api";
 
+function getSkipCache(): boolean {
+  // skipCache=true means force reanalysis (smart cache disabled)
+  // smart_cache defaults to "true" (enabled) if not set
+  const stored = localStorage.getItem("gitintel:smart_cache");
+  return stored === "false";
+}
+
 export const AnalyzeInput = ({ userId }: { userId: string }) => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -31,7 +38,6 @@ export const AnalyzeInput = ({ userId }: { userId: string }) => {
       const timer = setTimeout(() => {
         const store = useAppStore.getState();
         if (session?.user && !store.isAnalyzing) {
-          // 直接调用 handleAnalyze 逻辑
           const repoUrl = pendingRepoUrl;
           store.reset();
           store.setError(null);
@@ -51,7 +57,7 @@ export const AnalyzeInput = ({ userId }: { userId: string }) => {
               return;
             }
             store.pushAgentEvent(data as AgentEventData);
-          }).catch((err) => {
+          }, getSkipCache()).catch((err) => {
             store.setError(err instanceof Error ? err.message : "分析失败");
           }).finally(() => {
             store.setIsAnalyzing(false);
@@ -86,22 +92,20 @@ export const AnalyzeInput = ({ userId }: { userId: string }) => {
     store.setRepoUrl(repoUrl);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await analyzeRepo(repoUrl, undefined, userId, (data: any) => {
+      await analyzeRepo(repoUrl, undefined, userId, (data: unknown) => {
         const event = data as { agent?: string; type?: string };
         if (event?.agent) {
           store.setActiveAgent(event.agent);
         }
         if (event?.type === "error") {
-          // 后端返回的权限 / 访问错误，直接显示给用户
           const msg = (data as { message?: string }).message ?? "分析失败，请检查仓库地址或 Token 权限";
           store.setError(msg);
           store.setIsAnalyzing(false);
           store.setActiveAgent(null);
           return;
         }
-        store.pushAgentEvent(data);
-      });
+        store.pushAgentEvent(data as AgentEventData);
+      }, getSkipCache());
     } catch (err) {
       useAppStore.getState().setError(err instanceof Error ? err.message : "分析失败");
     } finally {

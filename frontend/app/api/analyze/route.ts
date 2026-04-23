@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const repoUrl = body.repoUrl ?? body.repo_url;
   const branch = body.branch;
+  const skipCache = body.skip_cache ?? false;
 
   const upstream = await fetch(`${API_BASE}/api/analyze`, {
     method: "POST",
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       "X-User-Id": userId,
       ...(authHeader ? { "Authorization": authHeader } : {}),
     },
-    body: JSON.stringify({ repo_url: repoUrl, branch }),
+    body: JSON.stringify({ repo_url: repoUrl, branch, skip_cache: skipCache }),
   });
 
   if (!upstream.ok) {

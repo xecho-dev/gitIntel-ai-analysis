@@ -425,7 +425,11 @@ class ReActSuggestionAgent:
             suggestions = []
 
         # ── Step 5: 存储建议到 RAG（多维度批量存储）──────────────
-        if rag_available and suggestions:
+        # loaded_count == 0（ReAct 加载失败）时不存 RAG，避免污染知识库
+        total_loaded_files = 0
+        if code_parser_result and isinstance(code_parser_result, dict):
+            total_loaded_files = code_parser_result.get("total_files", 0)
+        if rag_available and suggestions and total_loaded_files > 0:
             try:
                 def sync_rag_store():
                     tech_stack = []
@@ -494,7 +498,7 @@ class ReActSuggestionAgent:
                 "verified_count": sum(1 for s in suggestions if s.get("verified")),
                 "tool_calls": len(verification.tool_calls),
                 "rag": {
-                    "active": rag_available,
+                    "active": rag_available and total_loaded_files > 0,
                     "history_count": len(rag_results),
                 },
             },

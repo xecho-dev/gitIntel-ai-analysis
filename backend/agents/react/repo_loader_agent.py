@@ -33,6 +33,7 @@ from tools.github_tools import (
     get_file_blobs, search_code, get_commit_history,
     get_pull_requests, get_default_branch,
     _get_repo_info_impl, _get_file_tree_impl, _get_default_branch_impl,
+    _get_branch_sha_impl,
 )
 from tools.code_tools import parse_file_ast, summarize_code_file
 
@@ -284,7 +285,7 @@ class ReActRepoLoaderAgent:
 
     async def _get_sha(self, owner: str, repo: str, branch: str) -> str:
         """获取分支的 SHA。直接 await 底层 async impl。"""
-        result = await _get_default_branch_impl(owner, repo)
+        result = await _get_branch_sha_impl(owner, repo, branch)
         return result.strip()
 
     async def _build_initial_context(

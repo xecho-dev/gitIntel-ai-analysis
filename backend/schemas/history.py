@@ -18,6 +18,7 @@ class HistoryItem(BaseModel):
     repo_url: str
     repo_name: str
     branch: str
+    repo_sha: Optional[str] = None
     health_score: Optional[float]
     quality_score: Optional[str]
     risk_level: Optional[str]
@@ -125,6 +126,7 @@ class AdminHistoryItem(BaseModel):
     repo_url: str
     repo_name: str
     branch: str
+    repo_sha: Optional[str] = None
     health_score: Optional[float]
     quality_score: Optional[str]
     risk_level: Optional[str]

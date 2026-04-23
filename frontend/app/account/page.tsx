@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
+import { Switch } from "@/components/ui/Switch";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import type { UserProfile, HistoryStats } from "@/lib/types";
@@ -59,6 +60,7 @@ export default function AccountPage() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [syncedOnce, setSyncedOnce] = useState(false);
+  const [smartCacheEnabled, setSmartCacheEnabled] = useState(true);
 
   const syncProfile = useCallback(async () => {
     if (!sessionProfile?.login) return;
@@ -105,7 +107,11 @@ export default function AccountPage() {
     }
   }, [sessionProfile]);
 
-  // 监听登录状态：一旦 session 加载完成且有 login，立刻触发一次同步
+  // Initialize smartCacheEnabled from localStorage (default: true = enabled)
+  useEffect(() => {
+    const stored = localStorage.getItem("gitintel:smart_cache");
+    setSmartCacheEnabled(stored !== "false");
+  }, []);
   useEffect(() => {
     console.log("[account] useEffect triggered:", {
       status,
@@ -311,6 +317,21 @@ export default function AccountPage() {
                     }}
                   />
                 </div>
+              </div>
+
+              {/* 智能缓存开关 */}
+              <div className="flex items-center justify-between py-3 px-4 bg-[#0a0e14] rounded-sm border border-white/5">
+                <div>
+                  <p className="text-sm font-medium">智能缓存</p>
+                  <p className="text-xs text-slate-500 mt-0.5">仓库无变化时跳过重复分析，节省 token</p>
+                </div>
+                <Switch
+                  checked={smartCacheEnabled}
+                  onCheckedChange={(checked) => {
+                    setSmartCacheEnabled(checked);
+                    localStorage.setItem("gitintel:smart_cache", String(checked));
+                  }}
+                />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-[#0a0e14] p-4 rounded-sm border border-white/5">

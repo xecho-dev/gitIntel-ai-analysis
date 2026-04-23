@@ -42,6 +42,24 @@ def _get_headers() -> dict:
 # ─── 工具实现（内部 async 函数）───────────────────────────────────────────────
 
 
+async def _get_branch_sha_impl(owner: str, repo: str, branch: str) -> str:
+    """获取指定分支的当前 SHA。用于智能缓存比对。"""
+    async with __import__("httpx").AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            f"{GITHUB_API_BASE}/repos/{owner}/{repo}/branches/{branch}",
+            headers=_get_headers(),
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("commit", {}).get("sha", "")
+
+
+def get_branch_sha(owner: str, repo: str, branch: str) -> str:
+    """同步封装：获取指定分支的当前 SHA。"""
+    import asyncio
+    return asyncio.run(_get_branch_sha_impl(owner, repo, branch))
+
+
 async def _get_repo_info_impl(owner: str, repo: str) -> dict[str, Any]:
     async with __import__("httpx").AsyncClient(timeout=15.0) as client:
         resp = await client.get(

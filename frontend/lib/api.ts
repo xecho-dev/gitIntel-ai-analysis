@@ -25,11 +25,13 @@ export async function analyzeRepo(
   repoUrl: string,
   branch: string | undefined,
   userId: string,
-  onEvent?: (data: unknown) => void
+  onEvent?: (data: unknown) => void,
+  skipCache: boolean = false
 ) {
   // 注意：后端 AnalyzeRequest 使用 snake_case，所以字段名必须是 repo_url
-  const body: { repo_url: string; branch?: string } = { repo_url: repoUrl };
+  const body: { repo_url: string; branch?: string; skip_cache?: boolean } = { repo_url: repoUrl };
   if (branch) body.branch = branch;
+  if (skipCache) body.skip_cache = true;
 
   const res = await fetch(`/api/analyze`, {
     method: "POST",

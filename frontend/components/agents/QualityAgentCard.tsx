@@ -15,7 +15,8 @@ import { useAppStore } from "@/store/useAppStore";
 
 interface QualityData {
   health_score?: number;
-  test_coverage?: number;
+  // test_coverage?: number;
+  test_coverage_estimate?: number;
   qualityComplexity?: string;
   qualityMaintainability?: string;
   duplication?: {
@@ -55,6 +56,7 @@ export const QualityAgentCard = () => {
   const raw = qualityEvent?.data as QualityData | undefined;
   const qualityComplexity = raw?.qualityComplexity ?? '—';
   const qualityMaintainability = raw?.qualityMaintainability ?? '—';
+  const testCoverageEstimate = raw?.test_coverage_estimate ?? '—';
   const pyMetrics = raw?.python_metrics;
   const tsMetrics = raw?.typescript_metrics;
 
@@ -65,7 +67,8 @@ export const QualityAgentCard = () => {
   const testScore = raw?.test_score;
   const coupScore = raw?.coup_score;
   const llmPowered = raw?.llmPowered ?? false;
-  const hasLlmScores = llmPowered && (maintScore !== undefined || compScore !== undefined || dupScore !== undefined);
+  const hasLlmScores = (llmPowered && (maintScore !== undefined || compScore !== undefined || dupScore !== undefined))
+    || (maintScore !== undefined || compScore !== undefined || dupScore !== undefined || testScore !== undefined || coupScore !== undefined);
 
   const barData = hasLlmScores
     ? [
@@ -187,9 +190,7 @@ export const QualityAgentCard = () => {
                 </div>
                 <div className="bg-[#31353c] rounded p-2 text-center">
                   <p className="uppercase text-slate-600 mb-1">代码测试覆盖</p>
-                  <p className="text-emerald-400">
-                    {raw?.test_coverage ? `${raw.test_coverage}%` : '—'}
-                  </p>
+                  <p className="text-emerald-400">{testCoverageEstimate}</p>
                 </div>
               </div>
             </motion.div>

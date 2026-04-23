@@ -287,7 +287,7 @@ _QUALITY_EXPLORER_INSTRUCTIONS = """## 你的角色
     }
   ],
   "quality_score": 0-100,
-  "test_coverage_estimate": "low|medium|high",
+  "test_coverage_estimate": "Low|Medium|High",
   "main_concerns": ["最关心的 3 个问题"],
   "positive_patterns": ["做得好的 3 件事"],
   "qualityComplexity": "Low|Medium|High",

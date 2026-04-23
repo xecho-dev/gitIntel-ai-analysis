@@ -28,7 +28,8 @@ gitintel_logger = logging.getLogger("gitintel")
 gitintel_logger.setLevel(logging.DEBUG)
 
 from agents import BaseAgent, AgentEvent
-from graph.analysis_graph import stream_analysis_sse
+from graph.analysis_graph import stream_analysis_sse, _state_to_sse_events
+from graph.executor import format_sse_event
 from middleware.auth import require_auth
 from schemas.request import AnalyzeRequest, ExportPdfRequest
 from schemas.response import HealthResponse
@@ -48,6 +49,7 @@ from services.database import (
     upsert_user,
     get_user_profile,
     get_user_uuid,
+    get_sha_cached_analysis,
     db_get_overview_stats,
     db_get_all_users,
 )
@@ -135,10 +137,83 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
     # ─── Step 3: SSE 流式响应 ───────────────────────────────────
     def event_stream():
+        import asyncio
+
         # 立即发送初始事件，解锁 HTTP 响应头和 StreamingResponse 的初始传输
         # 否则 FastAPI/uvicorn 可能在等待第一个 yield 后才发送 HTTP headers，
         # 导致客户端长时间无响应
         yield "data: {\"type\": \"connected\", \"agent\": \"pipeline\", \"message\": \"连接已建立，开始分析...\", \"percent\": 0}\n\n"
+
+        # ─── Step 3a: 智能缓存检查 ─────────────────────────────────
+        # 默认开启：获取当前仓库 SHA，查询 Supabase 中最近一次分析的 repo_sha，
+        # 若 SHA 相同说明仓库代码未变，直接复用已有结果
+        cached_result: dict | None = None
+        if not req.skip_cache:
+            try:
+                from tools.github_tools import get_branch_sha
+                from graph.executor import parse_repo_url
+
+                parsed = parse_repo_url(req.repo_url)
+                if parsed:
+                    owner, repo = parsed
+                    current_sha = get_branch_sha(owner, repo, req.branch)
+
+                    sb = get_supabase_admin()
+                    cached_result = get_sha_cached_analysis(sb, auth_user_id, req.repo_url, req.branch, current_sha)
+                    if cached_result:
+                        logger.info(f"[/api/analyze] 智能缓存命中: {req.repo_url} SHA={current_sha}")
+
+                        # cached_result 来自数据库 result_data，其中 final_result 已嵌套一层
+                        # （存储时 result_data["final_result"] = state.final_result）
+                        # 所以需要解包一次才能得到真正的数据
+                        final_result_data = cached_result.get("final_result") or cached_result
+
+                        state = {
+                            "repo_url": req.repo_url,
+                            "branch": req.branch,
+                            "loaded_files": final_result_data.get("repo_loader", {}).get("loaded_files", {}),
+                            "loaded_paths": final_result_data.get("repo_loader", {}).get("loaded_paths", []),
+                            "repo_sha": current_sha,
+                            "react_events": [],
+                            "react_summary": final_result_data.get("repo_loader", {}).get("summary", ""),
+                            "react_iterations": final_result_data.get("repo_loader", {}).get("total_iterations", 0),
+                            "code_parser_result": final_result_data.get("code_parser"),
+                            "explorer_result": final_result_data.get("explorer"),
+                            "tech_stack_result": final_result_data.get("tech_stack"),
+                            "quality_result": final_result_data.get("quality") or {},
+                            "dependency_result": final_result_data.get("dependency"),
+                            "architecture_result": final_result_data.get("architecture"),
+                            "suggestion_result": final_result_data.get("suggestion"),
+                            "optimization_result": final_result_data.get("suggestion"),
+                            "optimization_events": [],
+                            "final_result": final_result_data,
+                            "errors": [],
+                        }
+
+                        # 按节点顺序生成 SSE 事件（与 stream_analysis_sse 完全一致）
+                        status_sent: set = set()
+                        result_sent: set = set()
+
+                        for node_name in ("react_loader", "explorer", "architecture", "react_suggestion"):
+                            for sse in _state_to_sse_events(
+                                node_name=node_name,
+                                state=state,
+                                owner=owner,
+                                repo=repo,
+                                status_sent=status_sent,
+                                result_sent=result_sent,
+                            ):
+                                yield sse
+
+                        yield "data: [DONE]\n\n"
+                        return
+                    else:
+                        logger.info(f"[/api/analyze] SHA 未命中，继续分析: {req.repo_url} SHA={current_sha}")
+                else:
+                    logger.warning(f"[/api/analyze] URL 解析失败，跳过缓存检查: {req.repo_url}")
+            except Exception as cache_err:
+                logger.warning(f"[/api/analyze] 缓存检查失败: {cache_err}")
+                cached_result = None
 
         # collected_events 用于在流结束后聚合同一 agent 的 result 事件
         collected_events: list[dict] = []
@@ -178,6 +253,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
         try:
             # stream_analysis_sse 是同步生成器，FastAPI 会自动在线程池中运行它
             # 这确保 SSE 事件能实时 flush 到客户端，而不会阻塞 FastAPI 事件循环
+            # skip_cache=True 禁用内部缓存（我们在外层已做了 SHA 级别的数据库缓存）
             for event in stream_analysis_sse(req.repo_url, req.branch, thread_id=thread_id):
                 collected = collect(event)
                 if collected:
@@ -209,6 +285,14 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
         if not result_data:
             logger.warning(f"[/api/analyze] result_data 为空，跳过保存")
+            return
+
+        # ReAct 失败（未加载到任何文件），不保存数据库、不存入 RAG，避免污染
+        react_loader_data = result_data.get("react_loader", {})
+        if react_loader_data.get("loaded_count", 0) == 0:
+            logger.warning(
+                f"[/api/analyze] ReAct 未能加载文件（loaded_count=0），跳过保存和 RAG 存储"
+            )
             return
 
         logger.info(f"[/api/analyze] 分析完成，准备保存 history，agents={list(result_data.keys())}")

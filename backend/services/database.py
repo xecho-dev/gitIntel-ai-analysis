@@ -80,6 +80,34 @@ def _derive_history_metrics(result_data: dict) -> dict:
     }
 
 
+def _extract_repo_sha(result_data: dict) -> Optional[str]:
+    """从 result_data 中提取 repo_sha。
+
+    result_data 可能有两个来源，结构不同：
+    1. SSE 流保存时：result_data = {"final_result": {...}}，需先解包
+    2. /api/history/save 手动保存时：result_data 直接包含 "repo_loader"
+    """
+    import logging
+    logger2 = logging.getLogger("gitintel")
+
+    data = result_data
+
+    # 如果 result_data["final_result"] 存在（来自 SSE 流保存路径），先解包
+    if "final_result" in data:
+        logger2.info(f"[_extract_repo_sha] 解包 final_result，原始 keys={list(data.keys())}")
+        data = data["final_result"]
+        logger2.info(f"[_extract_repo_sha] 解包后 keys={list(data.keys())}")
+    else:
+        logger2.info(f"[_extract_repo_sha] 无 final_result，原始 keys={list(data.keys())}")
+
+    repo_loader = data.get("repo_loader", {})
+    if isinstance(repo_loader, dict):
+        sha = repo_loader.get("repo_sha")
+        return sha
+    logger2.warning(f"[_extract_repo_sha] 未找到 repo_loader，data keys={list(data.keys())}")
+    return None
+
+
 def save_analysis(
     sb: Client,
     auth_user_id: str,
@@ -106,6 +134,7 @@ def save_analysis(
     user_uuid = row["id"]
 
     metrics = _derive_history_metrics(result_data)
+    repo_sha = _extract_repo_sha(result_data)
 
     # 从 repo_url 提取 repo_name（"owner/repo"）
     repo_name = repo_url.rstrip("/").split("/")[-1]
@@ -116,6 +145,7 @@ def save_analysis(
             "repo_url": repo_url,
             "repo_name": repo_name,
             "branch": branch,
+            "repo_sha": repo_sha,
             "result_data": result_data,
             "health_score": metrics["health_score"],
             "quality_score": metrics["quality_score"],
@@ -223,6 +253,7 @@ def get_history(
             repo_url=r["repo_url"],
             repo_name=r["repo_name"],
             branch=r.get("branch", "main"),
+            repo_sha=r.get("repo_sha"),
             health_score=r.get("health_score"),
             quality_score=r.get("quality_score"),
             risk_level=r.get("risk_level"),
@@ -230,8 +261,6 @@ def get_history(
             risk_level_bg=r.get("risk_level_bg"),
             border_color=r.get("border_color"),
             result_data=r.get("result_data"),
-            langsmith_trace_id=r.get("langsmith_trace_id"),
-            thread_id=r.get("thread_id"),
             created_at=r["created_at"],
         )
         for r in data.data
@@ -269,6 +298,41 @@ def delete_analysis(sb: Client, auth_user_id: str, history_id: str) -> bool:
 
     sb.table("analysis_history").delete().eq("id", history_id).eq("user_id", user_uuid).execute()
     return True
+
+
+def get_sha_cached_analysis(sb: Client, auth_user_id: str, repo_url: str, branch: str, repo_sha: str) -> Optional[dict]:
+    """
+    查询最近一次分析结果，条件：repo_url + branch + repo_sha 完全相同。
+
+    用于智能缓存：若 SHA 未变，直接复用已有结果，无需重新分析。
+    返回 result_data（完整分析结果），若不存在则返回 None。
+    """
+    user_row = (
+        sb.table("users")
+        .select("id")
+        .eq("auth_user_id", auth_user_id)
+        .maybe_single()
+        .execute()
+    )
+    if user_row is None or not user_row.data or not user_row.data.get("id"):
+        return None
+    user_uuid = user_row.data["id"]
+
+    record = (
+        sb.table("analysis_history")
+        .select("result_data, repo_sha, created_at")
+        .eq("user_id", user_uuid)
+        .eq("repo_url", repo_url)
+        .eq("branch", branch)
+        .eq("repo_sha", repo_sha)
+        .order("created_at", desc=True)
+        .limit(1)
+        .maybe_single()
+        .execute()
+    )
+    if record is None or not record.data:
+        return None
+    return record.data.get("result_data")
 
 
 def upsert_user(sb: Client, auth_user_id: str, payload: dict) -> UserProfile:
@@ -540,6 +604,7 @@ def db_get_all_history(
             repo_url=r["repo_url"],
             repo_name=r["repo_name"],
             branch=r.get("branch", "main"),
+            repo_sha=r.get("repo_sha"),
             health_score=r.get("health_score"),
             quality_score=r.get("quality_score"),
             risk_level=r.get("risk_level"),
@@ -593,6 +658,7 @@ def db_get_history_by_id(sb: Client, record_id: str) -> Optional[AdminHistoryIte
         repo_url=r["repo_url"],
         repo_name=r["repo_name"],
         branch=r.get("branch", "main"),
+        repo_sha=r.get("repo_sha"),
         health_score=r.get("health_score"),
         quality_score=r.get("quality_score"),
         risk_level=r.get("risk_level"),
@@ -682,6 +748,7 @@ def db_get_user_analysis_history(
             repo_url=r["repo_url"],
             repo_name=r["repo_name"],
             branch=r.get("branch", "main"),
+            repo_sha=r.get("repo_sha"),
             health_score=r.get("health_score"),
             quality_score=r.get("quality_score"),
             risk_level=r.get("risk_level"),
@@ -776,6 +843,7 @@ def db_get_filtered_history(
             repo_url=r["repo_url"],
             repo_name=r["repo_name"],
             branch=r.get("branch", "main"),
+            repo_sha=r.get("repo_sha"),
             health_score=r.get("health_score"),
             quality_score=r.get("quality_score"),
             risk_level=r.get("risk_level"),

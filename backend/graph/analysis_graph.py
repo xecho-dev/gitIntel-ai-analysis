@@ -44,6 +44,7 @@ from .executor import (
     parse_repo_url,
 )
 
+
 # ─── 全局 Checkpoint Saver ─────────────────────────────────────────────
 # MemorySaver：内存版，适合单实例开发/演示
 # 生产环境换 PostgresSaver + RedisSaver 实现持久化断点续传
@@ -203,6 +204,7 @@ def node_react_loader(state: SharedState) -> dict:
             "react_summary": summary,
             "react_iterations": iterations,
             "finished_agents": [],
+            "repo_sha": repo_sha,
         }
 
 
@@ -529,17 +531,20 @@ def node_react_suggestion(state: SharedState) -> dict:
                 "data": result,
             })
 
+    # repo_sha 从 react_loader 节点已写入 state
+    repo_sha = state.get("repo_sha", branch)
     final_result = {
         "repo_loader": {
             "owner": owner,
             "repo": repo,
             "branch": branch,
+            "repo_sha": repo_sha,
             "total_files": len(state.get("loaded_files", {})),
             "loaded_count": len(state.get("loaded_paths", [])),
         },
         "code_parser": state.get("code_parser_result"),
         "tech_stack": state.get("tech_stack_result"),
-        "quality": state.get("quality_result"),
+        "quality": _normalize_explorer_result(state.get("quality_result") or {}),
         "dependency": state.get("dependency_result"),
         "architecture": state.get("architecture_result"),
         "suggestion": result,
@@ -797,6 +802,7 @@ def stream_analysis_sse(
         if exc_info:
             raise exc_info[0]
 
+        # 分析完成，保存到缓存
         try:
             from utils.llm_factory import get_token_stats
             stats = get_token_stats()
@@ -809,6 +815,9 @@ def stream_analysis_sse(
             )
         except Exception:
             pass
+
+        final_state = _workflow.get_state(config).values
+        final_result = final_state.get("final_result") or {}
 
         yield "data: [DONE]\n\n"
 
@@ -863,6 +872,52 @@ def _dispatch_chunk(
             logger.warning(f"[stream_analysis_sse] 无法解析 chunk: {type(chunk)}")
 
 
+def _normalize_explorer_result(data: dict) -> dict:
+    """将不同 Agent 格式的输出标准化为前端期望的字段名。
+
+    QualityExplorer → QualityAgentCard 期望：
+      complexity → qualityComplexity
+      maintainability → qualityMaintainability
+      test_coverage → test_coverage_estimate
+      health_score / llmPowered / maint_score / comp_score / dup_score / test_score / coup_score
+
+    如果这些字段缺失（QualityExplorer 未返回），则从已有数据推导默认值。
+    所有其他 explorer 保持原样。
+    """
+    if not isinstance(data, dict):
+        return data
+
+    # 标准化字段名（legacy QualityAgent 用旧名，Explorer 用新名）
+    # 只在源字段存在时才覆盖，避免 Explorer 已返回正确字段名却被 None 覆盖
+    normalized = {k: v for k, v in data.items()}
+    if "complexity" in data:
+        normalized["qualityComplexity"] = data["complexity"]
+    if "maintainability" in data:
+        normalized["qualityMaintainability"] = data["maintainability"]
+    if "test_coverage" in data:
+        normalized["test_coverage_estimate"] = data["test_coverage"]
+
+    # 补全前端依赖但 Explorer 可能缺失的字段
+    if "health_score" not in normalized:
+        normalized["health_score"] = 75.0
+    if "llmPowered" not in normalized:
+        normalized["llmPowered"] = False
+    if "maint_score" not in normalized:
+        normalized["maint_score"] = 70
+    if "comp_score" not in normalized:
+        normalized["comp_score"] = 70
+    if "dup_score" not in normalized:
+        dup = data.get("duplication", {})
+        dup_score = dup.get("score", 0) if isinstance(dup, dict) else 0
+        normalized["dup_score"] = round(100 - dup_score, 1)
+    if "test_score" not in normalized:
+        normalized["test_score"] = 30
+    if "coup_score" not in normalized:
+        normalized["coup_score"] = 70
+
+    return normalized
+
+
 def _state_to_sse_events(
     node_name: str,
     state: dict,
@@ -914,6 +969,7 @@ def _state_to_sse_events(
                         "loaded_paths": data.get("loaded_paths", []),
                         "is_sufficient": data.get("is_sufficient"),
                         "summary": data.get("summary", ""),
+                        "repo_sha": state.get("repo_sha"),
                     },
                 }))
 
@@ -967,6 +1023,7 @@ def _state_to_sse_events(
 
         q_result = state.get("quality_result")
         if q_result:
+            q_normalized = _normalize_explorer_result(q_result)
             msg_q_done = "代码质量分析完成"
             if msg_q_done not in status_sent:
                 status_sent.add(msg_q_done)
@@ -975,7 +1032,7 @@ def _state_to_sse_events(
                     "agent": "quality",
                     "message": msg_q_done,
                     "percent": 85,
-                    "data": q_result,
+                    "data": q_normalized,
                 }))
             if "quality" not in result_sent:
                 result_sent.add("quality")
@@ -984,7 +1041,7 @@ def _state_to_sse_events(
                     "agent": "quality",
                     "message": "代码质量分析完成",
                     "percent": 85,
-                    "data": q_result,
+                    "data": q_normalized,
                 }))
 
         dep_result = state.get("dependency_result")
