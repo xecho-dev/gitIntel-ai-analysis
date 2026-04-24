@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   useLocalRuntime,
   type ChatModelAdapter,
@@ -60,14 +60,21 @@ async function getOrCreateSession(): Promise<ChatSession | null> {
   return sessionPromise;
 }
 
-// Custom adapter that connects to backend RAG chat API
+// Custom adapter that connects to backend RAG chat API with streaming support
 const RAGChatAdapter: ChatModelAdapter = {
-  async run({ messages, abortSignal }) {
+  async *run({ messages, abortSignal }) {
     const userMessage = messages[messages.length - 1];
-    const content =
-      typeof userMessage.content === "string"
-        ? userMessage.content
-        : "";
+
+    // Extract text from message parts (content is an array of parts)
+    let content = "";
+    if (userMessage) {
+      const contentArray = userMessage.content as readonly { type: string; text?: string }[];
+      for (const part of contentArray) {
+        if (part.type === "text" && part.text) {
+          content += part.text;
+        }
+      }
+    }
 
     let sessionId = currentSessionId;
     if (!sessionId) {
@@ -76,14 +83,16 @@ const RAGChatAdapter: ChatModelAdapter = {
     }
 
     if (!sessionId) {
-      return {
+      yield {
         content: [
           {
             type: "text" as const,
             text: "无法创建会话，请刷新页面重试。",
           },
         ],
+        status: { type: "complete" as const },
       };
+      return;
     }
 
     try {
@@ -95,33 +104,120 @@ const RAGChatAdapter: ChatModelAdapter = {
       });
 
       if (!response.ok) {
-        return {
+        yield {
           content: [
             {
               type: "text" as const,
               text: `请求失败: ${response.status}`,
             },
           ],
+          status: { type: "complete" as const },
         };
+        return;
       }
 
-      const data = await response.json();
-      const assistantContent = data.message?.content ?? "抱歉，发生了错误。";
+      if (!response.body) {
+        yield {
+          content: [
+            {
+              type: "text" as const,
+              text: "后端返回空响应",
+            },
+          ],
+          status: { type: "complete" as const },
+        };
+        return;
+      }
 
-      return {
-        content: [{ type: "text" as const, text: assistantContent }],
+      // SSE streaming
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalText = "";
+      let isComplete = false;
+
+      while (!isComplete) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (!data || data === "[DONE]") continue;
+
+          try {
+            const event = JSON.parse(data);
+
+            if (event.type === "token" && event.full_text !== undefined) {
+              finalText = event.full_text;
+              // Yield partial text while streaming
+              yield {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: finalText,
+                  },
+                ],
+                status: { type: "running" as const },
+              };
+            } else if (event.type === "done") {
+              finalText = event.answer ?? finalText;
+              isComplete = true;
+            } else if (event.type === "error") {
+              yield {
+                content: [
+                  {
+                    type: "text" as const,
+                    text: `错误: ${event.message}`,
+                  },
+                ],
+                status: { type: "complete" as const },
+              };
+              return;
+            }
+            // Skip "connected" and "sources" events
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+
+      // Final complete message
+      yield {
+        content: [
+          {
+            type: "text" as const,
+            text: finalText,
+          },
+        ],
+        status: { type: "complete" as const },
       };
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        return {
-          content: [{ type: "text" as const, text: "已取消" }],
+        yield {
+          content: [
+            {
+              type: "text" as const,
+              text: "已取消",
+            },
+          ],
+          status: { type: "complete" as const },
+        };
+      } else {
+        yield {
+          content: [
+            {
+              type: "text" as const,
+              text: `发生错误: ${(err as Error).message}`,
+            },
+          ],
+          status: { type: "complete" as const },
         };
       }
-      return {
-        content: [
-          { type: "text" as const, text: `发生错误: ${(err as Error).message}` },
-        ],
-      };
     }
   },
 };
@@ -133,7 +229,7 @@ export function useRAGRuntime() {
 export function useInitializeSession() {
   const [isReady, setIsReady] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     getOrCreateSession().then((session) => {
       if (session) {
         currentSessionId = session.id;
@@ -143,13 +239,4 @@ export function useInitializeSession() {
   }, []);
 
   return isReady;
-}
-
-/**
- * Returns the AUI client for use with AuiProvider.
- * Must be called inside an AuiProvider tree (or establishes its own via useLocalRuntime).
- */
-export function useRAGAui() {
-  const runtime = useRAGRuntime();
-  return runtime.__aiClient;
 }

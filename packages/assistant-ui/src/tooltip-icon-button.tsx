@@ -1,30 +1,29 @@
 "use client";
 
-import { type ComponentPropsWithRef, forwardRef } from "react";
-import { Slot } from "radix-ui";
-
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@gitintel/ui/tooltip";
-import { Button } from "@gitintel/ui/button";
+import { type ComponentPropsWithRef, forwardRef, type ReactElement } from "react";
 import { cn } from "@gitintel/ui";
 
-export type TooltipIconButtonProps = ComponentPropsWithRef<typeof Button> & {
+export type TooltipIconButtonProps = ComponentPropsWithRef<"button"> & {
   tooltip: string;
   side?: "top" | "bottom" | "left" | "right";
 };
 
 export const TooltipIconButton = forwardRef<
   HTMLButtonElement,
-  TooltipIconButtonProps
+  TooltipIconButtonProps & { children?: ReactElement }
 >(({ children, tooltip, side = "bottom", className, ...rest }, ref) => {
   return (
-    <Tooltip>
-      <TooltipTrigger render={<Button variant="ghost" size="icon" {...rest} className={cn("aui-button-icon size-6 p-1", className)} ref={ref} />}><Slot.Slottable>{children}</Slot.Slottable><span className="aui-sr-only sr-only">{tooltip}</span></TooltipTrigger>
-      <TooltipContent side={side}>{tooltip}</TooltipContent>
-    </Tooltip>
+    <button
+      ref={ref}
+      className={cn(
+        "relative inline-flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-white/10 hover:text-white",
+        className,
+      )}
+      title={tooltip}
+      {...rest}
+    >
+      {children}
+    </button>
   );
 });
 
