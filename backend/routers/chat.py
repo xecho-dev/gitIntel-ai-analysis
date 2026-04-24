@@ -1,12 +1,17 @@
 """
 Chat 相关路由 (/api/chat)
-RAG 问答功能
+RAG 问答功能（SSE 流式）
 """
+import json
+import logging
+from typing import AsyncGenerator
+
 from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import StreamingResponse
 
 from dependencies import get_auth_user_id, get_sb_client
 from schemas.chat import SendMessageRequest, CreateSessionRequest
-from services.rag_chat_service import rag_chat as do_rag_chat
+from services.rag_chat_service import rag_chat_stream
 from services.database import (
     create_chat_session,
     get_chat_sessions,
@@ -17,6 +22,7 @@ from services.database import (
     get_user_uuid,
 )
 
+logger = logging.getLogger("gitintel")
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
@@ -73,9 +79,13 @@ async def api_get_chat_messages(session_id: str, request: Request):
     return {"items": [m.model_dump(mode="json") for m in messages]}
 
 
-@router.post("/send", response_model=dict)
+@router.post("/send")
 async def api_send_message(body: SendMessageRequest, request: Request):
-    """发送消息并获取 RAG 回答。"""
+    """
+    发送消息，SSE 流式返回 LLM 逐字输出。
+
+    前端需要使用 EventSource 或 fetch + ReadableStream 消费此端点。
+    """
     auth_user_id = get_auth_user_id(request)
     sb = get_sb_client()
 
@@ -85,23 +95,64 @@ async def api_send_message(body: SendMessageRequest, request: Request):
     if not owner or str(owner) != str(user_uuid):
         raise HTTPException(status_code=403, detail="无权限访问此会话")
 
-    # 1. 保存用户消息
-    user_msg = save_chat_message(sb, body.session_id, "user", body.content)
+    # 保存用户消息
+    save_chat_message(sb, body.session_id, "user", body.content)
 
-    # 2. RAG 问答
-    answer, rag_sources = do_rag_chat(body.content)
+    collected_answer = ""
+    collected_sources: list = []
+    assistant_msg_id: str | None = None
 
-    # 3. 保存 Assistant 回答
-    assistant_msg = save_chat_message(
-        sb, body.session_id, "assistant", answer,
-        rag_context=[s.model_dump(mode="json") for s in rag_sources],
+    async def event_stream() -> AsyncGenerator[str, None]:
+        nonlocal collected_answer, collected_sources, assistant_msg_id
+
+        # 先发连接建立事件
+        yield "data: {\"type\": \"connected\", \"agent\": \"rag_chat\", \"message\": \"正在思考...\", \"percent\": 0}\n\n"
+
+        try:
+            first_yield = True
+            async for delta, sources, full_text in rag_chat_stream(body.content):
+                if first_yield and sources:
+                    collected_sources = sources
+                    sources_data = [s.model_dump(mode="json") for s in sources]
+                    yield f"data: {json.dumps({'type': 'sources', 'agent': 'rag_chat', 'sources': sources_data})}\n\n"
+                    first_yield = False
+
+                if delta:
+                    collected_answer = full_text
+                    yield f"data: {json.dumps({'type': 'token', 'agent': 'rag_chat', 'delta': delta, 'full_text': full_text})}\n\n"
+        except Exception as exc:
+            logger.error(f"[/api/chat/send] RAG 流异常: {exc}")
+            yield f"data: {json.dumps({'type': 'error', 'agent': 'rag_chat', 'message': str(exc)})}\n\n"
+
+        # 流结束，保存 Assistant 消息
+        if collected_answer:
+            try:
+                assistant_msg = save_chat_message(
+                    sb, body.session_id, "assistant", collected_answer,
+                    rag_context=[s.model_dump(mode="json") for s in collected_sources],
+                )
+                assistant_msg_id = str(assistant_msg.id)
+            except Exception as save_err:
+                logger.error(f"[/api/chat/send] 保存消息失败: {save_err}")
+
+        yield f"data: {json.dumps({
+            'type': 'done',
+            'agent': 'rag_chat',
+            'message_id': assistant_msg_id,
+            'answer': collected_answer,
+            'sources': [s.model_dump(mode="json") for s in collected_sources]
+        })}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
-
-    return {
-        "message": assistant_msg.model_dump(mode="json"),
-        "answer": answer,
-        "rag_sources": [s.model_dump(mode="json") for s in rag_sources],
-    }
 
 
 @router.delete("/sessions/{session_id}", response_model=dict)

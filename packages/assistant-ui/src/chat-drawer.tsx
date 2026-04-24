@@ -23,7 +23,7 @@ type DrawerWidth = keyof typeof DRAWER_WIDTHS;
 const WIDTH_PX = { narrow: 400, wide: 560 };
 
 const TypingIndicator: React.FC = () => (
-  <div className="flex items-center gap-1.5 px-4 py-3">
+  <div className="flex items-center gap-1.5">
     <div className="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-500/20">
       <Sparkles className="size-3.5 text-violet-400" />
     </div>
@@ -103,6 +103,7 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [inputValue, setInputValue] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isStreaming, setIsStreaming] = React.useState(false);
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -127,44 +128,88 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
       content: text.trim(),
     };
 
+    const assistantId = crypto.randomUUID();
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsSubmitting(true);
+    setIsStreaming(false);
 
-    // Auto-resize textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
     try {
-      const response = await fetch("/api/chat/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: getCurrentSessionId() ?? "",
-          content: text.trim(),
-        }),
+      const sessionId = getCurrentSessionId() ?? '';
+      const response = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, content: text.trim() }),
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-      const data = await response.json();
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.message?.content ?? "抱歉，发生了错误。",
-      };
+      if (!response.body) {
+        throw new Error('Response body is null');
+      }
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let pendingAssistant = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(data);
+
+            if (event.type === 'connected') {
+              // 收到连接事件后，再插入空的 assistant 占位
+              if (!pendingAssistant) {
+                setMessages((prev) => [
+                  ...prev,
+                  { id: assistantId, role: 'assistant', content: '' },
+                ]);
+                pendingAssistant = true;
+                setIsStreaming(true);
+              }
+            } else if (event.type === 'token') {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: event.full_text } : m)),
+              );
+            } else if (event.type === 'error') {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, content: `错误: ${event.message}` } : m,
+                ),
+              );
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
     } catch (err) {
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `错误: ${(err as Error).message}`,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, content: `错误: ${(err as Error).message}` } : m,
+        ),
+      );
     } finally {
       setIsSubmitting(false);
+      setIsStreaming(false);
     }
   };
 
@@ -191,16 +236,14 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col w-full">
       {/* Message area */}
       <div
         ref={viewportRef}
         className="flex flex-1 flex-col overflow-y-auto scroll-smooth px-4 py-4"
       >
         <div className="mx-auto w-full flex-1">
-          <AnimatePresence>
-            {isEmpty && <EmptyState onSubmit={handleSubmit} />}
-          </AnimatePresence>
+          <AnimatePresence>{isEmpty && <EmptyState onSubmit={handleSubmit} />}</AnimatePresence>
 
           <div className="flex flex-col gap-5">
             <AnimatePresence initial={false}>
@@ -212,7 +255,7 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  {msg.role === "user" ? (
+                  {msg.role === 'user' ? (
                     <UserBubble content={msg.content} />
                   ) : (
                     <AssistantBubble content={msg.content} />
@@ -221,9 +264,7 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
               ))}
             </AnimatePresence>
 
-            <AnimatePresence>
-              {isSubmitting && <TypingIndicator />}
-            </AnimatePresence>
+            <AnimatePresence>{isSubmitting && !isStreaming && <TypingIndicator />}</AnimatePresence>
           </div>
         </div>
       </div>
@@ -240,7 +281,7 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSubmit(inputValue);
                   }
@@ -253,10 +294,10 @@ const RAGChatThread: React.FC<{ drawerWidth: DrawerWidth }> = ({ drawerWidth }) 
                 disabled={isSubmitting || !inputValue.trim()}
                 onClick={() => handleSubmit(inputValue)}
                 className={cn(
-                  "absolute bottom-2 right-2 flex size-8 items-center justify-center rounded-xl transition-all duration-200",
+                  'absolute bottom-2 right-2 flex size-8 items-center justify-center rounded-xl transition-all duration-200',
                   inputValue.trim()
-                    ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-indigo-500 hover:shadow-blue-500/50 active:scale-95"
-                    : "bg-white/5 text-slate-600"
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-indigo-500 hover:shadow-blue-500/50 active:scale-95'
+                    : 'bg-white/5 text-slate-600',
                 )}
               >
                 <ArrowUpIcon className="size-4" />
@@ -290,15 +331,15 @@ export const ChatDrawer: React.FC = () => {
         onMouseEnter={() => setIsHoveringFab(true)}
         onMouseLeave={() => setIsHoveringFab(false)}
         className={cn(
-          "fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-2xl shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#0d1117] active:scale-95",
-          "bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 hover:shadow-blue-500/40 hover:scale-105 hover:shadow-2xl"
+          'fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-2xl shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#0d1117] active:scale-95',
+          'bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 hover:shadow-blue-500/40 hover:scale-105 hover:shadow-2xl',
         )}
         aria-label="打开知识库问答"
         whileTap={{ scale: 0.93 }}
       >
         <motion.div
           animate={{ rotate: isHoveringFab ? [0, 15, -15, 10, -10, 5, -5, 0] : 0 }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
         >
           <MessageCircle className="size-6 text-white drop-shadow-lg" />
         </motion.div>
@@ -325,16 +366,16 @@ export const ChatDrawer: React.FC = () => {
         {isOpen && (
           <motion.div
             className={cn(
-              "fixed right-0 top-0 z-50 flex h-full flex-col overflow-hidden shadow-2xl shadow-black/50",
-              "bg-[#0d1117]/95 border-l border-white/[0.06]",
-              "backdrop-blur-xl",
-              DRAWER_WIDTHS[drawerWidth]
+              'fixed right-0 top-0 z-50 flex h-full flex-col overflow-hidden shadow-2xl shadow-black/50',
+              'bg-[#0d1117]/95 border-l border-white/[0.06]',
+              'backdrop-blur-xl',
+              DRAWER_WIDTHS[drawerWidth],
             )}
             style={{ width: `min(${WIDTH_PX[drawerWidth]}px, 100vw)` }}
-            initial={{ x: "100%" }}
+            initial={{ x: '100%' }}
             animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
             {/* Header */}
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.06] px-4">
@@ -344,9 +385,7 @@ export const ChatDrawer: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-white">知识库问答</h2>
-                  <p className="text-[10px] text-slate-500">
-                    基于分析历史的 AI 助手
-                  </p>
+                  <p className="text-[10px] text-slate-500">基于分析历史的 AI 助手</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -354,9 +393,9 @@ export const ChatDrawer: React.FC = () => {
                 <button
                   onClick={toggleWidth}
                   className="flex size-8 items-center justify-center rounded-lg text-slate-400 transition-all duration-200 hover:bg-white/10 hover:text-white"
-                  title={drawerWidth === "narrow" ? "展开面板" : "收起面板"}
+                  title={drawerWidth === 'narrow' ? '展开面板' : '收起面板'}
                 >
-                  {drawerWidth === "narrow" ? (
+                  {drawerWidth === 'narrow' ? (
                     <Maximize2 className="size-4" />
                   ) : (
                     <Minimize2 className="size-4" />
@@ -374,7 +413,7 @@ export const ChatDrawer: React.FC = () => {
             </div>
 
             {/* Body */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 justify-center overflow-hidden">
               <RAGChatThread drawerWidth={drawerWidth} />
             </div>
           </motion.div>

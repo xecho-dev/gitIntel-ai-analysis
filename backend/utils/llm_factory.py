@@ -9,7 +9,7 @@
 import logging
 import os
 from functools import lru_cache
-from typing import Any
+from typing import Any, AsyncGenerator
 
 _logger = logging.getLogger("gitintel")
 
@@ -226,6 +226,15 @@ class LLMWithTracking:
         return await self._llm.with_config(callbacks=[self._callback]).ainvoke(
             messages, **kwargs
         )
+
+    async def astream(self, messages: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+        """异步流式调用（逐 token 返回）。"""
+        if self._llm is None:
+            raise RuntimeError("LLM 不可用")
+        async for chunk in self._llm.with_config(callbacks=[self._callback]).astream(
+            messages, **kwargs
+        ):
+            yield chunk
 
 
 def get_llm_with_tracking(

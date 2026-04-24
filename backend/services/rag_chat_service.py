@@ -6,7 +6,7 @@ RAG Chat Service — 基于 DashVector 向量检索 + LLM 生成回答。
 
 import logging
 import os
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 from utils.llm_factory import get_llm_with_tracking
 from memory.dashvector_store import DashVectorStore, SearchResult
@@ -108,3 +108,71 @@ def rag_chat(question: str, top_k: int = 5) -> tuple[str, list[RAGSource]]:
     ]
 
     return answer, sources
+
+
+async def rag_chat_stream(
+    question: str,
+    top_k: int = 5,
+) -> AsyncGenerator[tuple[str, list[RAGSource], str], None]:
+    """
+    流式 RAG 问答，逐 token 返回 LLM 输出。
+
+    Yields:
+        (delta_text, rag_sources, full_text)
+        - delta_text: 本次新增的文本片段
+        - rag_sources: 检索到的源文档（RAGSource，只在首次 yield 时非空）
+        - full_text: 截止目前的完整回答
+
+    流结束后，最后一次 yield 会以 delta_text == "" 表示结束。
+    """
+    vector_store = DashVectorStore()
+
+    if not vector_store.is_available:
+        _logger.warning("[RAGChatStream] DashVector 不可用，直接用 LLM 回答")
+        docs: list[SearchResult] = []
+    else:
+        docs = vector_store.retrieve_similar(question, top_k=top_k)
+        _logger.info(f"[RAGChatStream] 检索到 {len(docs)} 条相关文档")
+
+    sources = [
+        RAGSource(
+            repo_url=doc.repo_url,
+            category=doc.category,
+            title=doc.title,
+            content=doc.content,
+            score=doc.score,
+            priority=doc.priority,
+        )
+        for doc in docs
+    ]
+
+    # 立即先 yield 一次 sources（让前端先拿到引用）
+    yield ("", sources, "")
+
+    prompt = _build_rag_prompt(question, docs)
+
+    llm = get_llm_with_tracking(agent_name="RAGChat", temperature=0.3)
+    if llm is None:
+        yield ("抱歉，AI 服务暂时不可用。", [], "抱歉，AI 服务暂时不可用。")
+        return
+
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    messages = [
+        SystemMessage(content=SYSTEM_PROMPT),
+        HumanMessage(content=prompt),
+    ]
+
+    full_text = ""
+    try:
+        async for chunk in llm.astream(messages):
+            token = chunk.content if hasattr(chunk, "content") else str(chunk)
+            full_text += token
+            yield (token, [], full_text)
+    except Exception as exc:
+        _logger.error(f"[RAGChatStream] LLM 流式调用失败: {exc}")
+        yield ("抱歉，回答生成过程中出现错误。", [], full_text)
+        return
+
+    # 结束标记
+    yield ("", [], full_text)
