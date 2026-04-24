@@ -1,6 +1,6 @@
 """
 Chat 相关路由 (/api/chat)
-RAG 问答功能（SSE 流式）
+Multi-Agent 协作问答（SSE 流式）
 """
 import json
 import logging
@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import get_auth_user_id, get_sb_client
 from schemas.chat import SendMessageRequest, CreateSessionRequest
-from services.rag_chat_service import rag_chat_stream
+from agents.chat import multi_agent_chat_stream
 from services.database import (
     create_chat_session,
     get_chat_sessions,
@@ -21,6 +21,19 @@ from services.database import (
     get_session_owner,
     get_user_uuid,
 )
+
+
+def _format_history(messages: list) -> list[dict]:
+    """将数据库消息记录格式化为 Agent 所需的 history 列表。
+
+    仅保留最近 MAX_HISTORY_MESSAGES 条，兼顾多轮记忆与上下文大小控制。
+    """
+    MAX_HISTORY_MESSAGES = 10  # 约 5 轮对话（user + assistant），足够覆盖追问场景
+    return [
+        {"role": m.role, "content": m.content}
+        for m in messages
+        if m.role in ("user", "assistant") and m.content
+    ][-MAX_HISTORY_MESSAGES:]
 
 logger = logging.getLogger("gitintel")
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -82,21 +95,34 @@ async def api_get_chat_messages(session_id: str, request: Request):
 @router.post("/send")
 async def api_send_message(body: SendMessageRequest, request: Request):
     """
-    发送消息，SSE 流式返回 LLM 逐字输出。
+    发送消息，SSE 流式返回 Multi-Agent 协作回答。
 
-    前端需要使用 EventSource 或 fetch + ReadableStream 消费此端点。
+    流程：
+      1. Supervisor 意图分类 + 路由决策
+      2. 分发到最合适的专业 Agent（Knowledge / Code / Analysis / General）
+      3. 支持混合意图多 Agent 协作
+
+    SSE 事件类型：
+      - connected: 连接建立
+      - route: 路由决策（Supervisor 判定意图）
+      - sources: RAG 检索结果
+      - token: LLM 增量输出
+      - error: 异常
+      - done: 回答完成
     """
     auth_user_id = get_auth_user_id(request)
     sb = get_sb_client()
 
-    # 权限校验
     owner = get_session_owner(sb, body.session_id)
     user_uuid = get_user_uuid(sb, auth_user_id)
     if not owner or str(owner) != str(user_uuid):
         raise HTTPException(status_code=403, detail="无权限访问此会话")
 
-    # 保存用户消息
     save_chat_message(sb, body.session_id, "user", body.content)
+
+    # 加载历史消息，传入 Agent 以实现对话记忆
+    past_messages = get_chat_messages(sb, body.session_id)
+    history = _format_history(past_messages)
 
     collected_answer = ""
     collected_sources: list = []
@@ -105,31 +131,37 @@ async def api_send_message(body: SendMessageRequest, request: Request):
     async def event_stream() -> AsyncGenerator[str, None]:
         nonlocal collected_answer, collected_sources, assistant_msg_id
 
-        # 先发连接建立事件
-        yield "data: {\"type\": \"connected\", \"agent\": \"rag_chat\", \"message\": \"正在思考...\", \"percent\": 0}\n\n"
+        yield "data: {\"type\": \"connected\", \"agent\": \"supervisor\", \"message\": \"正在分析问题...\", \"percent\": 0}\n\n"
 
         try:
-            first_yield = True
-            async for delta, sources, full_text in rag_chat_stream(body.content):
-                if first_yield and sources:
-                    collected_sources = sources
-                    sources_data = [s.model_dump(mode="json") for s in sources]
-                    yield f"data: {json.dumps({'type': 'sources', 'agent': 'rag_chat', 'sources': sources_data})}\n\n"
-                    first_yield = False
+            async for sse_chunk in multi_agent_chat_stream(body.content, history=history):
+                # multi_agent_chat_stream yields SSE strings: "data: {...}\n\n"
+                yield sse_chunk
 
-                if delta:
-                    collected_answer = full_text
-                    yield f"data: {json.dumps({'type': 'token', 'agent': 'rag_chat', 'delta': delta, 'full_text': full_text})}\n\n"
+                # 解析 answer 和 sources（从 SSE JSON 中提取）
+                if sse_chunk.startswith("data: "):
+                    raw = sse_chunk[6:].strip()
+                    if raw and raw != "[DONE]":
+                        try:
+                            import json as _json
+                            data = _json.loads(raw)
+                            if data.get("type") == "sources":
+                                collected_sources = data.get("sources", [])
+                            elif data.get("type") == "token":
+                                collected_answer = data.get("full_text", "") or collected_answer
+                        except Exception:
+                            pass
+
         except Exception as exc:
-            logger.error(f"[/api/chat/send] RAG 流异常: {exc}")
-            yield f"data: {json.dumps({'type': 'error', 'agent': 'rag_chat', 'message': str(exc)})}\n\n"
+            logger.error(f"[/api/chat/send] Multi-Agent 流异常: {exc}")
+            yield f"data: {json.dumps({'type': 'error', 'agent': 'supervisor', 'message': str(exc)})}\n\n"
 
-        # 流结束，保存 Assistant 消息
+        # 保存 Assistant 消息
         if collected_answer:
             try:
                 assistant_msg = save_chat_message(
                     sb, body.session_id, "assistant", collected_answer,
-                    rag_context=[s.model_dump(mode="json") for s in collected_sources],
+                    rag_context=collected_sources,
                 )
                 assistant_msg_id = str(assistant_msg.id)
             except Exception as save_err:
@@ -137,10 +169,10 @@ async def api_send_message(body: SendMessageRequest, request: Request):
 
         yield f"data: {json.dumps({
             'type': 'done',
-            'agent': 'rag_chat',
+            'agent': 'multi_agent',
             'message_id': assistant_msg_id,
             'answer': collected_answer,
-            'sources': [s.model_dump(mode="json") for s in collected_sources]
+            'sources': collected_sources
         })}\n\n"
         yield "data: [DONE]\n\n"
 
