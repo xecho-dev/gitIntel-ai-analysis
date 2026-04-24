@@ -10,7 +10,7 @@ type MarkdownTextProps = {
   className?: string;
 };
 
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+const CopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = React.useState(false);
 
   const onCopy = () => {
@@ -45,14 +45,14 @@ const extractLanguage = (children: React.ReactNode): string => {
   return match?.[1] ?? "code";
 };
 
-export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, className }) => {
+export const MarkdownText = ({ children, className }: MarkdownTextProps) => {
   // Extract text content from children for markdown
   const content = React.useMemo(() => {
-    if (typeof children === "string") return children;
+    if (typeof children === 'string') return children;
     if (Array.isArray(children)) {
-      return children.map(c => typeof c === "string" ? c : "").join("");
+      return children.map((c) => (typeof c === 'string' ? c : '')).join('');
     }
-    return "";
+    return '';
   }, [children]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,20 +91,20 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, className 
       </blockquote>
     ),
     ul: ({ children: c }: { children: React.ReactNode }) => (
-      <ul className="mb-2 ml-4 list-disc marker:text-slate-500 [&>li]:mt-1">
-        {c}
-      </ul>
+      <ul className="mb-2 ml-4 list-disc marker:text-slate-500 [&>li]:mt-1">{c}</ul>
     ),
     ol: ({ children: c }: { children: React.ReactNode }) => (
-      <ol className="mb-2 ml-4 list-decimal marker:text-slate-500 [&>li]:mt-1">
-        {c}
-      </ol>
+      <ol className="mb-2 ml-4 list-decimal marker:text-slate-500 [&>li]:mt-1">{c}</ol>
     ),
-    li: ({ children: c }: { children: React.ReactNode }) => (
-      <li className="leading-normal">{c}</li>
-    ),
-    code: ({ className: codeClassName, children: c }: { className?: string; children: React.ReactNode }) => {
-      const isInline = !codeClassName?.includes("language-");
+    li: ({ children: c }: { children: React.ReactNode }) => <li className="leading-normal">{c}</li>,
+    code: ({
+      className: codeClassName,
+      children: c,
+    }: {
+      className?: string;
+      children: React.ReactNode;
+    }) => {
+      const isInline = !codeClassName?.includes('language-');
       if (isInline) {
         return (
           <code className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-300">
@@ -123,9 +123,7 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, className 
             <span className="text-xs font-medium lowercase text-slate-500">{lang}</span>
             <CopyButton text={code} />
           </div>
-          <pre className="overflow-x-auto p-3 text-xs leading-relaxed text-slate-300">
-            {c}
-          </pre>
+          <pre className="overflow-x-auto p-3 text-xs leading-relaxed text-slate-300">{c}</pre>
         </div>
       );
     },
@@ -134,7 +132,9 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({ children, className 
         <table className="w-full border-separate border-spacing-0">{c}</table>
       </div>
     ),
-    thead: ({ children: c }: { children: React.ReactNode }) => <thead className="bg-white/5">{c}</thead>,
+    thead: ({ children: c }: { children: React.ReactNode }) => (
+      <thead className="bg-white/5">{c}</thead>
+    ),
     th: ({ children: c }: { children: React.ReactNode }) => (
       <th className="border border-white/10 px-2 py-1.5 text-left text-xs font-medium first:rounded-tl-lg last:rounded-tr-lg">
         {c}

@@ -90,7 +90,7 @@ const RAGChatAdapter: ChatModelAdapter = {
             text: "无法创建会话，请刷新页面重试。",
           },
         ],
-        status: { type: "complete" as const },
+        status: { type: "complete" as const, reason: "stop" as const },
       };
       return;
     }
@@ -111,7 +111,7 @@ const RAGChatAdapter: ChatModelAdapter = {
               text: `请求失败: ${response.status}`,
             },
           ],
-          status: { type: "complete" as const },
+          status: { type: "complete" as const, reason: "stop" as const },
         };
         return;
       }
@@ -124,7 +124,7 @@ const RAGChatAdapter: ChatModelAdapter = {
               text: "后端返回空响应",
             },
           ],
-          status: { type: "complete" as const },
+          status: { type: "complete" as const, reason: "stop" as const },
         };
         return;
       }
@@ -175,7 +175,7 @@ const RAGChatAdapter: ChatModelAdapter = {
                     text: `错误: ${event.message}`,
                   },
                 ],
-                status: { type: "complete" as const },
+                status: { type: "complete" as const, reason: "stop" as const },
               };
               return;
             }
@@ -194,7 +194,7 @@ const RAGChatAdapter: ChatModelAdapter = {
             text: finalText,
           },
         ],
-        status: { type: "complete" as const },
+        status: { type: "complete" as const, reason: "stop" as const },
       };
     } catch (err) {
       if ((err as Error).name === "AbortError") {
@@ -205,7 +205,7 @@ const RAGChatAdapter: ChatModelAdapter = {
               text: "已取消",
             },
           ],
-          status: { type: "complete" as const },
+          status: { type: "complete" as const, reason: "stop" as const },
         };
       } else {
         yield {
@@ -215,7 +215,7 @@ const RAGChatAdapter: ChatModelAdapter = {
               text: `发生错误: ${(err as Error).message}`,
             },
           ],
-          status: { type: "complete" as const },
+          status: { type: "complete" as const, reason: "stop" as const },
         };
       }
     }

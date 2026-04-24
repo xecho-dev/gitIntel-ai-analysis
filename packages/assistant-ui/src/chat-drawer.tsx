@@ -11,7 +11,7 @@ import { AssistantRuntimeProvider } from "@assistant-ui/react";
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 800;
 
-export const ChatDrawer: React.FC = () => {
+export const ChatDrawer = (): React.JSX.Element => {
   const [open, setOpen] = React.useState(false);
   const [drawerWidth, setDrawerWidth] = React.useState(380);
   const isDraggingRef = React.useRef(false);
@@ -149,9 +149,9 @@ export const ChatDrawer: React.FC = () => {
       </AnimatePresence>
     </>
   );
-};;
+};
 
-const RAGChatWrapper: React.FC = () => {
+const RAGChatWrapper = (): React.JSX.Element => {
   const runtime = useRAGRuntime();
   return (
     <AssistantRuntimeProvider runtime={runtime}>
