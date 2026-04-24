@@ -20,6 +20,7 @@ import {
   ThreadPrimitive,
   useAuiState,
 } from "@assistant-ui/react";
+import { useRAGRuntime, useInitializeSession } from "./runtime";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -35,9 +36,21 @@ import {
 } from "lucide-react";
 import type { FC } from "react";
 
-export const Thread: FC = () => {
+const ThreadWithRuntime: FC = () => {
+  const runtime = useRAGRuntime();
+  const isReady = useInitializeSession();
+
+  if (!isReady) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="w-6 h-6 border-2 border-blue-400/20 rounded-full border-t-blue-400 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <ThreadPrimitive.Root
+      runtime={runtime}
       className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
       style={{
         ["--thread-max-width" as string]: "44rem",
@@ -94,11 +107,11 @@ const ThreadWelcome: FC = () => {
     <div className="aui-thread-welcome-root my-auto flex grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
-          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-2xl duration-200">
-            Hello there!
+          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-2xl duration-200 text-white">
+            知识库问答助手
           </h1>
-          <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-muted-foreground text-xl delay-75 duration-200">
-            How can I help you today?
+          <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-slate-400 text-base delay-75 duration-200">
+            基于你的分析历史，帮你解答代码架构、质量、依赖风险等问题
           </p>
         </div>
       </div>
@@ -308,3 +321,6 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({
     </BranchPickerPrimitive.Root>
   );
 };
+
+// Export with runtime wrapper
+export const Thread: FC = () => <ThreadWithRuntime />;

@@ -4,17 +4,18 @@
 import React from 'react';
 
 export async function getRoutes() {
-  const routes = {"1":{"path":"/","id":"1"},"2":{"path":"/","redirect":"/dashboard","parentId":"1","id":"2"},"3":{"path":"/dashboard","parentId":"1","id":"3"},"4":{"path":"/analysis-history","parentId":"1","id":"4"},"5":{"path":"/users","parentId":"1","id":"5"},"6":{"path":"/audit","parentId":"1","id":"6"},"7":{"path":"/settings","parentId":"1","id":"7"}} as const;
+  const routes = {"1":{"path":"/login","id":"1"},"2":{"path":"/","id":"2"},"3":{"path":"/","redirect":"/dashboard","parentId":"2","id":"3"},"4":{"path":"/dashboard","parentId":"2","id":"4"},"5":{"path":"/analysis-history","parentId":"2","id":"5"},"6":{"path":"/users","parentId":"2","id":"6"},"7":{"path":"/audit","parentId":"2","id":"7"},"8":{"path":"/settings","parentId":"2","id":"8"}} as const;
   return {
     routes,
     routeComponents: {
-'1': React.lazy(() => import(/* webpackChunkName: "layouts__AdminLayout" */'@/layouts/AdminLayout.tsx')),
-'2': React.lazy(() => import('./EmptyRoute')),
-'3': React.lazy(() => import(/* webpackChunkName: "p__dashboard" */'@/pages/dashboard.tsx')),
-'4': React.lazy(() => import(/* webpackChunkName: "p__analysis-history" */'@/pages/analysis-history.tsx')),
-'5': React.lazy(() => import(/* webpackChunkName: "p__users" */'@/pages/users.tsx')),
-'6': React.lazy(() => import(/* webpackChunkName: "p__audit" */'@/pages/audit.tsx')),
-'7': React.lazy(() => import(/* webpackChunkName: "p__settings" */'@/pages/settings.tsx')),
+'1': React.lazy(() => import(/* webpackChunkName: "p__login" */'@/pages/login.tsx')),
+'2': React.lazy(() => import(/* webpackChunkName: "layouts__AdminLayout" */'@/layouts/AdminLayout.tsx')),
+'3': React.lazy(() => import('./EmptyRoute')),
+'4': React.lazy(() => import(/* webpackChunkName: "p__dashboard" */'@/pages/dashboard.tsx')),
+'5': React.lazy(() => import(/* webpackChunkName: "p__analysis-history" */'@/pages/analysis-history.tsx')),
+'6': React.lazy(() => import(/* webpackChunkName: "p__users" */'@/pages/users.tsx')),
+'7': React.lazy(() => import(/* webpackChunkName: "p__audit" */'@/pages/audit.tsx')),
+'8': React.lazy(() => import(/* webpackChunkName: "p__settings" */'@/pages/settings.tsx')),
 },
   };
 }

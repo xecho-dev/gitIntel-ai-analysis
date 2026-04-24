@@ -18,11 +18,35 @@ const request = axios.create({
   },
 });
 
-request.interceptors.request.use((config) => config, (error) => Promise.reject(error));
+// Inject admin auth token from localStorage on every request
+request.interceptors.request.use((config) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {
+    // localStorage not available
+  }
+  return config;
+});
 
 request.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    // If 401, clear auth and redirect to login
+    if (error.response?.status === 401) {
+      try {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        localStorage.removeItem('admin_token_expires_at');
+      } catch {
+        // ignore
+      }
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
     const message = error.response?.data?.detail || error.message || '请求失败';
     console.error('[API Error]', message);
     return Promise.reject(error);
@@ -30,6 +54,40 @@ request.interceptors.response.use(
 );
 
 export default request;
+
+// ─── Admin Auth API ───────────────────────────────────────────────────────────
+
+export interface AdminLoginResponse {
+  token: string;
+  expires_at: string;
+  user: {
+    id: string;
+    username: string;
+    nickname: string;
+    avatar?: string | null;
+    role: string;
+  };
+}
+
+export interface AdminMeResponse {
+  id: string;
+  username: string;
+  nickname: string;
+  avatar?: string | null;
+  role: string;
+}
+
+/** 管理员登录 */
+export const adminLogin = (username: string, password: string): Promise<AdminLoginResponse> =>
+  request.post('/admin/login', { username, password });
+
+/** 注销当前 token */
+export const adminLogout = (): Promise<{ success: boolean }> =>
+  request.post('/admin/logout');
+
+/** 获取当前登录管理员信息 */
+export const adminMe = (): Promise<AdminMeResponse> =>
+  request.get('/admin/me');
 
 // ─── 管理端 API ──────────────────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ const config: Config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "../../packages/assistant-ui/src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     container: {
@@ -88,6 +89,10 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        fabGlow: {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(59, 130, 246, 0.4)" },
+          "50%": { boxShadow: "0 0 0 10px rgba(59, 130, 246, 0)" },
+        },
       },
       animation: {
         scan: "scan 3s linear infinite",
@@ -95,6 +100,7 @@ const config: Config = {
         pulseGlow: "pulseGlow 2s ease-in-out infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        fabGlow: "fabGlow 2.5s ease-in-out infinite",
       },
     },
   },

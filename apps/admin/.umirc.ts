@@ -5,6 +5,7 @@ export default defineConfig({
   npmClient: 'pnpm',
 
   routes: [
+    { path: '/login', component: '@/pages/login' },
     {
       path: '/',
       component: '@/layouts/AdminLayout',
@@ -22,8 +23,6 @@ export default defineConfig({
   alias: {
     '@': resolve(__dirname, 'src'),
   },
-
-  styles: ['@/src/tailwind.css'],
 
   proxy: {
     '/api': {

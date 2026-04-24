@@ -4,12 +4,12 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { LayoutDashboard, History, UserCircle, LogOut, Github, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, History, UserCircle, LogOut, Github, MessageCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { ChatDrawer } from "@gitintel/assistant-ui";
 
 const NAV_ITEMS = [
   { href: '/workspace', label: '工作台', icon: LayoutDashboard },
-  { href: '/chat', label: '知识库问答', icon: MessageSquare },
   { href: '/history', label: '历史记录', icon: History },
   { href: '/account', label: '账户中心', icon: UserCircle },
 ];
@@ -111,6 +111,8 @@ export const Header = () => {
       </div>
     </header>
 
+    {/* Floating Chat Drawer */}
+    <ChatDrawer />
     </>
   );
 };

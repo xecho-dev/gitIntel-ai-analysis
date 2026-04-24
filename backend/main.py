@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from typing import Any
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException, Query
+from fastapi import FastAPI, Request, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -98,6 +98,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── 认证依赖 ────────────────────────────────────────────────
+
+
+def get_current_admin(request: Request) -> dict:
+    """
+    管理员认证依赖。
+    从 Authorization header 中验证 admin token，验证失败抛出 401。
+    成功时返回管理员信息 dict: {id, username, nickname, avatar, role}
+    """
+    from middleware.admin_auth import require_admin_auth
+    return require_admin_auth(request)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -628,11 +640,96 @@ async def api_pr_create(req: PRCreateRequest, request: Request):
     }
 
 
+# ─── Admin Authentication API ────────────────────────────────────────────────
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    token: str
+    expires_at: str
+    user: dict
+
+
+@app.post("/api/admin/login", response_model=AdminLoginResponse)
+async def api_admin_login(req: AdminLoginRequest, request: Request):
+    """
+    管理员登录接口。
+    验证用户名密码，签发 token，返回给前端存储。
+    """
+    from middleware.admin_auth import (
+        get_admin_user_by_username,
+        verify_password,
+        create_admin_token,
+    )
+
+    # 1. 查询用户
+    admin_user = get_admin_user_by_username(req.username)
+    if not admin_user:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    # 2. 验证密码
+    if not verify_password(req.password, admin_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+
+    # 3. 生成 token 并记录
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+    token, expires_at = create_admin_token(
+        admin_user_id=admin_user["id"],
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    # 4. 更新最后登录时间
+    try:
+        sb = get_supabase_admin()
+        sb.table("admin_users").update({
+            "last_login_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", admin_user["id"]).execute()
+    except Exception:
+        pass  # 不影响登录流程
+
+    return AdminLoginResponse(
+        token=token,
+        expires_at=expires_at.isoformat(),
+        user={
+            "id": admin_user["id"],
+            "username": admin_user["username"],
+            "nickname": admin_user.get("nickname") or admin_user["username"],
+            "avatar": admin_user.get("avatar"),
+            "role": admin_user.get("role", "admin"),
+        },
+    )
+
+
+@app.post("/api/admin/logout")
+async def api_admin_logout(
+    request: Request,
+    admin: dict = Depends(get_current_admin),
+):
+    """注销当前 token（删除服务端 token 记录）。"""
+    from middleware.admin_auth import revoke_admin_token
+
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:] if auth_header.startswith("Bearer ") else ""
+    revoke_admin_token(token)
+    return {"success": True, "admin": admin}
+
+
+@app.get("/api/admin/me")
+async def api_admin_me(admin: dict = Depends(get_current_admin)):
+    """获取当前登录管理员信息。"""
+    return admin
+
+
 # ─── Admin 管理端 API ──────────────────────────────────────────────────────────
 
 @app.get("/api/admin/overview", response_model=AdminOverviewResponse)
-async def api_admin_overview():
-    """系统概览统计数据（无需登录，供 admin 后台使用）"""
+async def api_admin_overview(admin: dict = Depends(get_current_admin)):
+    """系统概览统计数据（需登录）。"""
     try:
         sb = get_supabase_admin()
     except RuntimeError as e:
@@ -648,6 +745,7 @@ async def api_admin_overview():
 
 @app.get("/api/admin/users", response_model=AdminUserListResponse)
 async def api_admin_list_users(
+    admin: dict = Depends(get_current_admin),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None),
@@ -663,7 +761,11 @@ async def api_admin_list_users(
 
 
 @app.put("/api/admin/users/{user_id}", response_model=dict)
-async def api_admin_update_user(user_id: str, body: dict, request: Request):
+async def api_admin_update_user(
+    user_id: str,
+    body: dict,
+    admin: dict = Depends(get_current_admin),
+):
     """管理端：更新指定用户（如禁用/启用）"""
     try:
         sb = get_supabase_admin()
@@ -679,6 +781,7 @@ async def api_admin_update_user(user_id: str, body: dict, request: Request):
 
 @app.get("/api/admin/analysis-history", response_model=AdminHistoryListResponse)
 async def api_admin_list_history(
+    admin: dict = Depends(get_current_admin),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None),
@@ -715,8 +818,11 @@ async def api_admin_list_history(
 
 
 @app.get("/api/admin/analysis-history/{record_id}", response_model=dict)
-async def api_admin_history_detail(record_id: str):
-    """管理端：获取单条分析记录的完整详情（包含关联用户信息 + 真实 LangSmith 追踪数据）"""
+async def api_admin_history_detail(
+    record_id: str,
+    admin: dict = Depends(get_current_admin),
+):
+    """管理端：获取单条分析记录的完整详情"""
     try:
         sb = get_supabase_admin()
     except RuntimeError as e:
@@ -764,6 +870,7 @@ async def api_admin_history_detail(record_id: str):
 @app.get("/api/admin/users/{user_id}/history", response_model=dict)
 async def api_admin_user_history(
     user_id: str,
+    admin: dict = Depends(get_current_admin),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     search: str | None = Query(None),

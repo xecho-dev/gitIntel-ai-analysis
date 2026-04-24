@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useLocation, Outlet } from 'umi';
-import { Layout, Menu, Button, Dropdown, Avatar, Space, Typography, ConfigProvider, App as AntApp } from 'antd';
+import { Link, useLocation, Outlet, Navigate } from 'umi';
+import { Layout, Menu, Button, Dropdown, Avatar, Space, Typography, ConfigProvider, App as AntApp, message, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import type { MenuProps } from 'antd';
 import {
@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
+import { adminLogout, adminMe } from '@/services/admin';
 
 dayjs.locale('zh-cn');
 
@@ -59,20 +60,85 @@ const menuItems = [
   { key: '/settings', icon: <SettingOutlined />, label: <Link to="/settings">系统设置</Link> },
 ];
 
-const userMenuItems: MenuProps['items'] = [
-  { key: 'profile', label: '个人中心' },
-  { key: 'settings', label: '账户设置' },
-  { type: 'divider' },
-  { key: 'logout', label: '退出登录', danger: true },
-];
-
 function AdminLayout() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [messageApi, contextHolder] = message.useMessage();
+  const [authState, setAuthState] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) {
+      setAuthState('unauthenticated');
+      return;
+    }
+
+    adminMe()
+      .then((user) => {
+        localStorage.setItem('admin_user', JSON.stringify(user));
+        setAuthState('authenticated');
+      })
+      .catch(() => {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        localStorage.removeItem('admin_token_expires_at');
+        setAuthState('unauthenticated');
+      });
+  }, []);
+
+  if (authState === 'loading') {
+    return (
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#f5f5f5',
+        }}
+      >
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (authState === 'unauthenticated') {
+    return <Navigate to="/login" replace />;
+  }
+
+  const adminUser = (() => {
+    try {
+      const stored = localStorage.getItem('admin_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const handleLogout = async () => {
+    try {
+      await adminLogout();
+    } catch {
+      // ignore server error, still clear local
+    }
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    localStorage.removeItem('admin_token_expires_at');
+    messageApi.success('已退出登录');
+    window.location.href = '/login';
+  };
+
+  const userMenuItems: MenuProps['items'] = [
+    { key: 'profile', label: '个人中心' },
+    { key: 'settings', label: '账户设置' },
+    { type: 'divider' },
+    { key: 'logout', label: '退出登录', danger: true, onClick: handleLogout },
+  ];
 
   return (
     <ConfigProvider theme={lightTheme} locale={zhCN}>
       <AntApp>
+        {contextHolder}
         <Layout style={{ minHeight: '100vh' }}>
           <Sider
             width={220}
@@ -191,9 +257,11 @@ function AdminLayout() {
                 <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                   <Space style={{ cursor: 'pointer' }}>
                     <Avatar size={32} style={{ background: '#3b82f6' }}>
-                      A
+                      {adminUser?.nickname?.[0] || adminUser?.username?.[0] || 'A'}
                     </Avatar>
-                    <Text strong style={{ fontSize: 14 }}>Admin</Text>
+                    <Text strong style={{ fontSize: 14 }}>
+                      {adminUser?.nickname || adminUser?.username || 'Admin'}
+                    </Text>
                   </Space>
                 </Dropdown>
               </Space>
