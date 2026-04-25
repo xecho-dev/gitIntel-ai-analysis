@@ -142,7 +142,9 @@ export const ChatDrawer = (): React.JSX.Element => {
 
             {/* Content */}
             <div className="flex flex-1 overflow-hidden pl-5">
-              <RAGChatWrapper />
+              <div className="flex flex-1 min-h-0">
+                <RAGChatWrapper />
+              </div>
             </div>
           </motion.div>
         )}

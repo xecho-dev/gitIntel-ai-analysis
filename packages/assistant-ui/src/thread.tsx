@@ -29,6 +29,7 @@ import { ToolFallback } from './tool-fallback';
 import { ComposerAddAttachment, ComposerAttachments, UserMessageAttachments } from './attachment';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import React from 'react';
 
 function AssistantText({ text }: { text: string }) {
   return (
@@ -100,11 +101,8 @@ function UserText({ text }: { text: string }) {
 
 export function Thread() {
   return (
-    <ThreadPrimitive.Root className="flex h-full flex-col bg-[#0d1117] text-sm w-full">
-      <ThreadPrimitive.Viewport
-        turnAnchor="top"
-        className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4"
-      >
+    <ThreadPrimitive.Root className="flex h-full flex-col overflow-hidden bg-[#0d1117] text-sm w-full">
+      <ThreadPrimitive.Viewport className="flex flex-1 flex-col overflow-y-scroll px-4 pt-4">
         <AuiIf condition={(s) => s.thread.isEmpty}>
           <ThreadWelcome />
         </AuiIf>

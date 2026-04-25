@@ -134,23 +134,28 @@ async def api_send_message(body: SendMessageRequest, request: Request):
         yield "data: {\"type\": \"connected\", \"agent\": \"supervisor\", \"message\": \"正在分析问题...\", \"percent\": 0}\n\n"
 
         try:
-            async for sse_chunk in multi_agent_chat_stream(body.content, history=history):
-                # multi_agent_chat_stream yields SSE strings: "data: {...}\n\n"
-                yield sse_chunk
+            async for raw_json in multi_agent_chat_stream(body.content, history=history):
+                # 统一加 data: 前缀后转发给客户端
+                yield f"data: {raw_json}\n\n"
 
-                # 解析 answer 和 sources（从 SSE JSON 中提取）
-                if sse_chunk.startswith("data: "):
-                    raw = sse_chunk[6:].strip()
-                    if raw and raw != "[DONE]":
-                        try:
-                            import json as _json
-                            data = _json.loads(raw)
-                            if data.get("type") == "sources":
-                                collected_sources = data.get("sources", [])
-                            elif data.get("type") == "token":
-                                collected_answer = data.get("full_text", "") or collected_answer
-                        except Exception:
-                            pass
+                # 解析 answer / sources（raw_json 已是纯 JSON 字符串）
+                if raw_json == "[DONE]":
+                    continue
+                try:
+                    import json as _json
+                    data = _json.loads(raw_json)
+                    t = data.get("type", "")
+                    if t == "sources":
+                        collected_sources = data.get("sources", [])
+                    elif t in ("token", "done"):
+                        # 优先从顶层 answer/full_text 取，否则从 data.final_answer 取
+                        ans = data.get("answer") or data.get("full_text") or ""
+                        if not ans and isinstance(data.get("data"), dict):
+                            ans = data["data"].get("final_answer", "")
+                        if ans:
+                            collected_answer = ans
+                except Exception:
+                    pass
 
         except Exception as exc:
             logger.error(f"[/api/chat/send] Multi-Agent 流异常: {exc}")

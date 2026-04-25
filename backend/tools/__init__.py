@@ -55,6 +55,17 @@ from tools.rag_tools import (
     rag_search_by_category,
     rag_search_code_pattern,
     rag_store_suggestion,
+    rag_search_knowledge_base,
+    rag_store_analysis,
+)
+from tools.chat_tools import (
+    rag_search_knowledge_base as chat_rag_search_knowledge_base,
+    rag_search_similar as chat_rag_search_similar,
+    rag_search_by_category as chat_rag_search_by_category,
+    lookup_repo_analysis,
+    analyze_code,
+    detect_code_language,
+    CHAT_TOOLS,
 )
 
 # 所有工具的聚合列表（方便批量绑定到 LLM）
@@ -81,6 +92,8 @@ ALL_TOOLS = [
     rag_search_by_category,
     rag_search_code_pattern,
     rag_store_suggestion,
+    # Chat
+    *CHAT_TOOLS,
 ]
 
 __all__ = [
@@ -92,7 +105,10 @@ __all__ = [
     "summarize_code_file", "detect_imports", "detect_dependencies",
     # RAG
     "rag_search_similar", "rag_search_by_repo", "rag_search_by_category",
-    "rag_search_code_pattern", "rag_store_suggestion",
+    "rag_search_code_pattern", "rag_store_suggestion", "rag_search_knowledge_base",
+    "rag_store_analysis",
+    # Chat
+    "lookup_repo_analysis", "analyze_code", "detect_code_language", "CHAT_TOOLS",
     # All
     "ALL_TOOLS",
 ]

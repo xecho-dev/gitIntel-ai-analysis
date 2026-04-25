@@ -19,7 +19,10 @@ from .knowledge_agent import KnowledgeAgent
 from .code_agent import CodeAgent
 from .analysis_agent import AnalysisAgent
 from .general_agent import GeneralAgent
-from .multi_agent_router import MultiAgentRouter, multi_agent_chat_stream
+from .multi_agent_router import MultiAgentRouter
+
+# 从 LangGraph 工作流导入（新的 LangGraph 实现）
+from graph.chat_graph import multi_agent_chat_stream as multi_agent_chat_stream
 
 __all__ = [
     "ChatAgent",

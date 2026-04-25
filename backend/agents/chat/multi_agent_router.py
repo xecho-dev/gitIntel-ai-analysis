@@ -1,11 +1,9 @@
 """
 Multi-Agent Router — 多 Agent 协作路由编排层。
 
-职责：
-  1. 接收用户问题，调用 Supervisor 进行意图分类
-  2. 根据路由决策分发到对应的专业 Agent
-  3. 支持 mixed 意图（多 Agent 协作）
-  4. 流式输出 SSE 事件
+**已迁移至 LangGraph 工作流（graph/chat_graph.py）。**
+
+本模块保留作为兼容层，代理到新的 LangGraph 实现。
 """
 
 import json
@@ -21,6 +19,10 @@ from .code_agent import CodeAgent
 from .general_agent import GeneralAgent
 from .knowledge_agent import KnowledgeAgent
 from .supervisor_agent import SupervisorAgent
+
+# 导入 LangGraph 实现（新逻辑）
+# 注意：这里用延迟导入避免循环依赖，graph/chat_graph.py 不依赖 agents 层
+import graph.chat_graph as _graph_chat_graph
 
 _logger = logging.getLogger("gitintel")
 
@@ -250,17 +252,14 @@ async def multi_agent_chat_stream(
     """
     主入口：yield SSE 格式字符串 "data: {...}\n\n"。
 
-    供 StreamingResponse 使用。
+    委托给 graph/chat_graph.py 的 LangGraph 工作流实现。
+    保留本函数作为兼容层，供 routers/chat.py 使用。
     """
-    router = MultiAgentRouter()
-
-    async for event in router.chat_stream(
+    async for event_str in _langgraph_chat_stream(
         question=question,
         history=history,
         repo_url=repo_url,
         analysis_cache=analysis_cache,
     ):
-        yield f"data: {json.dumps(event.to_sse_dict(), ensure_ascii=False)}\n\n"
-
-    yield "data: [DONE]\n\n"
+        yield event_str
 

@@ -45,8 +45,10 @@ from .chat import (
     AnalysisAgent,
     GeneralAgent,
     MultiAgentRouter,
-    multi_agent_chat_stream,
 )
+
+# 直接从 LangGraph 工作流模块导入（绕过 graph/__init__.py 避免循环依赖）
+from graph.chat_graph import multi_agent_chat_stream
 
 # ─── ReAct 模式 Agent（主力）──────────────────────────────────────────────────
 
