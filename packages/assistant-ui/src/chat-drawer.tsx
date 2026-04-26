@@ -77,6 +77,12 @@ export const ChatDrawer = (): React.JSX.Element => {
           'fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-2xl shadow-blue-500/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#0d1117] active:scale-95',
           'bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 hover:shadow-blue-500/40 hover:scale-105 hover:shadow-2xl',
         )}
+        style={{
+          width: '3.5rem',
+          height: '3.5rem',
+          background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+          boxShadow: '0 25px 50px -12px rgba(59, 130, 246, 0.25)',
+        }}
         aria-label="打开知识库问答"
         whileTap={{ scale: 0.93 }}
       >
