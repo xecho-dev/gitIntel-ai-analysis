@@ -5,11 +5,13 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@gitintel/ui/resizable";
-import type { FC, PropsWithChildren } from "react";
+import type { FC, ReactNode } from "react";
 
 import { Thread } from "./thread";
 
-export const AssistantSidebar: FC<PropsWithChildren> = ({ children }) => {
+export const AssistantSidebar: FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   return (
     <ResizablePanelGroup orientation="horizontal">
       <ResizablePanel>{children}</ResizablePanel>

@@ -1,6 +1,6 @@
 "use client";
 
-import { type PropsWithChildren, useEffect, useState, type FC } from "react";
+import { useEffect, useState, type FC, type ReactNode } from "react";
 import { XIcon, PlusIcon, FileText } from "lucide-react";
 import {
   AttachmentPrimitive,
@@ -81,7 +81,7 @@ const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
   );
 };
 
-const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
+const AttachmentPreviewDialog: FC<{ children: ReactNode }> = ({ children }) => {
   const src = useAttachmentSrc();
 
   if (!src) return children;
