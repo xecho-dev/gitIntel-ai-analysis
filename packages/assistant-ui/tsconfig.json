@@ -4,7 +4,7 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
-    "types": ["node"]
+    "types": ["node", "@types/react"]
   },
   "include": ["src/**/*"]
 }
