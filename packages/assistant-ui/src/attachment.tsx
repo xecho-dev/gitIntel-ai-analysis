@@ -189,6 +189,6 @@ export const ComposerAttachments: FC = () => {
 
 export const ComposerAddAttachment: FC = () => {
   return (
-    <ComposerPrimitive.AddAttachment render={<TooltipIconButton tooltip="Add Attachment" side="bottom" variant="ghost" size="icon" className="aui-composer-add-attachment size-8 rounded-full p-1 font-semibold text-xs hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30" aria-label="Add Attachment" />}><PlusIcon className="aui-attachment-add-icon size-5 stroke-[1.5px]" /></ComposerPrimitive.AddAttachment>
+    <ComposerPrimitive.AddAttachment render={<TooltipIconButton tooltip="Add Attachment" side="bottom" className="aui-composer-add-attachment size-8 rounded-full p-1 font-semibold text-xs hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30" aria-label="Add Attachment" />}><PlusIcon className="aui-attachment-add-icon size-5 stroke-[1.5px]" /></ComposerPrimitive.AddAttachment>
   );
 };

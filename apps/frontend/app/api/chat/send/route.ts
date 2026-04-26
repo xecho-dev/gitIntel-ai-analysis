@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
       try {
         while (true) {
           const { done, value } = await reader.read();

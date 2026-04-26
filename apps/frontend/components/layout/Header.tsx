@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { LayoutDashboard, History, UserCircle, LogOut, Github, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, History, UserCircle, LogOut, Github } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { ChatDrawer } from "@gitintel/assistant-ui";
 

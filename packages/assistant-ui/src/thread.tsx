@@ -26,7 +26,7 @@ import '@assistant-ui/react-markdown/styles/dot.css';
 
 import { cn } from '@gitintel/ui';
 import { ToolFallback } from './tool-fallback';
-import { ComposerAddAttachment, ComposerAttachments, UserMessageAttachments } from './attachment';
+import { ComposerAttachments, UserMessageAttachments } from './attachment';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import React from 'react';
@@ -176,7 +176,8 @@ function Composer() {
 function ComposerAction() {
   return (
     <div className="relative mx-2 mb-2 flex items-center justify-between">
-      <ComposerAddAttachment />
+      {/* <ComposerAddAttachment /> */}
+      <div></div>
 
       <AuiIf condition={(s) => !s.thread.isRunning}>
         <ComposerPrimitive.Send asChild>

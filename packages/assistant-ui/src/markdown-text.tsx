@@ -32,8 +32,9 @@ const CopyButton = ({ text }: { text: string }) => {
 };
 
 const extractCode = (children: React.ReactNode): string => {
-  const el = React.Children.toArray(children).find((c) => React.isValidElement(c)) as React.ElementType;
-  return String((el as React.ReactElement<{ children?: React.ReactNode }>)?.props?.children ?? "");
+  const el = React.Children.toArray(children).find((c) => React.isValidElement(c));
+  const element = el as unknown as React.ReactElement<{ children?: React.ReactNode }>;
+  return String(element?.props?.children ?? "");
 };
 
 const extractLanguage = (children: React.ReactNode): string => {
