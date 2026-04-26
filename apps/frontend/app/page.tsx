@@ -4,7 +4,6 @@ import React, { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
-  LandingNavbar,
   LandingHero,
   LandingPartners,
   LandingFeatures,
@@ -32,7 +31,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#10141a]">
-      <LandingNavbar />
       <main>
         <LandingHero />
         <LandingPartners />
