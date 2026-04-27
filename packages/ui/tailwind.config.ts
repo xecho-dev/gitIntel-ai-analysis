@@ -1,22 +1,9 @@
 import type { Config } from "tailwindcss";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Workspace packages 的相对路径
-const assistantUiPath = path.resolve(__dirname, "../../packages/assistant-ui/src");
-const uiPath = path.resolve(__dirname, "../../packages/ui/src");
 
 const config: Config = {
   darkMode: ["class"],
   content: [
-    // Frontend app
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    // Shared packages - 直接使用绝对路径
-    `${assistantUiPath}/**/*.{js,ts,jsx,tsx,mdx}`,
-    `${uiPath}/**/*.{js,ts,jsx,tsx,mdx}`,
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     container: {

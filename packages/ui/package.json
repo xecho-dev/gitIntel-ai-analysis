@@ -6,6 +6,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./tailwind.config": "./tailwind.config.ts",
     "./resizable": "./src/resizable.tsx",
     "./tooltip": "./src/tooltip.tsx",
     "./dialog": "./src/dialog.tsx",
@@ -29,6 +30,8 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^3.4.17",
+    "tailwindcss-animate": "^1.0.7",
     "typescript": "~5.8.2"
   }
 }
