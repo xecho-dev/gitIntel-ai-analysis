@@ -4,9 +4,13 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Workspace packages 的相对路径
-const assistantUiPath = path.resolve(__dirname, "../../packages/assistant-ui/src");
-const uiPath = path.resolve(__dirname, "../../packages/ui/src");
+// packages 目录在项目根目录的相对位置
+// 本地: __dirname = .../apps/frontend, packages = ../../packages
+// Docker: __dirname = /app, packages = ./packages
+// 检测是否在 Docker 中（__dirname 是根路径）
+const packagesRoot = __dirname === "/app"
+  ? path.join(__dirname, "packages")
+  : path.resolve(__dirname, "../../packages");
 
 const config: Config = {
   darkMode: ["class"],
@@ -14,9 +18,9 @@ const config: Config = {
     // Frontend app
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    // Shared packages - 直接使用绝对路径
-    `${assistantUiPath}/**/*.{js,ts,jsx,tsx,mdx}`,
-    `${uiPath}/**/*.{js,ts,jsx,tsx,mdx}`,
+    // Shared packages
+    `${packagesRoot}/assistant-ui/src/**/*.{js,ts,jsx,tsx,mdx}`,
+    `${packagesRoot}/ui/src/**/*.{js,ts,jsx,tsx,mdx}`,
   ],
   theme: {
     container: {
