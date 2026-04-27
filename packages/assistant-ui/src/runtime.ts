@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   useLocalRuntime,
   type ChatModelAdapter,
@@ -20,6 +20,9 @@ export function getCurrentSessionId() {
 }
 let sessionPromise: Promise<ChatSession | null> | null = null;
 
+// Track if we have pending operations
+let isInitialized = false;
+
 async function getOrCreateSession(): Promise<ChatSession | null> {
   if (currentSessionId) {
     return { id: currentSessionId, title: "", created_at: "", updated_at: "" };
@@ -32,7 +35,10 @@ async function getOrCreateSession(): Promise<ChatSession | null> {
   sessionPromise = (async () => {
     try {
       const res = await fetch("/api/chat/sessions");
-      if (!res.ok) return null;
+      if (!res.ok) {
+        console.warn("[runtime] Failed to get sessions:", res.status);
+        return null;
+      }
       const data = await res.json();
 
       if (data.items?.length > 0) {
@@ -46,11 +52,15 @@ async function getOrCreateSession(): Promise<ChatSession | null> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: "知识库问答" }),
       });
-      if (!createRes.ok) return null;
+      if (!createRes.ok) {
+        console.warn("[runtime] Failed to create session:", createRes.status);
+        return null;
+      }
       const newSession = await createRes.json();
       currentSessionId = newSession.id;
       return newSession;
-    } catch {
+    } catch (err) {
+      console.error("[runtime] Session error:", err);
       return null;
     } finally {
       sessionPromise = null;
@@ -87,7 +97,7 @@ const RAGChatAdapter: ChatModelAdapter = {
         content: [
           {
             type: "text" as const,
-            text: "无法创建会话，请刷新页面重试。",
+            text: "无法创建会话，请先访问「账户中心」完成 GitHub 资料同步。",
           },
         ],
         status: { type: "complete" as const, reason: "stop" as const },
@@ -223,7 +233,9 @@ const RAGChatAdapter: ChatModelAdapter = {
 };
 
 export function useRAGRuntime() {
-  return useLocalRuntime(RAGChatAdapter);
+  // Memoize the adapter to prevent recreation on every render
+  const adapter = useMemo<ChatModelAdapter>(() => RAGChatAdapter, []);
+  return useLocalRuntime(adapter);
 }
 
 export function useInitializeSession() {
@@ -234,9 +246,78 @@ export function useInitializeSession() {
       if (session) {
         currentSessionId = session.id;
         setIsReady(true);
+      } else {
+        // Session creation failed - might need profile sync
+        // Try to sync profile first, then retry session creation
+        syncProfileAndRetry().then((newSession) => {
+          if (newSession) {
+            currentSessionId = newSession.id;
+            setIsReady(true);
+          }
+        });
       }
     });
   }, []);
 
   return isReady;
+}
+
+async function syncProfileAndRetry(): Promise<ChatSession | null> {
+  try {
+    // Get session from useSession to access user info
+    const sessionRes = await fetch("/api/auth/session");
+    if (!sessionRes.ok) {
+      console.warn("[runtime] Failed to get auth session:", sessionRes.status);
+      return null;
+    }
+    const sessionData = await sessionRes.json();
+    const user = sessionData?.user;
+    if (!user?.login) {
+      console.warn("[runtime] No user login found in session");
+      return null;
+    }
+
+    // Try to sync profile
+    const syncRes = await fetch("/api/user/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        login: user.login,
+        name: user.name,
+        email: user.email,
+        avatar_url: user.image ?? null,
+      }),
+    });
+
+    if (!syncRes.ok) {
+      console.warn("[runtime] Failed to sync profile:", syncRes.status);
+      return null;
+    }
+
+    // Retry session creation
+    const res = await fetch("/api/chat/sessions");
+    if (!res.ok) {
+      console.warn("[runtime] Failed to get sessions after sync:", res.status);
+      return null;
+    }
+    const data = await res.json();
+
+    if (data.items?.length > 0) {
+      return data.items[0];
+    }
+
+    const createRes = await fetch("/api/chat/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "知识库问答" }),
+    });
+    if (!createRes.ok) {
+      console.warn("[runtime] Failed to create session after sync:", createRes.status);
+      return null;
+    }
+    return await createRes.json();
+  } catch (err) {
+    console.error("[runtime] Sync profile error:", err);
+    return null;
+  }
 }
