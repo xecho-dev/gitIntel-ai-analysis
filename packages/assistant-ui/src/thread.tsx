@@ -235,8 +235,7 @@ function UserMessage() {
       <UserMessageAttachments />
 
       <div className="relative col-start-2 min-w-0">
-        <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 px-4 py-2.5 text-white shadow-lg shadow-blue-500/20 break-words"
-          style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)' }}>
+        <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 px-4 py-2.5 text-white shadow-lg shadow-blue-500/20 break-words">
           <MessagePrimitive.Parts
             components={{
               Text: UserText,
