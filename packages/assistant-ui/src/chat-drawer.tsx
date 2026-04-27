@@ -14,28 +14,10 @@ const MAX_WIDTH = 800;
 export const ChatDrawer = (): React.JSX.Element => {
   const [open, setOpen] = React.useState(false);
   const [drawerWidth, setDrawerWidth] = React.useState(380);
-  const [isReady, setIsReady] = React.useState(false);
   const isDraggingRef = React.useRef(false);
   const startXRef = React.useRef(0);
   const startWidthRef = React.useRef(380);
-  const drawerRef = React.useRef<HTMLDivElement>(null);
-
-  // Initialize session and wait for drawer animation
-  React.useEffect(() => {
-    if (open) {
-      // Small delay to wait for animation
-      const timer = setTimeout(() => {
-        setIsReady(true);
-        // Focus the input
-        const input = drawerRef.current?.querySelector('input[aria-label="Message input"]') as HTMLInputElement | null;
-        input?.focus();
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
-      setIsReady(false);
-    }
-  }, [open]);
-
+  const runtime = useRAGRuntime();
   useInitializeSession();
 
   // Lock body scroll when drawer is open
@@ -120,7 +102,6 @@ export const ChatDrawer = (): React.JSX.Element => {
       <AnimatePresence>
         {open && (
           <motion.div
-            ref={drawerRef}
             className={cn(
               'fixed right-0 top-0 z-50 flex h-full flex-col overflow-hidden',
               'bg-[#0d1117]/95 border-l border-white/[0.06]',
@@ -163,7 +144,7 @@ export const ChatDrawer = (): React.JSX.Element => {
             {/* Content */}
             <div className="flex flex-1 overflow-hidden pl-5">
               <div className="flex flex-1 min-h-0">
-                <RAGChatWrapper />
+                <RAGChatWrapper runtime={runtime} />
               </div>
             </div>
           </motion.div>
@@ -173,8 +154,7 @@ export const ChatDrawer = (): React.JSX.Element => {
   );
 };
 
-const RAGChatWrapper = (): React.JSX.Element => {
-  const runtime = useRAGRuntime();
+const RAGChatWrapper = ({ runtime }: { runtime: ReturnType<typeof useRAGRuntime> }): React.JSX.Element => {
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <Thread />

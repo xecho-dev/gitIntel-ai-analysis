@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   useLocalRuntime,
   type ChatModelAdapter,

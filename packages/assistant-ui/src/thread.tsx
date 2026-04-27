@@ -162,10 +162,9 @@ function Composer() {
         <ComposerAttachments />
         <ComposerPrimitive.Input
           placeholder="输入你的问题..."
-          className="mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm text-white outline-none placeholder:text-slate-600 focus-visible:ring-0"
+          className="mb-1 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm text-white outline-none placeholder:text-slate-600"
           rows={1}
           autoFocus
-          aria-label="Message input"
         />
         <ComposerAction />
       </ComposerPrimitive.AttachmentDropzone>
