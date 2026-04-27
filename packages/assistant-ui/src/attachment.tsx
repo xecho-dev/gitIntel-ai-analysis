@@ -22,7 +22,6 @@ import {
   DialogTrigger,
 } from "@gitintel/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@gitintel/ui/avatar";
-import { TooltipIconButton } from "./tooltip-icon-button";
 import { cn } from "@gitintel/ui";
 
 const useFileSrc = (file: File | undefined) => {
@@ -150,7 +149,19 @@ const AttachmentUI: FC = () => {
         )}
       >
         <AttachmentPreviewDialog>
-          <TooltipTrigger render={<div className="aui-attachment-tile size-14 cursor-pointer overflow-hidden rounded-[calc(var(--composer-radius)-var(--composer-padding))] border bg-muted transition-opacity hover:opacity-75" role="button" tabIndex={0} aria-label={`${typeLabel} attachment`} />}><AttachmentThumb /></TooltipTrigger>
+          <TooltipTrigger
+            render={(props) => (
+              <div
+                {...props}
+                className="aui-attachment-tile size-14 cursor-pointer overflow-hidden rounded-[calc(var(--composer-radius)-var(--composer-padding))] border bg-muted transition-opacity hover:opacity-75"
+                role="button"
+                tabIndex={0}
+                aria-label={`${typeLabel} attachment`}
+              >
+                <AttachmentThumb />
+              </div>
+            )}
+          />
         </AttachmentPreviewDialog>
         {isComposer && <AttachmentRemove />}
       </AttachmentPrimitive.Root>
@@ -163,7 +174,12 @@ const AttachmentUI: FC = () => {
 
 const AttachmentRemove: FC = () => {
   return (
-    <AttachmentPrimitive.Remove render={<TooltipIconButton tooltip="Remove file" className="aui-attachment-tile-remove absolute top-1.5 right-1.5 size-3.5 rounded-full bg-white text-muted-foreground opacity-100 shadow-sm hover:bg-white! [&_svg]:text-black hover:[&_svg]:text-destructive" side="top" />}><XIcon className="aui-attachment-remove-icon size-3 dark:stroke-[2.5px]" /></AttachmentPrimitive.Remove>
+    <AttachmentPrimitive.Remove
+      className="aui-attachment-tile-remove absolute top-1.5 right-1.5 z-10 size-3.5 rounded-full bg-white text-muted-foreground opacity-100 shadow-sm hover:bg-white! [&_svg]:text-black hover:[&_svg]:text-destructive"
+      title="Remove file"
+    >
+      <XIcon className="aui-attachment-remove-icon size-3 dark:stroke-[2.5px]" />
+    </AttachmentPrimitive.Remove>
   );
 };
 
@@ -189,6 +205,12 @@ export const ComposerAttachments: FC = () => {
 
 export const ComposerAddAttachment: FC = () => {
   return (
-    <ComposerPrimitive.AddAttachment render={<TooltipIconButton tooltip="Add Attachment" side="bottom" className="aui-composer-add-attachment size-8 rounded-full p-1 font-semibold text-xs hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30" aria-label="Add Attachment" />}><PlusIcon className="aui-attachment-add-icon size-5 stroke-[1.5px]" /></ComposerPrimitive.AddAttachment>
+    <ComposerPrimitive.AddAttachment
+      className="aui-composer-add-attachment size-8 rounded-full p-1 font-semibold text-xs hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30"
+      title="Add Attachment"
+      aria-label="Add Attachment"
+    >
+      <PlusIcon className="aui-attachment-add-icon size-5 stroke-[1.5px]" />
+    </ComposerPrimitive.AddAttachment>
   );
 };

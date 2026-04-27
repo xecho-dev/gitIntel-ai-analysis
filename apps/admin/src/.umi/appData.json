@@ -56,20 +56,20 @@
     "@umijs/preset-umi": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "preset",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/index.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/index.js",
       "id": "@umijs/preset-umi",
       "key": "umi",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 26
+        "register": 14
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/registerMethods": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/registerMethods.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/registerMethods.js",
       "id": "@umijs/preset-umi/dist/registerMethods",
       "key": "registerMethods",
       "config": {},
@@ -79,7 +79,7 @@
             0
           ]
         },
-        "register": 4
+        "register": 10
       },
       "enableBy": "register"
     },
@@ -103,7 +103,7 @@
     "@umijs/preset-umi/dist/features/404/404": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/404/404.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/404/404.js",
       "id": "@umijs/preset-umi/dist/features/404/404",
       "key": "404",
       "config": {},
@@ -113,14 +113,14 @@
             0
           ]
         },
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/aiDev/aiDev": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/aiDev/aiDev.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/aiDev/aiDev.js",
       "id": "@umijs/preset-umi/dist/features/aiDev/aiDev",
       "key": "aiDev",
       "config": {},
@@ -133,37 +133,37 @@
     "@umijs/preset-umi/dist/features/appData/appData": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/appData/appData.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/appData/appData.js",
       "id": "@umijs/preset-umi/dist/features/appData/appData",
       "key": "appData",
       "config": {},
       "time": {
         "hooks": {
           "modifyAppData": [
-            35
+            7
           ]
         },
-        "register": 26
+        "register": 60
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/appData/umiInfo": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/appData/umiInfo.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/appData/umiInfo.js",
       "id": "@umijs/preset-umi/dist/features/appData/umiInfo",
       "key": "umiInfo",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/check/check": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/check/check.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/check/check.js",
       "id": "@umijs/preset-umi/dist/features/check/check",
       "key": "check",
       "config": {},
@@ -183,7 +183,7 @@
     "@umijs/preset-umi/dist/features/check/babel722": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/check/babel722.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/check/babel722.js",
       "id": "@umijs/preset-umi/dist/features/check/babel722",
       "key": "babel722",
       "config": {},
@@ -193,14 +193,14 @@
             0
           ]
         },
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/codeSplitting/codeSplitting": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/codeSplitting/codeSplitting.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/codeSplitting/codeSplitting.js",
       "id": "@umijs/preset-umi/dist/features/codeSplitting/codeSplitting",
       "key": "codeSplitting",
       "config": {},
@@ -213,7 +213,7 @@
     "@umijs/preset-umi/dist/features/configPlugins/configPlugins": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/configPlugins/configPlugins.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/configPlugins/configPlugins.js",
       "id": "@umijs/preset-umi/dist/features/configPlugins/configPlugins",
       "key": "configPlugins",
       "config": {},
@@ -223,7 +223,7 @@
             0
           ]
         },
-        "register": 11
+        "register": 32
       },
       "enableBy": "register"
     },
@@ -1069,20 +1069,20 @@
     "@umijs/preset-umi/dist/features/crossorigin/crossorigin": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/crossorigin/crossorigin.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/crossorigin/crossorigin.js",
       "id": "@umijs/preset-umi/dist/features/crossorigin/crossorigin",
       "key": "crossorigin",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 2
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand.js",
       "id": "@umijs/preset-umi/dist/features/depsOnDemand/depsOnDemand",
       "key": "depsOnDemand",
       "config": {},
@@ -1092,83 +1092,83 @@
             0
           ]
         },
-        "register": 1
+        "register": 2
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/devTool/devTool": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/devTool/devTool.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/devTool/devTool.js",
       "id": "@umijs/preset-umi/dist/features/devTool/devTool",
       "key": "devTool",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 2
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker.js",
       "id": "@umijs/preset-umi/dist/features/esbuildHelperChecker/esbuildHelperChecker",
       "key": "esbuildHelperChecker",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 75
+        "register": 69
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/esmi/esmi": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/esmi/esmi.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/esmi/esmi.js",
       "id": "@umijs/preset-umi/dist/features/esmi/esmi",
       "key": "esmi",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 57
+        "register": 30
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/exportStatic/exportStatic": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/exportStatic/exportStatic.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/exportStatic/exportStatic.js",
       "id": "@umijs/preset-umi/dist/features/exportStatic/exportStatic",
       "key": "exportStatic",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 26
+        "register": 17
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/favicons/favicons": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/favicons/favicons.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/favicons/favicons.js",
       "id": "@umijs/preset-umi/dist/features/favicons/favicons",
       "key": "favicons",
       "config": {},
       "time": {
         "hooks": {
           "modifyAppData": [
-            1
+            0
           ]
         },
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/helmet/helmet": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/helmet/helmet.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/helmet/helmet.js",
       "id": "@umijs/preset-umi/dist/features/helmet/helmet",
       "key": "helmet",
       "config": {},
@@ -1181,7 +1181,7 @@
     "@umijs/preset-umi/dist/features/icons/icons": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/icons/icons.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/icons/icons.js",
       "id": "@umijs/preset-umi/dist/features/icons/icons",
       "key": "icons",
       "config": {},
@@ -1194,19 +1194,19 @@
     "@umijs/preset-umi/dist/features/mock/mock": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mock/mock.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/mock/mock.js",
       "id": "@umijs/preset-umi/dist/features/mock/mock",
       "key": "mock",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 36
+        "register": 26
       }
     },
     "@umijs/preset-umi/dist/features/mpa/mpa": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mpa/mpa.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/mpa/mpa.js",
       "id": "@umijs/preset-umi/dist/features/mpa/mpa",
       "key": "mpa",
       "config": {},
@@ -1219,7 +1219,7 @@
     "@umijs/preset-umi/dist/features/okam/okam": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/okam/okam.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/okam/okam.js",
       "id": "@umijs/preset-umi/dist/features/okam/okam",
       "key": "okam",
       "config": {},
@@ -1231,7 +1231,7 @@
     "@umijs/preset-umi/dist/features/overrides/overrides": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/overrides/overrides.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/overrides/overrides.js",
       "id": "@umijs/preset-umi/dist/features/overrides/overrides",
       "key": "overrides",
       "config": {},
@@ -1244,7 +1244,7 @@
     "@umijs/preset-umi/dist/features/phantomDependency/phantomDependency": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/phantomDependency/phantomDependency.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/phantomDependency/phantomDependency.js",
       "id": "@umijs/preset-umi/dist/features/phantomDependency/phantomDependency",
       "key": "phantomDependency",
       "config": {},
@@ -1257,7 +1257,7 @@
     "@umijs/preset-umi/dist/features/polyfill/polyfill": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/polyfill/polyfill.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/polyfill/polyfill.js",
       "id": "@umijs/preset-umi/dist/features/polyfill/polyfill",
       "key": "polyfill",
       "config": {},
@@ -1267,15 +1267,28 @@
             1
           ]
         },
-        "register": 2
+        "register": 1
       }
     },
     "@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill.js",
       "id": "@umijs/preset-umi/dist/features/polyfill/publicPathPolyfill",
       "key": "publicPathPolyfill",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/features/prepare/prepare": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/prepare/prepare.js",
+      "id": "@umijs/preset-umi/dist/features/prepare/prepare",
+      "key": "prepare",
       "config": {},
       "time": {
         "hooks": {},
@@ -1283,23 +1296,10 @@
       },
       "enableBy": "register"
     },
-    "@umijs/preset-umi/dist/features/prepare/prepare": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/prepare/prepare.js",
-      "id": "@umijs/preset-umi/dist/features/prepare/prepare",
-      "key": "prepare",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 3
-      },
-      "enableBy": "register"
-    },
     "@umijs/preset-umi/dist/features/routePrefetch/routePrefetch": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routePrefetch/routePrefetch.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/routePrefetch/routePrefetch.js",
       "id": "@umijs/preset-umi/dist/features/routePrefetch/routePrefetch",
       "key": "routePrefetch",
       "config": {},
@@ -1312,7 +1312,7 @@
     "@umijs/preset-umi/dist/features/stagewise/stagewise": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/stagewise/stagewise.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/stagewise/stagewise.js",
       "id": "@umijs/preset-umi/dist/features/stagewise/stagewise",
       "key": "stagewise",
       "config": {},
@@ -1325,7 +1325,7 @@
     "@umijs/preset-umi/dist/features/terminal/terminal": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/terminal/terminal.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/terminal/terminal.js",
       "id": "@umijs/preset-umi/dist/features/terminal/terminal",
       "key": "terminal",
       "config": {},
@@ -1338,33 +1338,33 @@
     "@umijs/preset-umi/dist/features/tmpFiles/tmpFiles": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/tmpFiles/tmpFiles.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/tmpFiles/tmpFiles.js",
       "id": "@umijs/preset-umi/dist/features/tmpFiles/tmpFiles",
       "key": "tmpFiles",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 5
+        "register": 3
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/clientLoader/clientLoader": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/clientLoader/clientLoader.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/clientLoader/clientLoader.js",
       "id": "@umijs/preset-umi/dist/features/clientLoader/clientLoader",
       "key": "clientLoader",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/routeProps/routeProps": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routeProps/routeProps.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/routeProps/routeProps.js",
       "id": "@umijs/preset-umi/dist/features/routeProps/routeProps",
       "key": "routeProps",
       "config": {},
@@ -1376,97 +1376,97 @@
     "@umijs/preset-umi/dist/features/ssr/ssr": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/ssr/ssr.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/ssr/ssr.js",
       "id": "@umijs/preset-umi/dist/features/ssr/ssr",
       "key": "ssr",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 4
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/tmpFiles/configTypes": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/tmpFiles/configTypes.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/tmpFiles/configTypes.js",
       "id": "@umijs/preset-umi/dist/features/tmpFiles/configTypes",
       "key": "configTypes",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 3
+        "register": 2
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/transform/transform": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/transform/transform.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/transform/transform.js",
       "id": "@umijs/preset-umi/dist/features/transform/transform",
       "key": "transform",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 3
+        "register": 2
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/lowImport/lowImport": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/lowImport/lowImport.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/lowImport/lowImport.js",
       "id": "@umijs/preset-umi/dist/features/lowImport/lowImport",
       "key": "lowImport",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 8
+        "register": 2
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/vite/vite": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/vite/vite.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/vite/vite.js",
       "id": "@umijs/preset-umi/dist/features/vite/vite",
       "key": "vite",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/apiRoute/apiRoute": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/apiRoute/apiRoute.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/apiRoute/apiRoute.js",
       "id": "@umijs/preset-umi/dist/features/apiRoute/apiRoute",
       "key": "apiRoute",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 6
+        "register": 7
       }
     },
     "@umijs/preset-umi/dist/features/monorepo/redirect": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/monorepo/redirect.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/monorepo/redirect.js",
       "id": "@umijs/preset-umi/dist/features/monorepo/redirect",
       "key": "monorepoRedirect",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 19
+        "register": 14
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/test/test": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/test/test.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/test/test.js",
       "id": "@umijs/preset-umi/dist/features/test/test",
       "key": "test",
       "config": {},
@@ -1478,20 +1478,20 @@
     "@umijs/preset-umi/dist/features/clickToComponent/clickToComponent": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/clickToComponent/clickToComponent.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/clickToComponent/clickToComponent.js",
       "id": "@umijs/preset-umi/dist/features/clickToComponent/clickToComponent",
       "key": "clickToComponent",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/legacy/legacy": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/legacy/legacy.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/legacy/legacy.js",
       "id": "@umijs/preset-umi/dist/features/legacy/legacy",
       "key": "legacy",
       "config": {},
@@ -1504,7 +1504,7 @@
     "@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose.js",
       "id": "@umijs/preset-umi/dist/features/classPropertiesLoose/classPropertiesLoose",
       "key": "classPropertiesLoose",
       "config": {},
@@ -1517,19 +1517,19 @@
     "@umijs/preset-umi/dist/features/webpack/webpack": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/webpack/webpack.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/webpack/webpack.js",
       "id": "@umijs/preset-umi/dist/features/webpack/webpack",
       "key": "preset-umi:webpack",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 1
       }
     },
     "@umijs/preset-umi/dist/features/swc/swc": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/swc/swc.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/swc/swc.js",
       "id": "@umijs/preset-umi/dist/features/swc/swc",
       "key": "swc",
       "config": {},
@@ -1539,26 +1539,26 @@
             0
           ]
         },
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/features/ui/ui": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/ui/ui.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/ui/ui.js",
       "id": "@umijs/preset-umi/dist/features/ui/ui",
       "key": "ui",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 3
+        "register": 2
       }
     },
     "@umijs/preset-umi/dist/features/mako/mako": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/mako/mako.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/mako/mako.js",
       "id": "@umijs/preset-umi/dist/features/mako/mako",
       "key": "mako",
       "config": {},
@@ -1571,56 +1571,56 @@
     "@umijs/preset-umi/dist/features/utoopack/utoopack": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/utoopack/utoopack.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/utoopack/utoopack.js",
       "id": "@umijs/preset-umi/dist/features/utoopack/utoopack",
       "key": "utoopack",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       }
     },
     "@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian.js",
       "id": "@umijs/preset-umi/dist/features/hmrGuardian/hmrGuardian",
       "key": "hmrGuardian",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 2
       }
     },
     "@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad.js",
       "id": "@umijs/preset-umi/dist/features/routePreloadOnLoad/routePreloadOnLoad",
       "key": "routePreloadOnLoad",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 25
+        "register": 18
       }
     },
     "@umijs/preset-umi/dist/features/forget/forget": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/forget/forget.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/forget/forget.js",
       "id": "@umijs/preset-umi/dist/features/forget/forget",
       "key": "forget",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 2
+        "register": 1
       },
       "enableBy": "config"
     },
     "@umijs/preset-umi/dist/features/bundler/bundler": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/features/bundler/bundler.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/features/bundler/bundler.js",
       "id": "@umijs/preset-umi/dist/features/bundler/bundler",
       "key": "preset-umi:bundler",
       "config": {},
@@ -1633,86 +1633,73 @@
     "@umijs/preset-umi/dist/commands/build": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/build.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/build.js",
       "id": "@umijs/preset-umi/dist/commands/build",
       "key": "build",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 5
+        "register": 3
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/config/config": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/config/config.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/config/config.js",
       "id": "@umijs/preset-umi/dist/commands/config/config",
       "key": "config",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 33
+        "register": 27
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/dev/dev": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/dev/dev.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/dev/dev.js",
       "id": "@umijs/preset-umi/dist/commands/dev/dev",
       "key": "dev",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 34
+        "register": 33
       }
     },
     "@umijs/preset-umi/dist/commands/help": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/help.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/help.js",
       "id": "@umijs/preset-umi/dist/commands/help",
       "key": "help",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 0
+        "register": 1
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/lint": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/lint.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/lint.js",
       "id": "@umijs/preset-umi/dist/commands/lint",
       "key": "lint",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 0
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/setup": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/setup.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/setup.js",
       "id": "@umijs/preset-umi/dist/commands/setup",
       "key": "setup",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 0
-      },
-      "enableBy": "register"
-    },
-    "@umijs/preset-umi/dist/commands/deadcode": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/deadcode.js",
-      "id": "@umijs/preset-umi/dist/commands/deadcode",
-      "key": "deadcode",
       "config": {},
       "time": {
         "hooks": {},
@@ -1720,12 +1707,12 @@
       },
       "enableBy": "register"
     },
-    "@umijs/preset-umi/dist/commands/version": {
+    "@umijs/preset-umi/dist/commands/deadcode": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/version.js",
-      "id": "@umijs/preset-umi/dist/commands/version",
-      "key": "version",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/deadcode.js",
+      "id": "@umijs/preset-umi/dist/commands/deadcode",
+      "key": "deadcode",
       "config": {},
       "time": {
         "hooks": {},
@@ -1733,12 +1720,103 @@
       },
       "enableBy": "register"
     },
+    "@umijs/preset-umi/dist/commands/version": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/version.js",
+      "id": "@umijs/preset-umi/dist/commands/version",
+      "key": "version",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
     "@umijs/preset-umi/dist/commands/generators/page": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/page.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/page.js",
       "id": "@umijs/preset-umi/dist/commands/generators/page",
       "key": "generator:page",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/prettier": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/prettier.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/prettier",
+      "key": "generator:prettier",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/tsconfig": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/tsconfig.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/tsconfig",
+      "key": "generator:tsconfig",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/jest": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/jest.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/jest",
+      "key": "generator:jest",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/tailwindcss": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/tailwindcss.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/tailwindcss",
+      "key": "generator:tailwindcss",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 0
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/dva": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/dva.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/dva",
+      "key": "generator:dva",
+      "config": {},
+      "time": {
+        "hooks": {},
+        "register": 1
+      },
+      "enableBy": "register"
+    },
+    "@umijs/preset-umi/dist/commands/generators/component": {
+      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
+      "type": "plugin",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/component.js",
+      "id": "@umijs/preset-umi/dist/commands/generators/component",
+      "key": "generator:component",
       "config": {},
       "time": {
         "hooks": {},
@@ -1746,88 +1824,10 @@
       },
       "enableBy": "register"
     },
-    "@umijs/preset-umi/dist/commands/generators/prettier": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/prettier.js",
-      "id": "@umijs/preset-umi/dist/commands/generators/prettier",
-      "key": "generator:prettier",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 1
-      },
-      "enableBy": "register"
-    },
-    "@umijs/preset-umi/dist/commands/generators/tsconfig": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/tsconfig.js",
-      "id": "@umijs/preset-umi/dist/commands/generators/tsconfig",
-      "key": "generator:tsconfig",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 1
-      },
-      "enableBy": "register"
-    },
-    "@umijs/preset-umi/dist/commands/generators/jest": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/jest.js",
-      "id": "@umijs/preset-umi/dist/commands/generators/jest",
-      "key": "generator:jest",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 0
-      },
-      "enableBy": "register"
-    },
-    "@umijs/preset-umi/dist/commands/generators/tailwindcss": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/tailwindcss.js",
-      "id": "@umijs/preset-umi/dist/commands/generators/tailwindcss",
-      "key": "generator:tailwindcss",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 5
-      },
-      "enableBy": "register"
-    },
-    "@umijs/preset-umi/dist/commands/generators/dva": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/dva.js",
-      "id": "@umijs/preset-umi/dist/commands/generators/dva",
-      "key": "generator:dva",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 0
-      },
-      "enableBy": "register"
-    },
-    "@umijs/preset-umi/dist/commands/generators/component": {
-      "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
-      "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/component.js",
-      "id": "@umijs/preset-umi/dist/commands/generators/component",
-      "key": "generator:component",
-      "config": {},
-      "time": {
-        "hooks": {},
-        "register": 1
-      },
-      "enableBy": "register"
-    },
     "@umijs/preset-umi/dist/commands/generators/mock": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/mock.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/mock.js",
       "id": "@umijs/preset-umi/dist/commands/generators/mock",
       "key": "generator:mock",
       "config": {},
@@ -1840,7 +1840,7 @@
     "@umijs/preset-umi/dist/commands/generators/cypress": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/cypress.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/cypress.js",
       "id": "@umijs/preset-umi/dist/commands/generators/cypress",
       "key": "generator:cypress",
       "config": {},
@@ -1853,7 +1853,7 @@
     "@umijs/preset-umi/dist/commands/generators/api": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/api.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/api.js",
       "id": "@umijs/preset-umi/dist/commands/generators/api",
       "key": "generator:api",
       "config": {},
@@ -1866,7 +1866,7 @@
     "@umijs/preset-umi/dist/commands/generators/precommit": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/generators/precommit.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/generators/precommit.js",
       "id": "@umijs/preset-umi/dist/commands/generators/precommit",
       "key": "generator:precommit",
       "config": {},
@@ -1879,7 +1879,7 @@
     "@umijs/preset-umi/dist/commands/plugin": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/plugin.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/plugin.js",
       "id": "@umijs/preset-umi/dist/commands/plugin",
       "key": "command:plugin",
       "config": {},
@@ -1892,7 +1892,7 @@
     "@umijs/preset-umi/dist/commands/verify-commit": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/verify-commit.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/verify-commit.js",
       "id": "@umijs/preset-umi/dist/commands/verify-commit",
       "key": "verifyCommit",
       "config": {},
@@ -1905,26 +1905,26 @@
     "@umijs/preset-umi/dist/commands/preview": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/preview.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/preview.js",
       "id": "@umijs/preset-umi/dist/commands/preview",
       "key": "preview",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 21
+        "register": 15
       },
       "enableBy": "register"
     },
     "@umijs/preset-umi/dist/commands/mfsu/mfsu": {
       "cwd": "/Users/xecho/Downloads/gitintel-ai-analysis/apps/admin",
       "type": "plugin",
-      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@18.3.28_lightningcss@1.32.0_resolv_ppcj5ph6ktgtxrzm22eh2tjjzq/node_modules/@umijs/preset-umi/dist/commands/mfsu/mfsu.js",
+      "path": "/Users/xecho/Downloads/gitintel-ai-analysis/node_modules/.pnpm/@umijs+preset-umi@4.6.42_@types+node@22.19.15_@types+react@19.2.14_lightningcss@1.32.0_resolv_6jkfqgtied7dzpga2ppyrbvcay/node_modules/@umijs/preset-umi/dist/commands/mfsu/mfsu.js",
       "id": "@umijs/preset-umi/dist/commands/mfsu/mfsu",
       "key": "mfsu-cli",
       "config": {},
       "time": {
         "hooks": {},
-        "register": 1
+        "register": 2
       },
       "enableBy": "register"
     },
