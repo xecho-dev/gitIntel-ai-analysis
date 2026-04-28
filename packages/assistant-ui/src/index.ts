@@ -2,6 +2,7 @@ export { AssistantSidebar } from "./assistant-sidebar";
 export { Thread } from "./thread";
 export { ThreadList } from "./thread-list";
 export { ChatDrawer } from "./chat-drawer";
+export { AssistantUIProvider } from "./AssistantUIProvider";
 export { MarkdownText } from "./markdown-text";
 export {
   ToolFallback,

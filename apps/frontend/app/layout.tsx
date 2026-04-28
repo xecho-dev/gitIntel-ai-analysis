@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Background } from "@/components/layout/Background";
 import Providers from "@/components/Providers";
 import { WebSiteJsonLd, OrganizationJsonLd, SoftwareApplicationJsonLd } from "@/components/seo";
+import { AssistantUIProvider } from '@gitintel/assistant-ui';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -103,16 +104,18 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        <Providers>
-          <Background />
-          <Header />
-          <WebSiteJsonLd />
-          <OrganizationJsonLd />
-          <SoftwareApplicationJsonLd />
-          <main className="pt-24 pb-12 px-6 lg:px-12 max-w-[1400px] mx-auto min-h-screen">
-            {children}
-          </main>
-        </Providers>
+        <AssistantUIProvider>
+          <Providers>
+            <Background />
+            <Header />
+            <WebSiteJsonLd />
+            <OrganizationJsonLd />
+            <SoftwareApplicationJsonLd />
+            <main className="pt-24 pb-12 px-6 lg:px-12 max-w-[1400px] mx-auto min-h-screen">
+              {children}
+            </main>
+          </Providers>
+        </AssistantUIProvider>
       </body>
     </html>
   );

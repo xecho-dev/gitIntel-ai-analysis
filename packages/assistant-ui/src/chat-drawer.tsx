@@ -5,8 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { MessageCircle, X, GripVertical } from 'lucide-react';
 import { cn } from "@gitintel/ui";
 import { Thread } from "./thread";
-import { useInitializeSession, useRAGRuntime } from "./runtime";
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import { useInitializeSession } from "./runtime";
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 800;
@@ -17,7 +16,6 @@ export const ChatDrawer = (): React.JSX.Element => {
   const isDraggingRef = React.useRef(false);
   const startXRef = React.useRef(0);
   const startWidthRef = React.useRef(380);
-  const runtime = useRAGRuntime();
   useInitializeSession();
 
   // Lock body scroll when drawer is open
@@ -144,20 +142,12 @@ export const ChatDrawer = (): React.JSX.Element => {
             {/* Content */}
             <div className="flex flex-1 overflow-hidden pl-5">
               <div className="flex flex-1 min-h-0">
-                <RAGChatWrapper runtime={runtime} />
+                <Thread />
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </>
-  );
-};
-
-const RAGChatWrapper = ({ runtime }: { runtime: ReturnType<typeof useRAGRuntime> }): React.JSX.Element => {
-  return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <Thread />
-    </AssistantRuntimeProvider>
   );
 };

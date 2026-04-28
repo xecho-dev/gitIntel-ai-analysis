@@ -13,8 +13,8 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.12.26",
-    "@assistant-ui/react-markdown": "^0.12.9",
+    "@assistant-ui/react": "^0.12.10",
+    "@assistant-ui/react-markdown": "^0.12.3",
     "@gitintel/ui": "workspace:*",
     "clsx": "^2.1.1",
     "lucide-react": "^0.546.0",
