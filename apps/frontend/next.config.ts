@@ -12,7 +12,6 @@ const nextConfig: NextConfig = {
   // 关键：确保 Next.js 在构建时正确处理 workspace 包中的 Tailwind 类名提取
   transpilePackages: [
     "@gitintel/ui",
-    "@gitintel/assistant-ui",
     "@gitintel/types",
   ],
 

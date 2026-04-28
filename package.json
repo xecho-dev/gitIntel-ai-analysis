@@ -22,9 +22,7 @@
   "pnpm": {
     "overrides": {
       "@types/react": "^19.0.0",
-      "@types/react-dom": "^19.0.0",
-      "@assistant-ui/react": "0.12.10",
-      "@assistant-ui/react-markdown": "0.12.3"
+      "@types/react-dom": "^19.0.0"
     }
   },
   "packageManager": "pnpm@9.0.4"

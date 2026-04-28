@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { LayoutDashboard, History, UserCircle, LogOut, Github } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { ChatDrawer } from "@gitintel/assistant-ui";
 
 const NAV_ITEMS = [
   { href: '/workspace', label: '工作台', icon: LayoutDashboard },
@@ -111,8 +110,6 @@ export const Header = () => {
       </div>
     </header>
 
-    {/* Floating Chat Drawer */}
-    <ChatDrawer />
     </>
   );
 };

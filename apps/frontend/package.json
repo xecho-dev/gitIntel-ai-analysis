@@ -13,10 +13,7 @@
     "postbuild": "node -e \"const fs=require('fs'),path=require('path');const src=path.join(__dirname,'.next','static','css');const dest=path.join(__dirname,'.next','standalone','.next','static','css');if(fs.existsSync(src)&&!fs.existsSync(dest)){fs.mkdirSync(dest,{recursive:true});fs.readdirSync(src).filter(f=>f.endsWith('.css')).forEach(f=>{fs.copyFileSync(path.join(src,f),path.join(dest,f));console.log('[postbuild] Copied CSS: '+f);});}if(fs.existsSync(src)){const dest2=path.join(__dirname,'.next','standalone','_next','static','css');if(!fs.existsSync(dest2)){fs.mkdirSync(dest2,{recursive:true});fs.readdirSync(src).filter(f=>f.endsWith('.css')).forEach(f=>{fs.copyFileSync(path.join(src,f),path.join(dest2,f));console.log('[postbuild] Copied CSS to _next: '+f);});}}\""
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.12.10",
-    "@assistant-ui/react-markdown": "^0.12.3",
     "@auth/core": "^0.38.0",
-    "@gitintel/assistant-ui": "workspace:*",
     "@gitintel/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.49.0",
