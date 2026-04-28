@@ -9,7 +9,6 @@ import {
   User,
   Send,
   Square,
-  MessageSquare,
   PanelRightClose,
 } from 'lucide-react';
 
@@ -469,7 +468,7 @@ export function ChatDrawer({ onClose }: ChatDrawerProps) {
       {isExpanded && (
         <>
           {/* 消息列表 */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-white/20">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-12">
                 <div className="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center">

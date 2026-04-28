@@ -1,11 +1,24 @@
 "use client";
 
+import { useEffect } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import { MessageSquare } from "lucide-react";
 
 export function ChatDrawerWrapper() {
   const { isChatDrawerOpen, setChatDrawerOpen } = useAppStore();
+
+  // 打开抽屉时锁定背景滚动
+  useEffect(() => {
+    if (isChatDrawerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isChatDrawerOpen]);
 
   return (
     <>

@@ -11,7 +11,6 @@ import {
   Square,
   MessageSquare,
   Trash2,
-  X,
 } from "lucide-react";
 
 export interface ChatMessage {
@@ -167,16 +166,6 @@ function ChatBubble({ message }: { message: ChatMessage; isLoading?: boolean }) 
   );
 }
 
-function LoadingDots() {
-  return (
-    <div className="flex gap-1 items-center px-1 py-1">
-      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0ms]" />
-      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:150ms]" />
-      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:300ms]" />
-    </div>
-  );
-}
-
 // ─── 主组件 ──────────────────────────────────────────────────────
 
 export interface ChatInterfaceProps {
@@ -204,11 +193,13 @@ export function ChatInterface({
     if (initialMessages.length > 0 && messages.length === 0) {
       setMessages(initialMessages);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessages]);
 
   // 滚动到底部
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
   // ── SSE 消费 ──────────────────────────────────────────────────
