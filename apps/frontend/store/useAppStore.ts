@@ -49,6 +49,11 @@ interface AppState {
 
   // 清除所有状态
   reset: () => void;
+
+  // 聊天抽屉
+  isChatDrawerOpen: boolean;
+  toggleChatDrawer: () => void;
+  setChatDrawerOpen: (open: boolean) => void;
 }
 
 const initialState = {
@@ -62,6 +67,7 @@ const initialState = {
   analysisResult: null,
   error: null,
   progressMessages: [],
+  isChatDrawerOpen: false,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -130,4 +136,7 @@ export const useAppStore = create<AppState>((set) => ({
   setError: (error) => set({ error, isAnalyzing: false }),
 
   reset: () => set({ ...initialState, progressMessages: [] }),
+
+  toggleChatDrawer: () => set((state) => ({ isChatDrawerOpen: !state.isChatDrawerOpen })),
+  setChatDrawerOpen: (open) => set({ isChatDrawerOpen: open }),
 }));

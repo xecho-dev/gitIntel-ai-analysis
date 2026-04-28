@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Background } from "@/components/layout/Background";
+import { ChatDrawerWrapper } from "@/components/chat/ChatDrawerWrapper";
 import Providers from "@/components/Providers";
 import { WebSiteJsonLd, OrganizationJsonLd, SoftwareApplicationJsonLd } from "@/components/seo";
 
@@ -109,6 +110,7 @@ export default function RootLayout({
             <WebSiteJsonLd />
             <OrganizationJsonLd />
             <SoftwareApplicationJsonLd />
+            <ChatDrawerWrapper />
             <main className="pt-24 pb-12 px-6 lg:px-12 max-w-[1400px] mx-auto min-h-screen">
               {children}
             </main>
