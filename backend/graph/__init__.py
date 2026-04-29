@@ -2,7 +2,7 @@
 Graph — LangGraph 工作流包。
 
 注意：analysis_graph 的导入是 lazy 的（在 __getattr__ 中），因为它依赖 agents 层，
-直接导入会触发 agents → chat → graph → analysis_graph → agents 的循环依赖。
+直接导入会触发 agents → routers → analysis_graph → agents 的循环依赖。
 """
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from typing import Any
 
 # 直接导入（这些模块不依赖 agents 层）
 from .state import SharedState
-from .chat_graph import chat_stream_sse, multi_agent_chat_stream, ChatState
 from .executor import (
     format_sse_event,
     format_sse_error,
@@ -37,10 +36,6 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
-    # Chat graph
-    "chat_stream_sse",
-    "multi_agent_chat_stream",
-    "ChatState",
     # State
     "SharedState",
     # Executor utilities

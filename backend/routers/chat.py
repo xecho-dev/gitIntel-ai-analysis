@@ -1,6 +1,6 @@
 """
 Chat 相关路由 (/api/chat)
-Multi-Agent 协作问答（SSE 流式）
+标准 RAG Pipeline（SSE 流式）
 """
 import json
 import logging
@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from dependencies import get_auth_user_id, get_sb_client
 from schemas.chat import SendMessageRequest, CreateSessionRequest
-from agents.chat import multi_agent_chat_stream
+from rag import RAGPipeline
 from services.database import (
     create_chat_session,
     get_chat_sessions,
@@ -95,20 +95,23 @@ async def api_get_chat_messages(session_id: str, request: Request):
 @router.post("/send")
 async def api_send_message(body: SendMessageRequest, request: Request):
     """
-    发送消息，SSE 流式返回 Multi-Agent 协作回答。
+    发送消息，SSE 流式返回标准 RAG Pipeline 回答。
 
-    流程：
-      1. Supervisor 意图分类 + 路由决策
-      2. 分发到最合适的专业 Agent（Knowledge / Code / Analysis / General）
-      3. 支持混合意图多 Agent 协作
+    流程（Query → Retrieval → Context → Generate → Post-Process）：
+      1. Query Processing：意图分类、关键词提取、查询扩展
+      2. Retrieval：多策略检索（向量 + 关键词 + RRF 融合）
+      3. Context Processing：过滤、去重、Token 预算控制
+      4. LLM Streaming Generation：意图感知的流式生成
+      5. Post-Processing：引用提取、质量评估
 
     SSE 事件类型：
-      - connected: 连接建立
-      - route: 路由决策（Supervisor 判定意图）
-      - sources: RAG 检索结果
+      - route: 查询处理完成（意图、关键词）
+      - retrieving: 正在检索
+      - sources: 检索结果
+      - generating: 开始生成
       - token: LLM 增量输出
-      - error: 异常
       - done: 回答完成
+      - error: 异常
     """
     auth_user_id = get_auth_user_id(request)
     sb = get_sb_client()
@@ -120,46 +123,57 @@ async def api_send_message(body: SendMessageRequest, request: Request):
 
     save_chat_message(sb, body.session_id, "user", body.content)
 
-    # 加载历史消息，传入 Agent 以实现对话记忆
     past_messages = get_chat_messages(sb, body.session_id)
     history = _format_history(past_messages)
 
     collected_answer = ""
     collected_sources: list = []
+    collected_intent = ""
     assistant_msg_id: str | None = None
 
-    async def event_stream() -> AsyncGenerator[str, None]:
-        nonlocal collected_answer, collected_sources, assistant_msg_id
+    pipeline = RAGPipeline()
 
-        yield "data: {\"type\": \"connected\", \"agent\": \"supervisor\", \"message\": \"正在分析问题...\", \"percent\": 0}\n\n"
+    async def event_stream() -> AsyncGenerator[str, None]:
+        nonlocal collected_answer, collected_sources, collected_intent, assistant_msg_id
+
+        yield "data: {\"type\": \"connected\", \"message\": \"正在连接...\", \"percent\": 0}\n\n"
 
         try:
-            async for raw_json in multi_agent_chat_stream(body.content, history=history):
-                # 统一加 data: 前缀后转发给客户端
-                yield f"data: {raw_json}\n\n"
+            async for event in pipeline.chat(body.content, history=history):
+                # RAG Pipeline 已包含 "data: " 前缀
+                # 如果没有 data: 前缀就加上
+                if not event.startswith("data: "):
+                    yield event
+                else:
+                    yield event
 
-                # 解析 answer / sources（raw_json 已是纯 JSON 字符串）
-                if raw_json == "[DONE]":
-                    continue
-                try:
-                    import json as _json
-                    data = _json.loads(raw_json)
-                    t = data.get("type", "")
-                    if t == "sources":
-                        collected_sources = data.get("sources", [])
-                    elif t in ("token", "done"):
-                        # 优先从顶层 answer/full_text 取，否则从 data.final_answer 取
-                        ans = data.get("answer") or data.get("full_text") or ""
-                        if not ans and isinstance(data.get("data"), dict):
-                            ans = data["data"].get("final_answer", "")
-                        if ans:
-                            collected_answer = ans
-                except Exception:
-                    pass
+                # 解析收集数据
+                if event.startswith("data: "):
+                    raw = event[6:].strip()
+                    if raw == "[DONE]":
+                        continue
+                    try:
+                        data = json.loads(raw)
+                        t = data.get("type", "")
+                        if t == "done":
+                            collected_answer = data.get("answer") or data.get("full_text") or ""
+                            collected_sources = data.get("sources", [])
+                            collected_intent = data.get("intent", "")
+                        elif t == "token":
+                            ans = data.get("full_text") or data.get("answer") or ""
+                            if ans:
+                                collected_answer = ans
+                    except Exception:
+                        pass
 
         except Exception as exc:
-            logger.error(f"[/api/chat/send] Multi-Agent 流异常: {exc}")
-            yield f"data: {json.dumps({'type': 'error', 'agent': 'supervisor', 'message': str(exc)})}\n\n"
+            logger.error(f"[/api/chat/send] RAG Pipeline 流异常: {exc}")
+            import traceback
+            logger.error(traceback.format_exc())
+            yield "data: " + json.dumps({
+                "type": "error",
+                "message": f"处理异常: {str(exc)}",
+            }, ensure_ascii=False) + "\n\n"
 
         # 保存 Assistant 消息
         if collected_answer:
@@ -172,13 +186,13 @@ async def api_send_message(body: SendMessageRequest, request: Request):
             except Exception as save_err:
                 logger.error(f"[/api/chat/send] 保存消息失败: {save_err}")
 
-        yield f"data: {json.dumps({
-            'type': 'done',
-            'agent': 'multi_agent',
-            'message_id': assistant_msg_id,
-            'answer': collected_answer,
-            'sources': collected_sources
-        })}\n\n"
+        yield "data: " + json.dumps({
+            "type": "done",
+            "message_id": assistant_msg_id,
+            "answer": collected_answer,
+            "sources": collected_sources,
+            "intent": collected_intent,
+        }, ensure_ascii=False) + "\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(

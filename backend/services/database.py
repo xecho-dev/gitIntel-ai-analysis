@@ -911,6 +911,17 @@ def get_chat_sessions(sb: Client, user_uuid: str) -> list[ChatSession]:
     ]
 
 
+def _normalize_rag_source(src: dict) -> dict:
+    """Normalize old DB records that may be missing score/priority/content/repo_url."""
+    defaults = {
+        "score": src.get("relevance", src.get("score", 0.0)),
+        "priority": src.get("priority", "medium"),
+        "content": src.get("content") or src.get("preview", ""),
+        "repo_url": src.get("repo_url", ""),
+    }
+    return {**defaults, **src}
+
+
 def get_chat_messages(sb: Client, session_id: str) -> list[ChatMessage]:
     """获取某个 Session 的所有消息。"""
     rows = (
@@ -927,11 +938,11 @@ def get_chat_messages(sb: Client, session_id: str) -> list[ChatMessage]:
         if r.get("rag_context"):
             raw_ctx = r["rag_context"]
             if isinstance(raw_ctx, list):
-                rag_context = [RAGSource(**src) if isinstance(src, dict) else src for src in raw_ctx]
+                rag_context = [RAGSource(**_normalize_rag_source(src)) if isinstance(src, dict) else src for src in raw_ctx]
             elif isinstance(raw_ctx, str):
                 import json as _json
                 parsed = _json.loads(raw_ctx)
-                rag_context = [RAGSource(**src) for src in parsed]
+                rag_context = [RAGSource(**_normalize_rag_source(src)) for src in parsed]
 
         messages.append(
             ChatMessage(
@@ -976,7 +987,7 @@ def save_chat_message(
     rag_ctx_out = None
     if data.get("rag_context"):
         parsed = _json.loads(data["rag_context"]) if isinstance(data["rag_context"], str) else data["rag_context"]
-        rag_ctx_out = [RAGSource(**src) for src in parsed]
+        rag_ctx_out = [RAGSource(**_normalize_rag_source(src)) for src in parsed]
 
     return ChatMessage(
         id=data["id"],
