@@ -375,8 +375,11 @@ jobs:
 
           # 拉取镜像（公开仓库无需登录，私有仓库需要 token）
           echo "正在拉取镜像..."
+          # 先尝试拉取 frontend 测试是否需要登录
           if docker pull "$FRONTEND_IMAGE" &>/dev/null; then
             echo "公开镜像，无需登录即可拉取"
+            # 所有镜像都是同一个 registry，直接用 docker-compose pull 拉取所有
+            docker-compose pull
           else
             echo "镜像拉取失败，尝试登录后再拉取..."
             echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin || { echo "Docker login 失败，请检查 REGISTRY_TOKEN 是否有 ghcr.io 的 packages 权限"; exit 1; }
