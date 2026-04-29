@@ -63,8 +63,6 @@ const PIPELINE_STAGES: { key: PipelineStage; label: string; icon: React.ReactNod
 ];
 
 function PipelineIndicator({ stage, percent }: { stage: PipelineStage; percent: number }) {
-  const currentIdx = PIPELINE_STAGES.findIndex((s) => s.key === stage);
-
   return (
     <div className="flex items-center gap-1.5 px-3 py-2 bg-[#0d1117]/80 rounded-lg border border-white/5">
       {PIPELINE_STAGES.map((s, idx) => {
@@ -362,6 +360,10 @@ export function ChatDrawer({ onClose }: ChatDrawerProps) {
   const [pipelineMessage, setPipelineMessage] = useState('');
   const [currentSources, setCurrentSources] = useState<RAGSource[]>([]);
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
+
+  // Intentionally unused — retained for future pipeline UI display
+  void pipelinePercent;
+  void currentSources;
 
   const assistantMsgIdRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
