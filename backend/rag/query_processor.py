@@ -2,20 +2,78 @@
 Query Processor — 查询处理层。
 
 职责：
-  1. 查询意图分类（factual / analytical / conversational / code_related）
-  2. 关键词提取
-  3. 查询扩展（同义词、相关概念）
-  4. 语言检测
-  5. 特殊标记（代码相关、仓库相关）
+  1. HyDE 假设文档生成（先用 LLM 生成"假设答案"，再用于检索）
+  2. LLM-Based 意图分类（factual / analytical / conversational / code_related）
+  3. LLM-Based 特殊标记检测（代码相关、仓库相关、技术栈）
+  4. 关键词提取
+  5. 语言检测
+
+HyDE 流程：
+  用户查询 → 生成假设文档 → 向量检索（用假设文档） → 真实文档
 """
 
 import re
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
+from langchain_core.messages import HumanMessage, SystemMessage
+
 _logger = logging.getLogger("gitintel")
 
+
+# ─── HyDE Prompt Templates ──────────────────────────────────────────────
+
+HYDE_SYSTEM_PROMPT = """你是一个专业的技术文档助手。你的任务是根据用户问题生成一个"假设的技术文档"。
+
+要求：
+1. 这个假设文档应该是一个完整、详细的技术回答
+2. 包含具体的代码示例、技术细节、实现方法
+3. 使用真实的技术术语和概念
+4. 文档长度适中（200-500字），足够提供丰富的语义信息用于检索
+5. 不要求回答完全正确，重点是提供丰富的检索信号"""
+
+HYDE_USER_PROMPT_TEMPLATE = """【用户问题】
+{query}
+
+【任务】
+请根据上述问题，生成一段详细的技术文档作为"假设回答"。
+这段文档将用于向量检索，因此需要包含丰富的技术术语和概念。
+
+【输出格式】
+直接输出一段技术文档，不需要额外说明。"""
+
+
+# ─── 查询分析 Prompt Templates ─────────────────────────────────────────
+
+QUERY_ANALYSIS_SYSTEM_PROMPT = """你是一个查询分析助手。请分析用户查询，返回结构化的分析结果。
+
+分析维度：
+1. intent（意图）: factual(事实) | analytical(分析) | conversational(对话) | code_related(代码相关)
+2. language（语言）: zh(中文) | en(英文) | mixed(混合)
+3. is_code_related（是否代码相关）: true | false
+4. detected_tech_stack（检测到的技术栈）: 数组，如 ["react", "typescript"]
+5. repo_url（仓库URL）: 如果提到了 GitHub 仓库则返回完整 URL，否则返回 null
+
+请严格按 JSON 格式返回，不要输出其他内容。"""
+
+QUERY_ANALYSIS_USER_PROMPT_TEMPLATE = """【用户查询】
+{query}
+
+【输出格式】
+直接返回 JSON，不要任何解释：
+{{"intent": "...", "language": "...", "is_code_related": ..., "detected_tech_stack": [...], "repo_url": null或完整URL}}"""
+
+
+# ─── 假设文档缓存（避免重复生成）────────────────────────────────────────
+
+_hyde_cache: dict[str, str] = {}
+_query_analysis_cache: dict[str, dict] = {}
+_CACHE_MAX_SIZE = 200
+
+
+# ─── ProcessedQuery ──────────────────────────────────────────────────────
 
 @dataclass
 class ProcessedQuery:
@@ -29,246 +87,235 @@ class ProcessedQuery:
     is_repo_related: bool
     repo_url: Optional[str] = None
     detected_tech_stack: list[str] = field(default_factory=list)
+    # HyDE 字段
+    hyde_document: Optional[str] = None  # LLM 生成的假设文档
+    hyde_enabled: bool = False
 
 
-# ─── 领域术语映射（用于查询扩展）───────────────────────────────────────
+# ─── 查询分析（LLM-Based，替代规则穷举）────────────────────────────────
 
-TERM_MAPPINGS: dict[str, list[str]] = {
-    "性能": ["performance", "优化", "慢", "卡顿", "响应时间", "加载速度", "渲染"],
-    "安全": ["security", "漏洞", "风险", "攻击", "权限", "认证", "授权", "xss", "csrf", "sql注入"],
-    "架构": ["architecture", "设计模式", "结构", "模块化", "分层", "微服务", "monolith"],
-    "依赖": ["dependency", "包管理", "版本", "npm", "pip", "conflict", "升级", "迁移"],
-    "代码质量": ["code quality", "重构", "规范", "lint", "format", "clean code"],
-    "测试": ["testing", "单元测试", "集成测试", "e2e", "coverage", "jest", "pytest"],
-    "typescript": ["ts", "类型安全", "interface", "type", "泛型"],
-    "python": ["python", "py", "pip", "django", "flask", "fastapi"],
-    "react": ["react", "hooks", "组件", "state", "props", "jsx", "next.js"],
-    "前端": ["frontend", "ui", "css", "html", "浏览器", "dom"],
-    "后端": ["backend", "api", "server", "数据库", "db"],
-    "部署": ["deployment", "ci/cd", "docker", "k8s", "nginx", "vercel"],
-    "内存泄漏": ["memory leak", "gc", "垃圾回收", "堆栈", "heap"],
-    "并发": ["concurrency", "并行", "异步", "多线程", "锁", "race condition"],
-}
+async def _analyze_query_llm(query: str) -> dict:
+    """
+    使用 LLM 分析查询意图、语言、技术栈等。
+    替代原有的穷举式规则匹配。
+    """
+    cache_key = query[:100]
+    if cache_key in _query_analysis_cache:
+        _logger.debug(f"[QueryAnalysis] Cache hit for: {query[:30]}...")
+        return _query_analysis_cache[cache_key]
 
+    try:
+        from utils.llm_factory import get_llm_with_tracking
 
-# ─── 意图分类规则 ─────────────────────────────────────────────────────
+        llm = get_llm_with_tracking(
+            agent_name="query_analyzer",
+            model=None,
+            temperature=0.0,  # 分析不需要创造性，一致性更重要
+            max_tokens=256,
+        )
 
-INTENT_KEYWORDS: dict[str, list[str]] = {
-    "factual": [
-        "是什么", "什么是", "有什么区别", "哪个好", "如何实现",
-        "怎么实现", "怎么做", "方法", "步骤", "流程",
-        "explain", "what is", "how to", "difference between",
-    ],
-    "analytical": [
-        "分析", "评估", "对比", "建议", "优化", "改进",
-        "原因", "为什么", "哪里问题", "风险",
-        "analyze", "evaluate", "compare", "suggest", "optimize",
-    ],
-    "code_related": [
-        "代码", "函数", "算法", "class ", "def ", "const ", "let ",
-        "async ", "await", "this.", "import ", "export ", "interface ",
-        "复杂度", "时间", "空间", "bug", "报错", "error", "exception",
-    ],
-    "conversational": [
-        "你好", "hi", "hello", "嗨", "help", "怎么用", "是什么",
-        "请问", "问一下", "问一下", "谢谢你", "thanks",
-    ],
-}
+        if llm is None:
+            return _default_analysis()
 
+        messages = [
+            SystemMessage(content=QUERY_ANALYSIS_SYSTEM_PROMPT),
+            HumanMessage(content=QUERY_ANALYSIS_USER_PROMPT_TEMPLATE.format(query=query)),
+        ]
 
-# ─── 代码模式检测 ─────────────────────────────────────────────────────
+        response = await llm.ainvoke(messages)
+        content = response.content if hasattr(response, "content") else str(response)
 
-CODE_PATTERNS: list[tuple[str, re.Pattern]] = [
-    # 函数定义
-    ("python_def", re.compile(r'\bdef\s+\w+\s*\(')),
-    ("js_function", re.compile(r'\bfunction\s+\w+\s*\(')),
-    ("ts_interface", re.compile(r'\binterface\s+\w+\s*\{')),
-    ("rust_fn", re.compile(r'\bfn\s+\w+\s*\(')),
-    ("go_func", re.compile(r'\bfunc\s+\w+\s*\(')),
-    # 代码符号
-    ("arrow", re.compile(r'=>\s*\{')),
-    ("async", re.compile(r'\basync\s+(def|function|fn)')),
-    ("class_def", re.compile(r'\bclass\s+\w+')),
-    ("import", re.compile(r'\b(import|from|require|include)\s+')),
-    ("decorator", re.compile(r'@\w+')),
-    # 代码内容
-    ("console", re.compile(r'console\.(log|error|warn)')),
-    ("print", re.compile(r'\bprint\s*\(')),
-]
+        result = json.loads(content.strip())
+
+        if len(_query_analysis_cache) >= _CACHE_MAX_SIZE:
+            _query_analysis_cache.clear()
+        _query_analysis_cache[cache_key] = result
+
+        return result
+
+    except Exception as e:
+        _logger.warning(f"[QueryAnalysis] LLM 分析失败: {e}，使用默认分析")
+        return _default_analysis()
 
 
-# ─── 仓库 URL 检测 ────────────────────────────────────────────────────
-
-REPO_PATTERNS: list[re.Pattern] = [
-    re.compile(r'github\.com/[\w-]+/[\w.-]+'),
-    re.compile(r'[\w-]+/[\w.-]+'),  # owner/repo 格式
-]
-
-
-def _detect_language(text: str) -> str:
-    """检测查询语言"""
-    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
-    english_chars = len(re.findall(r'[a-zA-Z]', text))
-
-    if chinese_chars > english_chars * 0.3:
-        return "zh"
-    elif english_chars > chinese_chars * 3:
-        return "en"
-    return "mixed"
+def _default_analysis() -> dict:
+    """当 LLM 不可用时的默认分析"""
+    return {
+        "intent": "conversational",
+        "language": "mixed",
+        "is_code_related": False,
+        "detected_tech_stack": [],
+        "repo_url": None,
+    }
 
 
-def _classify_intent(query: str, is_code_related: bool) -> str:
-    """基于关键词规则分类意图"""
-    q = query.lower()
+# ─── 关键词提取 ─────────────────────────────────────────────────────────
 
-    # 代码相关优先
-    if is_code_related:
-        return "code_related"
+def _extract_keywords(query: str) -> list[str]:
+    """提取查询关键词（轻量规则，作为 HyDE 的补充）"""
+    stop_words = {
+        "的", "是", "在", "有", "和", "了", "我", "你", "他", "她", "它",
+        "a", "an", "the", "is", "are", "was", "were", "be", "been",
+        "have", "has", "had", "do", "does", "did", "will", "would",
+        "could", "should", "may", "might", "can", "to", "of", "in",
+        "for", "on", "with", "at", "by", "from", "as", "into", "through",
+    }
 
-    # 检查各意图关键词
-    scores: dict[str, int] = {}
-    for intent, keywords in INTENT_KEYWORDS.items():
-        if intent == "code_related":
-            continue
-        score = sum(1 for kw in keywords if kw.lower() in q)
-        scores[intent] = score
-
-    # 返回得分最高的意图
-    if scores:
-        best_intent = max(scores, key=scores.get)
-        if scores[best_intent] > 0:
-            return best_intent
-
-    return "conversational"
-
-
-def _extract_keywords(query: str, language: str) -> list[str]:
-    """提取查询关键词"""
-    # 移除标点符号和停用词
-    stop_words = {"的", "是", "在", "有", "和", "了", "我", "你", "他", "她", "它",
-                   "a", "an", "the", "is", "are", "was", "were", "be", "been",
-                   "have", "has", "had", "do", "does", "did", "will", "would",
-                   "could", "should", "may", "might", "can", "to", "of", "in",
-                   "for", "on", "with", "at", "by", "from", "as", "into", "through"}
-
-    # 简单分词（按空格和标点）
     words = re.split(r'[\s,，.。!！?？;；:：()（）\[\]【】""''""''《》<>\/]+', query)
     words = [w.strip().lower() for w in words if w.strip()]
 
-    # 过滤停用词和短词
     keywords = [w for w in words if w not in stop_words and len(w) >= 2]
-
     return list(dict.fromkeys(keywords))  # 去重保持顺序
 
 
-def _expand_query(query: str, keywords: list[str]) -> list[str]:
-    """查询扩展：增加同义词和相关概念"""
-    expanded = list(keywords)
+# ─── HyDE: 假设文档生成 ─────────────────────────────────────────────────
 
-    for kw in keywords:
-        # 精确匹配
-        if kw in TERM_MAPPINGS:
-            for synonym in TERM_MAPPINGS[kw]:
-                if synonym not in expanded:
-                    expanded.append(synonym)
-
-        # 部分匹配（中文字符串可能包含关键词）
-        for term, synonyms in TERM_MAPPINGS.items():
-            if term in query or any(s in query for s in synonyms[:3]):
-                for synonym in synonyms:
-                    if synonym not in expanded:
-                        expanded.append(synonym)
-
-    return expanded[:12]  # 限制扩展词数量
-
-
-def _detect_code_patterns(query: str) -> bool:
-    """检测查询是否涉及代码"""
-    for _, pattern in CODE_PATTERNS:
-        if pattern.search(query):
-            return True
-    return False
-
-
-def _detect_repo_patterns(query: str) -> tuple[bool, Optional[str]]:
-    """检测查询是否涉及仓库URL"""
-    for pattern in REPO_PATTERNS:
-        match = pattern.search(query)
-        if match:
-            repo_url = match.group(0)
-            if not repo_url.startswith("github.com/"):
-                repo_url = f"github.com/{repo_url}"
-            return True, repo_url
-    return False, None
-
-
-def _detect_tech_stack(query: str) -> list[str]:
-    """检测查询中提到的技术栈"""
-    detected = []
-    tech_patterns = {
-        "react": re.compile(r'\breact\b', re.I),
-        "vue": re.compile(r'\bvue\b', re.I),
-        "angular": re.compile(r'\bangular\b', re.I),
-        "next.js": re.compile(r'\bnext\.?js?\b', re.I),
-        "nuxt": re.compile(r'\bnuxt\b', re.I),
-        "svelte": re.compile(r'\bsvelte\b', re.I),
-        "django": re.compile(r'\bdjango\b', re.I),
-        "flask": re.compile(r'\bflask\b', re.I),
-        "fastapi": re.compile(r'\bfastapi\b', re.I),
-        "express": re.compile(r'\bexpress\b', re.I),
-        "spring": re.compile(r'\bspring\b', re.I),
-        "golang": re.compile(r'\b(go|golang)\b', re.I),
-        "rust": re.compile(r'\brust\b', re.I),
-        "typescript": re.compile(r'\btypescript\b', re.I),
-        "python": re.compile(r'\bpython\b', re.I),
-        "java": re.compile(r'\bjava\b', re.I),
-        "docker": re.compile(r'\bdocker\b', re.I),
-        "kubernetes": re.compile(r'\bkubernetes\b', re.I),
-        "aws": re.compile(r'\baws\b', re.I),
-        "azure": re.compile(r'\bazure\b', re.I),
-    }
-
-    for tech, pattern in tech_patterns.items():
-        if pattern.search(query):
-            detected.append(tech)
-
-    return detected
-
-
-def process_query(query: str) -> ProcessedQuery:
+async def _generate_hyde_document(query: str, is_code_related: bool) -> Optional[str]:
     """
-    Query Processing 主函数：分析用户查询
+    使用 LLM 生成假设文档（HyDE）。
 
     Args:
         query: 原始用户查询
+        is_code_related: 是否代码相关（影响 prompt 风格）
 
     Returns:
-        ProcessedQuery: 处理后的查询对象
+        假设文档文本，失败时返回 None
     """
-    # 1. 语言检测
-    language = _detect_language(query)
+    cache_key = f"{query[:100]}_{is_code_related}"
+    if cache_key in _hyde_cache:
+        _logger.debug(f"[HyDE] Cache hit for query: {query[:30]}...")
+        return _hyde_cache[cache_key]
 
-    # 2. 特殊标记
-    is_code_related = _detect_code_patterns(query)
-    is_repo_related, repo_url = _detect_repo_patterns(query)
+    try:
+        from utils.llm_factory import get_llm_with_tracking
 
-    # 3. 技术栈检测
-    detected_tech_stack = _detect_tech_stack(query)
+        llm = get_llm_with_tracking(
+            agent_name="hyde_generator",
+            model=None,
+            temperature=0.7,  # HyDE 需要一定创造性
+            max_tokens=512,
+        )
 
-    # 4. 关键词提取
-    keywords = _extract_keywords(query, language)
+        if llm is None:
+            _logger.warning("[HyDE] LLM 不可用，跳过假设文档生成")
+            return None
 
-    # 5. 查询扩展
-    expanded_terms = _expand_query(query, keywords)
+        if is_code_related:
+            system_prompt = (
+                "你是一个专业的代码技术助手。根据用户问题，生成一段包含代码示例的技术文档。\n"
+                "要求：\n"
+                "1. 包含具体的代码实现\n"
+                "2. 解释代码逻辑和原理\n"
+                "3. 指出潜在的注意事项\n"
+                "4. 使用 markdown 代码块\n"
+                "5. 长度 200-400 字"
+            )
+        else:
+            system_prompt = HYDE_SYSTEM_PROMPT
 
-    # 6. 意图分类
-    intent = _classify_intent(query, is_code_related)
+        user_prompt = HYDE_USER_PROMPT_TEMPLATE.format(query=query)
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+
+        response = await llm.ainvoke(messages)
+        hyde_doc = response.content if hasattr(response, "content") else str(response)
+
+        if len(_hyde_cache) >= _CACHE_MAX_SIZE:
+            _hyde_cache.clear()
+        _hyde_cache[cache_key] = hyde_doc
+
+        _logger.info(f"[HyDE] Generated document for query: {query[:30]}...")
+        return hyde_doc
+
+    except Exception as e:
+        _logger.warning(f"[HyDE] 生成假设文档失败: {e}")
+        return None
+
+
+# ─── 基于 HyDE 提取扩展词 ───────────────────────────────────────────────
+
+def _expand_query_from_hyde(hyde_doc: Optional[str]) -> list[str]:
+    """
+    从假设文档中提取扩展词。
+    不再依赖硬编码的 TERM_MAPPINGS。
+    """
+    if not hyde_doc:
+        return []
+
+    expanded = []
+
+    # 从引号中提取术语
+    quoted = re.findall(r'[""「『]([^""」』]+)[""」』]', hyde_doc)
+    expanded.extend(t.strip().lower() for t in quoted if len(t.strip()) >= 2)
+
+    # 从代码块中提取标识符
+    code_blocks = re.findall(r'```[\s\S]*?```', hyde_doc)
+    for block in code_blocks:
+        identifiers = re.findall(r'\b([a-zA-Z_]\w{2,20})\b', block)
+        expanded.extend(i.lower() for i in identifiers)
+
+    # 从 backtick 中提取技术关键词
+    tech_terms = re.findall(r'`([^`]+)`', hyde_doc)
+    expanded.extend(t.strip().lower() for t in tech_terms if len(t) >= 2)
+
+    # 去重
+    seen = set()
+    for term in expanded:
+        term = term.strip()
+        if term and term not in seen and len(term) >= 2:
+            seen.add(term)
+
+    return list(seen)[:12]
+
+
+# ─── 主流程 ─────────────────────────────────────────────────────────────
+
+async def process_query(query: str, enable_hyde: bool = True) -> ProcessedQuery:
+    """
+    Query Processing 主函数：分析用户查询，并可选地生成 HyDE 假设文档。
+
+    流程：
+      原始查询 → LLM 意图/语言/技术栈分析 → HyDE 生成假设文档
+              → 扩展词提取 → ProcessedQuery
+    """
+    # 1. LLM 查询分析（意图、语言、技术栈、代码相关、仓库URL）
+    analysis = await _analyze_query_llm(query)
+
+    intent: str = analysis.get("intent", "conversational")
+    language: str = analysis.get("language", "mixed")
+    is_code_related: bool = analysis.get("is_code_related", False)
+    detected_tech_stack: list = analysis.get("detected_tech_stack", [])
+    raw_repo_url: Optional[str] = analysis.get("repo_url")
+
+    is_repo_related = raw_repo_url is not None
+    repo_url: Optional[str] = None
+    if is_repo_related and raw_repo_url:
+        url = raw_repo_url.strip()
+        if not url.startswith("github.com/") and not url.startswith("http"):
+            repo_url = f"github.com/{url}"
+        else:
+            repo_url = url
+
+    # 2. 关键词提取（轻量规则，作为 HyDE 的补充信号）
+    keywords = _extract_keywords(query)
+
+    # 3. HyDE 假设文档生成
+    hyde_document: Optional[str] = None
+    if enable_hyde:
+        hyde_document = await _generate_hyde_document(query, is_code_related)
+
+    # 4. 扩展词（基于 HyDE 提取）
+    expanded_terms = _expand_query_from_hyde(hyde_document)
 
     _logger.info(
         f"[QueryProcessor] query='{query[:50]}...', "
         f"intent={intent}, lang={language}, "
         f"code={is_code_related}, repo={is_repo_related}, "
-        f"keywords={keywords[:5]}, expanded={expanded_terms[:5]}"
+        f"tech_stack={detected_tech_stack}, "
+        f"hyde={'✓' if hyde_document else '✗'}"
     )
 
     return ProcessedQuery(
@@ -281,4 +328,6 @@ def process_query(query: str) -> ProcessedQuery:
         is_repo_related=is_repo_related,
         repo_url=repo_url,
         detected_tech_stack=detected_tech_stack,
+        hyde_document=hyde_document,
+        hyde_enabled=bool(hyde_document),
     )

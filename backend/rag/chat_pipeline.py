@@ -75,7 +75,7 @@ class RAGPipeline:
         reset_token_stats()
 
         # ── Step 1: Query Processing ───────────────────────────────
-        processed_query = self._process_query(question)
+        processed_query = await self._process_query(question)
         yield self._sse_event(SSEEventType.ROUTE, {
             "intent": processed_query.intent,
             "language": processed_query.language,
@@ -83,7 +83,13 @@ class RAGPipeline:
             "expanded_terms": processed_query.expanded_terms,
             "is_code_related": processed_query.is_code_related,
             "is_repo_related": processed_query.is_repo_related,
-            "message": "正在分析问题...",
+            "hyde_enabled": processed_query.hyde_enabled,
+            "hyde_preview": (
+                processed_query.hyde_document[:100] + "..."
+                if processed_query.hyde_document
+                else None
+            ),
+            "message": "正在分析问题..." if not processed_query.hyde_enabled else "正在生成假设文档...",
             "percent": 10,
         })
 
@@ -111,7 +117,6 @@ class RAGPipeline:
             "message": f"找到 {len(retrieval_results)} 条相关知识",
             "percent": 40,
         })
-
         # ── Step 3: Context Processing ─────────────────────────────
         processed_context = self._process_context(retrieval_results, processed_query)
         context_text = format_context_for_prompt(processed_context)
@@ -180,18 +185,25 @@ class RAGPipeline:
             f"quality={processed_answer.quality_score:.2f}"
         )
 
-    def _process_query(self, question: str) -> ProcessedQuery:
-        """Query Processing"""
-        return process_query(question)
+    async def _process_query(self, question: str) -> ProcessedQuery:
+        """Query Processing（异步）"""
+        from .query_processor import process_query
+        return await process_query(question)
 
     async def _retrieve(self, query: ProcessedQuery) -> list:
         """Retrieval Layer（异步包装）"""
         import asyncio
 
+        # HyDE 检索策略：
+        # 1. 如果有 HyDE 假设文档，用它作为主检索 query
+        # 2. expanded_terms 作为辅助增强信号
+        hyde_query = query.hyde_document if query.hyde_document else query.original
+        expanded = " ".join(query.expanded_terms) if query.expanded_terms else ""
+
         def sync_retrieve():
             return self.retriever.retrieve(
-                query=query.original,
-                expanded_query=" ".join(query.expanded_terms),
+                query=hyde_query,
+                expanded_query=expanded,
                 intent=query.intent,
                 top_k=self.retrieval_top_k,
                 is_code_related=query.is_code_related,
