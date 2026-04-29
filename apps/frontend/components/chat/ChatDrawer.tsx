@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import {
   X,
@@ -22,134 +24,37 @@ export interface ChatMessage {
 // ─── Markdown 渲染 ────────────────────────────────────────────────
 
 function MarkdownContent({ content }: { content: string }) {
-  const lines = content.split('\n');
-  const elements: React.ReactNode[] = [];
-  let codeBlock: { lang: string; content: string[] } | null = null;
-  let listItems: string[] = [];
-  let inList = false;
-
-  const flushCodeBlock = () => {
-    if (!codeBlock) return;
-    elements.push(
-      <pre
-        key={`code-${elements.length}`}
-        className="bg-[#1a2030] border border-white/10 rounded-lg p-4 my-3 overflow-x-auto text-sm"
-      >
-        <code className="text-slate-200 font-mono">{codeBlock.content.join('\n')}</code>
-      </pre>,
-    );
-    codeBlock = null;
-  };
-
-  const flushList = () => {
-    if (!inList || listItems.length === 0) return;
-    elements.push(
-      <ul key={`list-${elements.length}`} className="list-disc pl-5 my-2 space-y-1">
-        {listItems.map((item, i) => (
-          <li key={i} className="text-slate-300 text-sm leading-relaxed">
-            {item}
-          </li>
-        ))}
-      </ul>,
-    );
-    listItems = [];
-    inList = false;
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.startsWith('```')) {
-      if (codeBlock) {
-        flushCodeBlock();
-      } else {
-        flushList();
-        codeBlock = { lang: line.slice(3).trim(), content: [] };
-      }
-      continue;
-    }
-
-    if (codeBlock) {
-      codeBlock.content.push(line);
-      continue;
-    }
-
-    if (line.startsWith('- ') || line.startsWith('* ')) {
-      if (!inList) {
-        flushList();
-        inList = true;
-      }
-      listItems.push(line.slice(2));
-      continue;
-    }
-    flushList();
-
-    if (line.startsWith('# ')) {
-      elements.push(
-        <h1 key={`h1-${i}`} className="text-xl font-bold text-white mt-5 mb-2">
-          {line.slice(2)}
-        </h1>,
-      );
-    } else if (line.startsWith('## ')) {
-      elements.push(
-        <h2 key={`h2-${i}`} className="text-lg font-semibold text-slate-100 mt-4 mb-2">
-          {line.slice(3)}
-        </h2>,
-      );
-    } else if (line.startsWith('### ')) {
-      elements.push(
-        <h3 key={`h3-${i}`} className="text-base font-medium text-slate-200 mt-3 mb-1">
-          {line.slice(4)}
-        </h3>,
-      );
-    } else if (line.startsWith('> ')) {
-      elements.push(
-        <blockquote
-          key={`q-${i}`}
-          className="border-l-2 border-blue-500/40 pl-4 my-2 text-slate-400 italic text-sm"
-        >
-          {line.slice(2)}
-        </blockquote>,
-      );
-    } else if (line.trim() === '') {
-      elements.push(<div key={`sp-${i}`} className="h-1" />);
-    } else {
-      const parts: React.ReactNode[] = [];
-      let last = 0;
-      const re = /`([^`]+)`|\*\*([^*]+)\*\*/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(line)) !== null) {
-        if (m.index > last) parts.push(line.slice(last, m.index));
-        if (m[1]) {
-          parts.push(
-            <code
-              key={`ic-${m.index}`}
-              className="bg-[#1a2030] text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono"
-            >
-              {m[1]}
-            </code>,
-          );
-        } else if (m[2]) {
-          parts.push(
-            <strong key={`b-${m.index}`} className="text-white font-semibold">
-              {m[2]}
-            </strong>,
-          );
-        }
-        last = m.index + m[0].length;
-      }
-      if (last < line.length) parts.push(line.slice(last));
-      elements.push(
-        <p key={`p-${i}`} className="text-slate-300 text-sm leading-relaxed">
-          {parts.length > 0 ? parts : line}
-        </p>,
-      );
-    }
-  }
-
-  flushCodeBlock();
-  flushList();
-  return <>{elements}</>;
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ children }) => <h1 className="text-xl font-bold text-slate-100 mt-5 mb-2">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-lg font-semibold text-slate-100 mt-4 mb-2">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-base font-medium text-slate-200 mt-3 mb-1">{children}</h3>,
+        p: ({ children }) => <p className="text-slate-300 text-sm leading-relaxed">{children}</p>,
+        a: ({ href, children }) => <a href={href} className="text-blue-400 no-underline hover:underline">{children}</a>,
+        code: ({ className, children }) => {
+          const isInline = !className;
+          if (isInline) {
+            return <code className="bg-[#1a2030] text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>;
+          }
+          return <code className={className}>{children}</code>;
+        },
+        pre: ({ children }) => <pre className="bg-[#1a2030] border border-white/10 rounded-lg p-4 my-3 overflow-x-auto text-sm">{children}</pre>,
+        blockquote: ({ children }) => <blockquote className="border-l-2 border-blue-500/40 pl-4 my-2 text-slate-400 italic text-sm">{children}</blockquote>,
+        ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
+        li: ({ children }) => <li className="text-slate-300 text-sm leading-relaxed">{children}</li>,
+        table: ({ children }) => <table className="w-full border-collapse my-3 text-sm">{children}</table>,
+        thead: ({ children }) => <thead className="bg-white/5">{children}</thead>,
+        th: ({ children }) => <th className="border border-white/10 px-3 py-2 text-left text-slate-200">{children}</th>,
+        td: ({ children }) => <td className="border border-white/10 px-3 py-2 text-slate-300">{children}</td>,
+        hr: () => <hr className="border-white/10 my-4" />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 }
 
 // ─── 单条气泡 ────────────────────────────────────────────────────
@@ -223,8 +128,13 @@ export function ChatDrawer({ onClose }: ChatDrawerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const sessionCreatedRef = useRef(false);
+
   // 组件挂载时创建真实会话
   useEffect(() => {
+    if (sessionCreatedRef.current) return;
+    sessionCreatedRef.current = true;
+
     const now = new Date();
     const title = `${now.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })} 对话`;
     fetch('/api/chat/sessions', {
@@ -324,10 +234,10 @@ export function ChatDrawer({ onClose }: ChatDrawerProps) {
       abortRef.current = ctrl;
 
       try {
-        const res = await fetch('/api/chat/stream', {
+        const res = await fetch('/api/chat/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, content: content.trim() }),
+          body: JSON.stringify({ session_id: sessionId, content: content.trim() }),
           signal: ctrl.signal,
         });
 
