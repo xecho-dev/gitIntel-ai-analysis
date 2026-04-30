@@ -651,7 +651,7 @@ export function ChatDrawer({ onClose }: ChatDrawerProps) {
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-[#161b22] flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-sm font-medium text-slate-200">AI 助手</span>
+          <span className="text-sm font-medium text-slate-200">GitIntel AI 助手</span>
           <span className="text-xs text-slate-500">· RAG Pipeline</span>
         </div>
         <div className="flex items-center gap-1">

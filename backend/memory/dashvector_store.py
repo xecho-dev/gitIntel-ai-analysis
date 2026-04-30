@@ -1,25 +1,26 @@
 """
 DashVector 向量存储实现 — GitIntel RAG 记忆层。
 
-支持：
+基于 LangChain 集成，提供优雅的向量存储和检索功能：
   - 存储分析洞察（suggestions）到向量数据库
   - 检索相似记忆（跨仓库经验 + 知识库）
   - 按仓库、类别、优先级过滤检索
 
-环境变量：
-  DASHVECTOR_API_KEY: DashVector API 密钥
-  DASHVECTOR_ENDPOINT: DashVector 服务地址（默认 dashvector.aliyuncs.com）
-  DASHVECTOR_COLLECTION: Collection 名称（默认 gitintel_knowledge）
+使用 LangChain DashVector 的优势：
+  - 统一的 VectorStore 接口
+  - 自动化的集合管理和 schema 处理
+  - 与 LangChain 生态无缝集成
 """
 
 import os
 import json
 import logging
 import hashlib
-from typing import Optional
+from typing import Optional, Any
 from dataclasses import dataclass, field
 
-import dashvector
+from langchain_community.vectorstores import DashVector as LCDashVector
+from langchain_community.embeddings import DashScopeEmbeddings
 
 from .embeddings import DashScopeEmbedder
 
@@ -31,7 +32,7 @@ _logger = logging.getLogger("gitintel")
 DIMENSION = DashScopeEmbedder.DIMENSION  # 1536
 
 
-# ─── 数据模型 ────────────────────────────────────────────────────────────────
+# ─── 数据模型 ───────────────────────────────────────────────────────────────
 
 @dataclass
 class RAGDocument:
@@ -112,7 +113,8 @@ class RAGDocument:
 
         return "\n".join(parts)
 
-    def to_dict(self) -> dict:
+    def to_metadata(self) -> dict:
+        """转换为元数据字典，用于 DashVector 存储。"""
         return {
             "repo_url": self.repo_url,
             "category": self.category,
@@ -132,6 +134,10 @@ class RAGDocument:
             "tags": ",".join(self.tags) if self.tags else "",
             "metadata": json.dumps(self.metadata) if isinstance(self.metadata, dict) else str(self.metadata),
         }
+
+    def to_dict(self) -> dict:
+        """to_metadata() 的别名，保持向后兼容。"""
+        return self.to_metadata()
 
 
 @dataclass
@@ -157,11 +163,12 @@ class SearchResult:
     issue_type: str = ""
 
     @classmethod
-    def from_dashvector_doc(cls, doc: "dashvector.Doc", score: float) -> "SearchResult":
-        fields = doc.fields or {}
+    def from_langchain_doc(cls, doc: Any, score: float) -> "SearchResult":
+        """从 LangChain Document 对象转换。"""
+        metadata = doc.metadata or {}
 
-        # 解析 code_fix（可能是 JSON 字符串或字典）
-        code_fix_raw = fields.get("code_fix", "{}")
+        # 解析 code_fix
+        code_fix_raw = metadata.get("code_fix", "{}")
         if isinstance(code_fix_raw, str):
             try:
                 code_fix = json.loads(code_fix_raw)
@@ -171,37 +178,36 @@ class SearchResult:
             code_fix = code_fix_raw or {}
 
         # 解析 tags
-        tags_str = fields.get("tags", "")
+        tags_str = metadata.get("tags", "")
         tags = tags_str.split(",") if tags_str else []
 
         # 解析技术栈
-        tech_stack_str = fields.get("tech_stack", "")
+        tech_stack_str = metadata.get("tech_stack", "")
         tech_stack = tech_stack_str.split(",") if tech_stack_str else []
 
-        languages_str = fields.get("languages", "")
+        languages_str = metadata.get("languages", "")
         languages = languages_str.split(",") if languages_str else []
 
         # 解析 verified
-        verified_str = fields.get("verified", "false")
+        verified_str = metadata.get("verified", "false")
         verified = verified_str.lower() == "true" if isinstance(verified_str, str) else bool(verified_str)
 
         return cls(
-            id=doc.id or "",
+            id=metadata.get("id", doc.id) if hasattr(doc, "id") else str(hash(doc.page_content[:50])),
             score=score,
-            repo_url=fields.get("repo_url", ""),
-            category=fields.get("category", ""),
-            title=fields.get("title", ""),
-            content=fields.get("content", ""),
-            priority=fields.get("priority", "medium"),
+            repo_url=metadata.get("repo_url", ""),
+            category=metadata.get("category", ""),
+            title=metadata.get("title", ""),
+            content=doc.page_content or metadata.get("content", ""),
+            priority=metadata.get("priority", "medium"),
             tags=tags,
-            metadata=fields.get("metadata", {}),
-            # 新增字段
+            metadata=metadata.get("metadata", {}),
             tech_stack=tech_stack,
             languages=languages,
-            project_scale=fields.get("project_scale", ""),
+            project_scale=metadata.get("project_scale", ""),
             code_fix=code_fix,
             verified=verified,
-            issue_type=fields.get("issue_type", ""),
+            issue_type=metadata.get("issue_type", ""),
         )
 
 
@@ -209,7 +215,7 @@ class SearchResult:
 
 class DashVectorStore:
     """
-    基于 DashVector 的向量存储实现。
+    基于 DashVector 的向量存储实现（使用 LangChain 集成）。
 
     功能：
       - get_or_create_collection(): 获取或创建 Collection
@@ -218,6 +224,11 @@ class DashVectorStore:
       - retrieve_by_repo(): 检索同一仓库的历史记忆
       - retrieve_by_category(): 按类别检索
       - delete_by_repo(): 删除某仓库的所有记忆
+
+    LangChain 集成优势：
+      - 简化的 API（无需手动管理向量和 doc）
+      - 自动化的 embedding 处理
+      - 更清晰的代码结构
     """
 
     def __init__(
@@ -236,16 +247,17 @@ class DashVectorStore:
             collection_name: Collection 名称，默认 gitintel_knowledge
             embedder: Embedder 实例，默认创建新的 DashScopeEmbedder
         """
-        self.api_key = api_key or os.getenv("DASHVECTOR_API_KEY") or os.getenv("OPENAI_API_KEY")
-        self.endpoint = endpoint or os.getenv("DASHVECTOR_ENDPOINT")
-        self.collection_name = collection_name or os.getenv("DASHVECTOR_COLLECTION")
-        self.embedder = embedder or DashScopeEmbedder(api_key=os.getenv("OPENAI_API_KEY"))
+        self.api_key = api_key or os.getenv("DASHVECTOR_API_KEY")
+        self.endpoint = endpoint or os.getenv("DASHVECTOR_ENDPOINT", "https://dashvector.aliyuncs.com")
+        self.collection_name = collection_name or os.getenv("DASHVECTOR_COLLECTION", "gitintel_knowledge")
+        self.embedder = embedder or DashScopeEmbedder()
+
+        # LangChain VectorStore 实例（懒加载）
+        self._vectorstore: Optional[LCDashVector] = None
 
         if not self.api_key:
             _logger.warning("[DashVectorStore] 未配置 DASHVECTOR_API_KEY，RAG 功能将不可用")
-            self._client: Optional[dashvector.Client] = None
         else:
-            self._client = dashvector.Client(api_key=self.api_key, endpoint=self.endpoint)
             _logger.info(
                 f"[DashVectorStore] 初始化完成: endpoint={self.endpoint}, "
                 f"collection={self.collection_name}"
@@ -254,81 +266,107 @@ class DashVectorStore:
     @property
     def is_available(self) -> bool:
         """检查是否可用（已配置 API 密钥且 Embedder 可用）。"""
-        return self._client is not None and self.embedder.is_available
+        return bool(self.api_key) and self.embedder.is_available
+
+    def _get_vectorstore(self) -> Optional[LCDashVector]:
+        """获取或初始化 LangChain VectorStore。"""
+        if not self.is_available:
+            return None
+
+        if self._vectorstore is None:
+            try:
+                # 获取或创建 DashVector Collection
+                from dashvector import Client, Collection
+
+                client = Client(api_key=self.api_key, endpoint=self.endpoint)
+                collection = client.get(self.collection_name)
+
+                if collection is None:
+                    # 创建新 Collection
+                    collection = client.create(
+                        name=self.collection_name,
+                        dimension=DIMENSION,
+                        metric="cosine",
+                        fields_schema={
+                            "repo_url": "str",
+                            "category": "str",
+                            "title": "str",
+                            "content": "str",
+                            "priority": "str",
+                            "tech_stack": "str",
+                            "languages": "str",
+                            "project_scale": "str",
+                            "code_fix": "str",
+                            "verified": "str",
+                            "issue_type": "str",
+                            "tags": "str",
+                            "metadata": "str",
+                        },
+                    )
+                    _logger.info(f"[DashVectorStore] Collection 创建成功: {self.collection_name}")
+
+                # 使用 LangChain DashVector 包装
+                self._vectorstore = LCDashVector(
+                    client=client,
+                    collection_name=self.collection_name,
+                    embedding=self.embedder._embeddings,  # 使用 LangChain Embeddings
+                )
+
+            except Exception as exc:
+                _logger.error(f"[DashVectorStore] VectorStore 初始化失败: {exc}")
+                return None
+
+        return self._vectorstore
 
     # ─── Collection 管理 ──────────────────────────────────────────────────────
 
-    def get_or_create_collection(self) -> Optional[dashvector.Collection]:
-        """获取或创建 Collection（自动处理不存在的情况）。"""
-        if not self._client:
+    def get_or_create_collection(self) -> Optional[Any]:
+        """获取或创建 Collection（返回底层 dashvector.Collection）。"""
+        if not self.api_key:
             return None
 
         try:
-            collection = self._client.get(self.collection_name)
-            _logger.debug(f"[DashVectorStore] 获取 Collection: {self.collection_name}")
-            return collection
-        except dashvector.DashVectorException:
-            _logger.info(f"[DashVectorStore] Collection 不存在，创建: {self.collection_name}")
-            return self._create_collection()
+            from dashvector import Client
 
-    def _create_collection(self) -> Optional[dashvector.Collection]:
-        """创建新的 Collection。"""
-        if not self._client:
-            return None
+            client = Client(api_key=self.api_key, endpoint=self.endpoint)
+            collection = client.get(self.collection_name)
 
-        try:
-            collection = self._client.create(
-                name=self.collection_name,
-                dimension=DIMENSION,
-                metric="cosine",
-                fields_schema={
-                    # 基础字段
-                    "repo_url": "str",
-                    "category": "str",
-                    "title": "str",
-                    "content": "str",
-                    "priority": "str",
-                    # 技术栈维度
-                    "tech_stack": "str",  # comma-separated: "react,typescript,next.js"
-                    "languages": "str",     # comma-separated: "TypeScript,Python"
-                    "project_scale": "str",  # small | medium | large
-                    # code_fix
-                    "code_fix": "str",     # JSON string
-                    "verified": "str",      # true | false
-                    # 问题上下文
-                    "issue_type": "str",    # N+1查询 | 硬编码密码 | ...
-                    # 标签与元数据
-                    "tags": "str",          # comma-separated
-                    "metadata": "str",      # JSON string
-                },
-            )
-            _logger.info(f"[DashVectorStore] Collection 创建成功: {self.collection_name}")
-            return collection
-        except Exception as exc:
-            _logger.error(f"[DashVectorStore] Collection 创建失败: {exc}")
-            return None
-
-    def _ensure_collection(func):
-        """装饰器：确保 Collection 存在，必要时自动创建。"""
-        def wrapper(self, *args, **kwargs):
-            if not self.is_available:
-                return None
-            collection = self.get_or_create_collection()
             if collection is None:
-                _logger.warning(f"[DashVectorStore] 无法获取 Collection: {self.collection_name}")
-                return None
-            return func(self, collection, *args, **kwargs)
-        return wrapper
+                collection = client.create(
+                    name=self.collection_name,
+                    dimension=DIMENSION,
+                    metric="cosine",
+                    fields_schema={
+                        "repo_url": "str",
+                        "category": "str",
+                        "title": "str",
+                        "content": "str",
+                        "priority": "str",
+                        "tech_stack": "str",
+                        "languages": "str",
+                        "project_scale": "str",
+                        "code_fix": "str",
+                        "verified": "str",
+                        "issue_type": "str",
+                        "tags": "str",
+                        "metadata": "str",
+                    },
+                )
+                _logger.info(f"[DashVectorStore] Collection 创建成功: {self.collection_name}")
+
+            return collection
+
+        except Exception as exc:
+            _logger.error(f"[DashVectorStore] Collection 获取/创建失败: {exc}")
+            return None
 
     # ─── 文档存储 ─────────────────────────────────────────────────────────────
 
-    @_ensure_collection
-    def upsert_documents(self, collection: dashvector.Collection, docs: list[RAGDocument]) -> int:
+    def upsert_documents(self, docs: list[RAGDocument]) -> int:
         """
         批量存储文档（upsert，根据 doc_id 去重）。
 
         Args:
-            collection: DashVector Collection
             docs: RAGDocument 列表
 
         Returns:
@@ -337,25 +375,30 @@ class DashVectorStore:
         if not docs:
             return 0
 
-        # 生成向量
-        texts = [doc.to_text() for doc in docs]
-        vectors = self.embedder.embed(texts)
-
-        # 构建 dashvector.Doc
-        dv_docs = []
-        for doc, vector in zip(docs, vectors):
-            doc_id = self._make_doc_id(doc)
-            dv_doc = dashvector.Doc(
-                id=doc_id,
-                vector=vector,
-                fields=doc.to_dict(),
-            )
-            dv_docs.append(dv_doc)
+        collection = self.get_or_create_collection()
+        if collection is None:
+            return 0
 
         try:
-            collection.insert(dv_docs)
-            _logger.info(f"[DashVectorStore] 存储了 {len(dv_docs)} 个文档")
-            return len(dv_docs)
+            # 准备文本和元数据
+            texts = [doc.to_text() for doc in docs]
+            metadatas = [doc.to_metadata() for doc in docs]
+            ids = [self._make_doc_id(doc) for doc in docs]
+
+            # 使用 LangChain DashVector 的 add_texts 方法
+            lc_store = self._get_vectorstore()
+            if lc_store is None:
+                return 0
+
+            lc_store.add_texts(
+                texts=texts,
+                metadatas=metadatas,
+                ids=ids,
+            )
+
+            _logger.info(f"[DashVectorStore] 存储了 {len(docs)} 个文档")
+            return len(docs)
+
         except Exception as exc:
             _logger.error(f"[DashVectorStore] 存储文档失败: {exc}")
             return 0
@@ -394,16 +437,12 @@ class DashVectorStore:
                 title=sug.get("title", f"Suggestion {idx}"),
                 content=sug.get("description", ""),
                 priority=sug.get("priority", "medium"),
-                # 技术栈维度
                 tech_stack=tech_stack or [],
                 languages=languages or [],
                 project_scale=project_scale,
-                # code_fix（核心价值）
                 code_fix=sug.get("code_fix", {}),
                 verified=sug.get("verified", False),
-                # 问题上下文
                 issue_type=sug.get("type", ""),
-                # 标签
                 tags=[sug.get("category", ""), sug.get("type", "")],
                 metadata={
                     "id": sug.get("id"),
@@ -458,11 +497,6 @@ class DashVectorStore:
         suggestion_data = analysis_result.get("suggestion", {}) or {}
         suggestions = suggestion_data.get("suggestions", [])
         if suggestions:
-            for sug in suggestions:
-                sug_copy = dict(sug)
-                sug_copy["_tech_stack"] = tech_stack
-                sug_copy["_languages"] = languages
-                sug_copy["_project_scale"] = project_scale
             stored = self.store_suggestions(
                 repo_url=repo_url,
                 suggestions=suggestions,
@@ -504,14 +538,12 @@ class DashVectorStore:
     def _extract_tech_stack(self, tech_stack_result: dict) -> list[str]:
         """从 tech_stack_result 提取技术栈列表。"""
         techs = []
-        # frameworks
         frameworks = tech_stack_result.get("frameworks", []) or []
         if frameworks and isinstance(frameworks[0], dict):
             techs.extend([f.get("name", "") for f in frameworks if f.get("name")])
         else:
             techs.extend([str(f) for f in frameworks if f])
 
-        # infrastructure
         infra = tech_stack_result.get("infrastructure", []) or []
         if isinstance(infra, list) and infra:
             if isinstance(infra[0], dict):
@@ -540,7 +572,6 @@ class DashVectorStore:
         """从架构分析结果中提取可存储的洞察。"""
         docs = []
 
-        # 存储架构关注点
         concerns = arch_data.get("concerns", []) or []
         for concern in concerns:
             if isinstance(concern, str):
@@ -552,7 +583,7 @@ class DashVectorStore:
             else:
                 continue
 
-            if len(content) > 10:  # 过滤空内容
+            if len(content) > 10:
                 docs.append(RAGDocument(
                     repo_url=repo_url,
                     category="architecture",
@@ -567,7 +598,6 @@ class DashVectorStore:
                     metadata={"source": "architecture_analysis"},
                 ))
 
-        # 存储架构模式
         patterns = arch_data.get("patterns", []) or []
         for pattern in patterns:
             if isinstance(pattern, str):
@@ -607,17 +637,15 @@ class DashVectorStore:
         """从依赖分析结果中提取可存储的洞察。"""
         docs = []
 
-        # 存储高危依赖
         risky_deps = dep_data.get("risky_deps", []) or []
         if not risky_deps:
-            # 尝试从 deps 列表中筛选高危的
             all_deps = dep_data.get("deps", []) or []
             risky_deps = [
                 d for d in all_deps
                 if isinstance(d, dict) and d.get("risk_level") in ("high", "高危")
             ]
 
-        for dep in risky_deps[:5]:  # 最多存5个
+        for dep in risky_deps[:5]:
             if isinstance(dep, dict):
                 name = dep.get("name", "unknown")
                 version = dep.get("version", "*")
@@ -644,7 +672,6 @@ class DashVectorStore:
                     },
                 ))
 
-        # 存储过时依赖警告
         outdated_deps = dep_data.get("outdated_deps", []) or []
         for dep in outdated_deps[:3]:
             if isinstance(dep, dict):
@@ -673,10 +700,8 @@ class DashVectorStore:
 
     # ─── 检索 ─────────────────────────────────────────────────────────────────
 
-    @_ensure_collection
     def retrieve_similar(
         self,
-        collection: dashvector.Collection,
         query: str,
         top_k: int = 5,
         category: Optional[str] = None,
@@ -686,7 +711,6 @@ class DashVectorStore:
         向量相似度检索。
 
         Args:
-            collection: DashVector Collection
             query: 查询文本
             top_k: 返回数量
             category: 可选，按类别过滤
@@ -695,30 +719,39 @@ class DashVectorStore:
         Returns:
             SearchResult 列表（按相似度降序）
         """
-        # 生成向量
-        query_vector = self.embedder.embed_one(query)
-
-        # 构建过滤表达式
-        filter_expr = self._build_filter(category=category, priority=priority)
+        collection = self.get_or_create_collection()
+        if collection is None:
+            return []
 
         try:
-            response = collection.query(
-                vector=query_vector,
-                topk=top_k,
-                filter=filter_expr,
-                output_fields=[
-                    "repo_url", "category", "title", "content", "priority",
-                    "tech_stack", "languages", "project_scale",
-                    "code_fix", "verified", "issue_type",
-                    "tags", "metadata",
-                ],
-            )
+            # 使用 LangChain 的 similarity_search_with_score
+            lc_store = self._get_vectorstore()
+            if lc_store is None:
+                return []
+
+            # 构建过滤条件
+            filter_dict = {}
+            if category:
+                filter_dict["category"] = category
+            if priority:
+                filter_dict["priority"] = priority
+
+            # 执行检索
+            if filter_dict:
+                docs_and_scores = lc_store.similarity_search_with_score(
+                    query,
+                    k=top_k,
+                    filter=filter_dict if filter_dict else None,
+                )
+            else:
+                docs_and_scores = lc_store.similarity_search_with_score(
+                    query,
+                    k=top_k,
+                )
 
             results = []
-            if response and response.output:
-                for doc in response.output:
-                    score = 1 - doc.score
-                    results.append(SearchResult.from_dashvector_doc(doc, score))
+            for doc, score in docs_and_scores:
+                results.append(SearchResult.from_langchain_doc(doc, score))
 
             _logger.debug(f"[DashVectorStore] 检索 query='{query}', 返回 {len(results)} 条")
             return results
@@ -742,10 +775,31 @@ class DashVectorStore:
         Returns:
             SearchResult 列表
         """
-        return self.retrieve_similar(
-            query=f"repo:{repo_url} analysis suggestion",
-            top_k=top_k,
-        )
+        collection = self.get_or_create_collection()
+        if collection is None:
+            return []
+
+        try:
+            # 使用 repo_url 作为过滤条件
+            lc_store = self._get_vectorstore()
+            if lc_store is None:
+                return []
+
+            docs_and_scores = lc_store.similarity_search_with_score(
+                f"repo:{repo_url} analysis suggestion",
+                k=top_k,
+                filter={"repo_url": repo_url},
+            )
+
+            results = []
+            for doc, score in docs_and_scores:
+                results.append(SearchResult.from_langchain_doc(doc, score))
+
+            return results
+
+        except Exception as exc:
+            _logger.error(f"[DashVectorStore] 按仓库检索失败: {exc}")
+            return []
 
     def retrieve_best_practices(self, top_k: int = 3) -> list[SearchResult]:
         """
@@ -762,18 +816,20 @@ class DashVectorStore:
 
     # ─── 删除 ─────────────────────────────────────────────────────────────────
 
-    @_ensure_collection
-    def delete_by_repo(self, collection: dashvector.Collection, repo_url: str) -> bool:
+    def delete_by_repo(self, repo_url: str) -> bool:
         """
         删除某仓库的所有记忆。
 
         Args:
-            collection: DashVector Collection
             repo_url: 仓库 URL
 
         Returns:
             是否成功
         """
+        collection = self.get_or_create_collection()
+        if collection is None:
+            return False
+
         try:
             # 检索所有匹配的文档 ID
             all_ids = []

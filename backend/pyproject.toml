@@ -1,3 +1,6 @@
+[tool.uv]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
 [project]
 name = "gitintel-backend"
 version = "0.1.0"
@@ -13,6 +16,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "python-jose[cryptography]>=3.3.0",
+    "bcrypt>=4.0.0",
     "supabase>=2.0.0",
     "langsmith>=0.1.0",
     # 代码拉取与分析
@@ -24,6 +28,11 @@ dependencies = [
     "reportlab>=4.0.0",
     # 多语言代码分析
     "lizard>=1.17.0",
+    # 向量数据库
+    "dashvector>=1.0.0,<2.0.0",
+    "dashscope>=1.20.0",
+    # LangChain 集成（向量存储、嵌入模型）
+    "langchain-community>=0.3.0",
 ]
 
 [project.optional-dependencies]
