@@ -627,6 +627,7 @@ class BaseExplorerAgent:
         tool_calls_log: list[dict] = []
         iteration = 0
         min_tool_calls = _EXPLORER_MIN_TOOL_CALLS
+        tool_retry_count: dict[str, int] = {}  # 工具连续失败计数，防止死循环
 
         while iteration < self.MAX_ITERATIONS:
             iteration += 1
@@ -672,13 +673,43 @@ class BaseExplorerAgent:
             for tc in tool_calls:
                 tc_result = await self._run_tool(owner, repo, branch, tc, iteration)
                 tool_calls_log.append(tc_result["log"])
-                messages.append(tc_result["message"])
+
+                # 从 response.tool_calls 中精确查找 tool_call_id（与 _run_tool 保持一致）
+                tc_id = tc.get("id") or f"call_{iteration}_{tc['name']}"
+                if hasattr(self.llm, "_last_response") and self.llm._last_response:
+                    for _tc in getattr(self.llm._last_response, "tool_calls", []) or []:
+                        if _tc.get("name") == tc["name"]:
+                            tc_id = _tc.get("id") or tc_id
+                            break
 
                 if tc_result["error"]:
+                    # 错误信息发送给 LLM，让它决定重试或换方案
                     logger.warning(
                         f"[{self.__class__.__name__}] 工具 {tc['name']} 执行失败: "
                         f"{tc_result['error']}"
                     )
+                    # 同一工具连续失败上限：超过 3 次则跳过，防止死循环
+                    failed_count = tool_retry_count.get(tc["name"], 0) + 1
+                    tool_retry_count[tc["name"]] = failed_count
+                    if failed_count >= 3:
+                        messages.append(ToolMessage(
+                            content=f"[跳过] {tc['name']} 已连续失败 {failed_count} 次，不再重试",
+                            tool_call_id=tc_id,
+                        ))
+                    else:
+                        messages.append(ToolMessage(
+                            content=f"[工具执行错误] {tc_result['error']}",
+                            tool_call_id=tc_id,
+                        ))
+                        messages.append(HumanMessage(
+                            content=(
+                                f"工具 {tc['name']} 执行失败: {tc_result['error']}。"
+                                "请换一种方式继续探索（尝试不同的工具或参数）。"
+                            )
+                        ))
+                else:
+                    messages.append(tc_result["message"])
+                    tool_retry_count.pop(tc["name"], None)  # 成功后重置计数
 
             # 检查是否达到最小工具调用次数，如果是最后一次迭代，强制继续
             if len(tool_calls_log) < min_tool_calls and iteration >= self.MAX_ITERATIONS:

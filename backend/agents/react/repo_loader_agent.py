@@ -212,6 +212,7 @@ class ReActRepoLoaderAgent:
 
         max_iter = max_iterations or self.MAX_ITERATIONS
         max_f = max_files or self.MAX_FILES
+        consecutive_no_progress = 0
 
         if self.llm is None:
             # LLM 不可用时，使用规则模式（基于文件树做启发式选择）
@@ -262,10 +263,21 @@ class ReActRepoLoaderAgent:
                     logger.info(f"[ReActRepoLoader] Agent 认为信息足够，停止探索")
                     break
 
+                # 工具失败重试：如果本步有工具失败但 LLM 已继续（生成了新工具调用），
+                # 保持当前消息状态，让 LLM 在下一轮看到失败信息并决定如何处理。
+                # 只在连续 3 次迭代都无新进展时停止。
+                if step_result.get("had_tool_error"):
+                    consecutive_no_progress += 1
+                    if consecutive_no_progress >= 3:
+                        logger.warning("[ReActRepoLoader] 连续 3 次迭代无进展，停止探索")
+                        break
+                else:
+                    consecutive_no_progress = 0
+
             except Exception as e:
                 logger.error(f"[ReActRepoLoader] 迭代 {iteration + 1} 异常: {e}")
-                # LLM 调用失败（如 400）时，_run_single_step 可能已追加了 AIMessage 和 ToolMessage，
-                # 必须回滚这些部分追加的消息，避免破坏下一轮的消息链。
+                # LLM 调用失败（如 400）时，必须回滚这些部分追加的消息，
+                # 避免破坏下一轮的消息链。
                 messages[:] = messages[:msg_count_before]
                 result.errors.append(f"迭代 {iteration + 1}: {str(e)}")
                 if len(result.errors) >= 3:
@@ -398,9 +410,11 @@ class ReActRepoLoaderAgent:
                 "is_sufficient": is_sufficient,
                 "summary": summary,
                 "messages": messages[start_idx:],
+                "had_tool_error": False,
             }
 
         # 执行工具调用
+        had_tool_error = False
         for tc in tool_calls:
             tool_name = tc["name"]
             tool_args = tc["args"]
@@ -447,7 +461,8 @@ class ReActRepoLoaderAgent:
                 elapsed = time.time() - t0
                 error_msg = f"[工具执行错误] {type(e).__name__}: {str(e)}"
                 result.errors.append(error_msg)
-                # 工具执行失败时追加 ToolMessage（带 tool_call_id）
+                # 工具执行失败时追加 ToolMessage（带 tool_call_id），让 LLM 看到错误信息。
+                # 不再回滚消息，保持完整的对话链。
                 tc_id = None
                 if response.tool_calls:
                     for _tc in response.tool_calls:
@@ -470,10 +485,11 @@ class ReActRepoLoaderAgent:
                     error=str(e),
                     elapsed_ms=round(elapsed * 1000, 1),
                 ))
-                # 回滚本步新追加的 Human + AI + Tool 消息，防止破坏消息链
-                messages[:] = messages[:start_idx]
+                # 不回滚，让错误信息参与下一轮 LLM 推理
+                had_tool_error = True
 
-        return {"is_sufficient": False, "summary": "", "messages": messages[start_idx:]}
+        return {"is_sufficient": False, "summary": "", "messages": messages[start_idx:],
+                "had_tool_error": had_tool_error}
 
     async def _execute_tool(
         self,

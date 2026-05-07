@@ -300,10 +300,30 @@ class ReActSuggestionAgent:
                 # LLM 没有调用工具，可能已完成
                 break
 
+            # 工具重试计数：同一工具连续失败超过 3 次则跳过，防止死循环
+            tool_retry_count: dict[str, int] = {}
+
             # 执行工具调用
             for tc in tool_calls:
                 tool_name = tc["name"]
                 tool_args = tc["args"]
+
+                # 从 response.tool_calls 中精确查找 tool_call_id
+                tc_id = None
+                if hasattr(response, "tool_calls") and response.tool_calls:
+                    for _tc in response.tool_calls:
+                        if _tc.get("name") == tool_name:
+                            tc_id = _tc.get("id")
+                            break
+                tc_id = tc_id or tc.get("id") or f"call_{iteration}_{tool_name}"
+
+                # 同一工具连续失败上限：超过 3 次则跳过
+                if tool_retry_count.get(tool_name, 0) >= 3:
+                    error_msg = f"[跳过] {tool_name} 已连续失败 3 次，不再重试"
+                    messages.append(
+                        ToolMessage(content=error_msg, tool_call_id=tc_id)
+                    )
+                    continue
 
                 try:
                     result = await self._execute_tool(
@@ -312,6 +332,8 @@ class ReActSuggestionAgent:
                     verification.tool_calls.append({
                         "tool": tool_name, "args": tool_args, "result": result[:500]
                     })
+                    # 重置该工具的失败计数
+                    tool_retry_count[tool_name] = 0
 
                     # 实时 yield 工具执行进度
                     yield {
@@ -324,7 +346,6 @@ class ReActSuggestionAgent:
 
                     # 使用 ToolMessage 添加观察结果（Function Calling 规范要求）
                     from langchain_core.messages import ToolMessage
-                    tc_id = tc.get("id") or f"call_{iteration}_{tool_name}"
                     messages.append(
                         ToolMessage(
                             content=result[:_TOOL_RESULT_TRUNCATE],
@@ -335,13 +356,14 @@ class ReActSuggestionAgent:
                 except Exception as e:
                     logger.warning(f"[ReActSuggestion] 工具执行失败: {tool_name}: {e}")
                     from langchain_core.messages import ToolMessage
-                    tc_id = tc.get("id") or f"call_{iteration}_{tool_name}"
+                    # 错误信息发给 LLM，让它决定是重试还是换方案
                     messages.append(
                         ToolMessage(
                             content=f"[错误] {type(e).__name__}: {str(e)}",
                             tool_call_id=tc_id,
                         )
                     )
+                    tool_retry_count[tool_name] = tool_retry_count.get(tool_name, 0) + 1
 
             # 防止消息历史无限膨胀：保留 SystemMessage + 初始 HumanMessage + 最近 2 轮完整对话
             # 关键：必须保留完整的三元组（Human + AI(tool_calls) + ToolMessage），
