@@ -23,11 +23,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ── 先复制依赖文件，再安装（利用 Docker 缓存层）──────────────
-COPY backend/requirements.txt /app/requirements.txt
+# ── 安装 uv 包管理器 ────────────────────────────────────────
+RUN pip install --no-cache-dir uv
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+# ── 先复制 pyproject.toml，再安装依赖（利用 Docker 缓存层）───
+COPY backend/pyproject.toml /app/pyproject.toml
+
+RUN uv pip install --system --no-cache -r pyproject.toml
 
 # ── 复制后端源码 ─────────────────────────────────────────────
 COPY backend/ /app/
