@@ -1,12 +1,12 @@
 """
-DashVector 向量存储实现 — GitIntel RAG 记忆层。
+Chroma 向量存储实现 — GitIntel RAG 记忆层。
 
-基于 LangChain 集成，提供优雅的向量存储和检索功能：
-  - 存储分析洞察（suggestions）到向量数据库
-  - 检索相似记忆（跨仓库经验 + 知识库）
-  - 按仓库、类别、优先级过滤检索
+基于 Chroma，提供优雅的向量存储和检索功能：
+  - gitintel_knowledge: RAG 知识库（分析结果、建议、洞察）
+  - gitintel_memory:   聊天记忆（AI 助手对话历史，按 session_id 隔离）
 
-使用 LangChain DashVector 的优势：
+使用 Chroma 的优势：
+  - 本地持久化，无需额外部署服务
   - 统一的 VectorStore 接口
   - 自动化的集合管理和 schema 处理
   - 与 LangChain 生态无缝集成
@@ -19,7 +19,19 @@ import hashlib
 from typing import Optional, Any
 from dataclasses import dataclass, field
 
-from langchain_community.vectorstores import DashVector as LCDashVector
+# 在导入 chromadb 之前禁用遥测，避免 posthog 版本兼容性问题
+os.environ["ANONYMIZED_TELEMETRY"] = "false"
+os.environ["CHROMA_TELEMETRY_DISABLED"] = "true"
+
+import chromadb
+from chromadb.config import Settings as ChromaSettings
+
+# posthog 7.x 与 chromadb 0.6.x 接口不兼容，直接将 posthog.capture 替换为空函数
+# 确保在任何 chromadb 初始化之前执行
+import chromadb.telemetry.product.posthog as _posthog_module
+_orig_posthog_capture = _posthog_module.posthog.capture
+_posthog_module.posthog.capture = lambda *args, **kwargs: None
+from langchain_chroma import Chroma
 from langchain_community.embeddings import DashScopeEmbeddings
 
 from .embeddings import DashScopeEmbedder
@@ -30,6 +42,13 @@ _logger = logging.getLogger("gitintel")
 # ─── 常量 ────────────────────────────────────────────────────────────────────
 
 DIMENSION = DashScopeEmbedder.DIMENSION  # 1536
+
+# 两个 Collection 的默认名称
+COLLECTION_KNOWLEDGE = os.getenv("CHROMA_COLLECTION_KNOWLEDGE", "gitintel_knowledge")
+COLLECTION_MEMORY = os.getenv("CHROMA_COLLECTION_MEMORY", "gitintel_memory")
+
+# Chroma 数据目录
+CHROMA_DATA_DIR = os.getenv("CHROMA_DATA_DIR", "./data/chroma")
 
 
 # ─── 数据模型 ───────────────────────────────────────────────────────────────
@@ -43,6 +62,7 @@ class RAGDocument:
       - 按问题类型检索（安全问题、性能问题）
       - 按场景检索（迁移经验、优化经验）
       - 按仓库检索（同一项目的历史分析）
+      - 按会话检索（同一对话的相关历史）
     """
 
     repo_url: str
@@ -50,6 +70,10 @@ class RAGDocument:
     title: str
     content: str
     priority: str = "medium"
+
+    # ── 文档类型（用于区分不同来源）─────────────────────────────
+    doc_type: str = "analysis"  # analysis | conversation_history | best_practice
+    session_id: str = ""         # 会话 ID，用于隔离对话历史
 
     # ── 技术栈维度（元数据）────────────────────────────────────
     tech_stack: list[str] = field(default_factory=list)  # ["react", "typescript", "next.js"]
@@ -114,13 +138,19 @@ class RAGDocument:
         return "\n".join(parts)
 
     def to_metadata(self) -> dict:
-        """转换为元数据字典，用于 DashVector 存储。"""
+        """转换为元数据字典，用于 Chroma 存储。"""
         return {
             "repo_url": self.repo_url,
             "category": self.category,
             "title": self.title,
             "content": self.content,
             "priority": self.priority,
+            # 文档类型与会话
+            "doc_type": self.doc_type,
+            "session_id": self.session_id,
+            # 对话历史字段（供 SemanticMemory 检索和格式化使用）
+            "user_message": self.metadata.get("user_message", "") if isinstance(self.metadata, dict) else "",
+            "assistant_message": self.metadata.get("assistant_message", "") if isinstance(self.metadata, dict) else "",
             # 技术栈维度
             "tech_stack": ",".join(self.tech_stack) if self.tech_stack else "",
             "languages": ",".join(self.languages) if self.languages else "",
@@ -193,7 +223,7 @@ class SearchResult:
         verified = verified_str.lower() == "true" if isinstance(verified_str, str) else bool(verified_str)
 
         return cls(
-            id=metadata.get("id", doc.id) if hasattr(doc, "id") else str(hash(doc.page_content[:50])),
+            id=metadata.get("id", doc.id) if hasattr(doc, "id") else str(hash(doc.page_content[:50] if doc.page_content else "")),
             score=score,
             repo_url=metadata.get("repo_url", ""),
             category=metadata.get("category", ""),
@@ -211,11 +241,11 @@ class SearchResult:
         )
 
 
-# ─── DashVector Store ────────────────────────────────────────────────────────
+# ─── Chroma Store ─────────────────────────────────────────────────────────────
 
-class DashVectorStore:
+class ChromaStore:
     """
-    基于 DashVector 的向量存储实现（使用 LangChain 集成）。
+    基于 Chroma 的向量存储实现（使用 LangChain 集成）。
 
     功能：
       - get_or_create_collection(): 获取或创建 Collection
@@ -229,136 +259,151 @@ class DashVectorStore:
       - 简化的 API（无需手动管理向量和 doc）
       - 自动化的 embedding 处理
       - 更清晰的代码结构
+
+    两个 Collection 的职责：
+      - gitintel_knowledge (collection_type="knowledge"): RAG 知识库，存分析结果、建议、洞察
+      - gitintel_memory   (collection_type="memory"):   聊天记忆，存 AI 助手对话历史（按 session_id 隔离）
     """
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        endpoint: Optional[str] = None,
+        persist_directory: Optional[str] = None,
         collection_name: Optional[str] = None,
         embedder: Optional[DashScopeEmbedder] = None,
+        *,
+        collection_type: Optional[str] = None,
     ):
         """
-        初始化 DashVector Store。
+        初始化 Chroma Store。
 
         Args:
-            api_key: DashVector API 密钥，默认从环境变量读取
-            endpoint: DashVector 服务地址，默认 dashvector.aliyuncs.com
-            collection_name: Collection 名称，默认 gitintel_knowledge
+            persist_directory: Chroma 数据持久化目录，默认 ./data/chroma
+            collection_name: Collection 名称，优先使用此参数；否则根据 collection_type 自动选择
             embedder: Embedder 实例，默认创建新的 DashScopeEmbedder
+            collection_type: 集合类型，"knowledge" 或 "memory"，用于自动选择 collection_name。
+                             优先级：collection_name > collection_type > 环境变量 > 默认值。
+                             "knowledge" → gitintel_knowledge
+                             "memory"    → gitintel_memory
         """
-        self.api_key = api_key or os.getenv("DASHVECTOR_API_KEY")
-        self.endpoint = endpoint or os.getenv("DASHVECTOR_ENDPOINT", "https://dashvector.aliyuncs.com")
-        self.collection_name = collection_name or os.getenv("DASHVECTOR_COLLECTION", "gitintel_knowledge")
+        self.persist_directory = persist_directory or os.getenv("CHROMA_DATA_DIR", CHROMA_DATA_DIR)
+        self._ensure_data_dir()
+
+        # 确定 collection 名称：显式参数 > collection_type > 环境变量 > 默认值
+        if collection_name:
+            self.collection_name = collection_name
+        elif collection_type == "knowledge":
+            self.collection_name = os.getenv("CHROMA_COLLECTION_KNOWLEDGE", COLLECTION_KNOWLEDGE)
+        elif collection_type == "memory":
+            self.collection_name = os.getenv("CHROMA_COLLECTION_MEMORY", COLLECTION_MEMORY)
+        else:
+            # 兜底：向后兼容，优先读旧的 DASHVECTOR_COLLECTION，其次读 KNOWLEDGE
+            self.collection_name = (
+                os.getenv("DASHVECTOR_COLLECTION")
+                or os.getenv("CHROMA_COLLECTION_KNOWLEDGE")
+                or COLLECTION_KNOWLEDGE
+            )
+
         self.embedder = embedder or DashScopeEmbedder()
 
         # LangChain VectorStore 实例（懒加载）
-        self._vectorstore: Optional[LCDashVector] = None
+        self._vectorstore: Optional["Chroma"] = None
 
-        if not self.api_key:
-            _logger.warning("[DashVectorStore] 未配置 DASHVECTOR_API_KEY，RAG 功能将不可用")
-        else:
-            _logger.info(
-                f"[DashVectorStore] 初始化完成: endpoint={self.endpoint}, "
-                f"collection={self.collection_name}"
-            )
+        _logger.info(
+            f"[ChromaStore] 初始化完成: persist_dir={self.persist_directory}, "
+            f"collection={self.collection_name}"
+        )
+
+    def _ensure_data_dir(self) -> None:
+        """确保数据目录存在。"""
+        os.makedirs(self.persist_directory, exist_ok=True)
 
     @property
     def is_available(self) -> bool:
-        """检查是否可用（已配置 API 密钥且 Embedder 可用）。"""
-        return bool(self.api_key) and self.embedder.is_available
+        """检查是否可用（Embedder 可用）。"""
+        return self.embedder.is_available
 
-    def _get_vectorstore(self) -> Optional[LCDashVector]:
+    def _get_vectorstore(self) -> Optional["Chroma"]:
         """获取或初始化 LangChain VectorStore。"""
         if not self.is_available:
             return None
 
         if self._vectorstore is None:
             try:
-                # 获取或创建 DashVector Collection
-                from dashvector import Client, Collection
-
-                client = Client(api_key=self.api_key, endpoint=self.endpoint)
-                collection = client.get(self.collection_name)
-
-                if collection is None:
-                    # 创建新 Collection
-                    collection = client.create(
-                        name=self.collection_name,
-                        dimension=DIMENSION,
-                        metric="cosine",
-                        fields_schema={
-                            "repo_url": "str",
-                            "category": "str",
-                            "title": "str",
-                            "content": "str",
-                            "priority": "str",
-                            "tech_stack": "str",
-                            "languages": "str",
-                            "project_scale": "str",
-                            "code_fix": "str",
-                            "verified": "str",
-                            "issue_type": "str",
-                            "tags": "str",
-                            "metadata": "str",
-                        },
-                    )
-                    _logger.info(f"[DashVectorStore] Collection 创建成功: {self.collection_name}")
-
-                # 使用 LangChain DashVector 包装
-                self._vectorstore = LCDashVector(
-                    client=client,
+                self._vectorstore = Chroma(
+                    client=self._get_client(),
                     collection_name=self.collection_name,
-                    embedding=self.embedder._embeddings,  # 使用 LangChain Embeddings
+                    embedding_function=self.embedder._embeddings,
+                    persist_directory=self.persist_directory,
                 )
-
+                _logger.info(f"[ChromaStore] VectorStore 初始化成功: {self.collection_name}")
             except Exception as exc:
-                _logger.error(f"[DashVectorStore] VectorStore 初始化失败: {exc}")
+                _logger.error(f"[ChromaStore] VectorStore 初始化失败: {exc}")
                 return None
 
         return self._vectorstore
 
-    # ─── Collection 管理 ──────────────────────────────────────────────────────
+    def _get_client(self) -> "chromadb.PersistentClient":
+        """获取 Chroma PersistentClient。"""
+        return chromadb.PersistentClient(
+            path=self.persist_directory,
+            settings=ChromaSettings(
+                anonymized_telemetry=False,
+                allow_reset=True,
+            ),
+        )
 
-    def get_or_create_collection(self) -> Optional[Any]:
-        """获取或创建 Collection（返回底层 dashvector.Collection）。"""
-        if not self.api_key:
+    def _get_or_create_collection(self) -> Any:
+        """获取或创建 Chroma Collection（返回底层 collection 对象）。"""
+        try:
+            client = self._get_client()
+            collection = client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"description": "GitIntel RAG Knowledge Base"},
+            )
+            return collection
+        except Exception as exc:
+            _logger.error(f"[ChromaStore] Collection 获取/创建失败: {exc}")
             return None
 
+    def delete_by_session(self, session_id: str) -> bool:
+        """
+        删除某会话的所有记忆。
+
+        Args:
+            session_id: 会话 ID
+
+        Returns:
+            是否成功
+        """
         try:
-            from dashvector import Client
-
-            client = Client(api_key=self.api_key, endpoint=self.endpoint)
-            collection = client.get(self.collection_name)
-
+            collection = self._get_or_create_collection()
             if collection is None:
-                collection = client.create(
-                    name=self.collection_name,
-                    dimension=DIMENSION,
-                    metric="cosine",
-                    fields_schema={
-                        "repo_url": "str",
-                        "category": "str",
-                        "title": "str",
-                        "content": "str",
-                        "priority": "str",
-                        "tech_stack": "str",
-                        "languages": "str",
-                        "project_scale": "str",
-                        "code_fix": "str",
-                        "verified": "str",
-                        "issue_type": "str",
-                        "tags": "str",
-                        "metadata": "str",
-                    },
-                )
-                _logger.info(f"[DashVectorStore] Collection 创建成功: {self.collection_name}")
+                return False
 
-            return collection
+            # 查询并删除该 session_id 的所有文档
+            try:
+                results = collection.get(where={"session_id": session_id})
+                if results and results.get("ids"):
+                    collection.delete(ids=results["ids"])
+                    _logger.info(f"[ChromaStore] 删除会话 {session_id} 的 {len(results['ids'])} 条记忆")
+            except Exception:
+                # Chroma where 查询可能不支持，尝试全量扫描
+                all_docs = collection.get(limit=10000)
+                if all_docs and all_docs.get("metadatas"):
+                    ids_to_delete = [
+                        all_docs["ids"][i]
+                        for i, m in enumerate(all_docs["metadatas"])
+                        if m and m.get("session_id") == session_id
+                    ]
+                    if ids_to_delete:
+                        collection.delete(ids=ids_to_delete)
+                        _logger.info(f"[ChromaStore] 删除会话 {session_id} 的 {len(ids_to_delete)} 条记忆")
+
+            return True
 
         except Exception as exc:
-            _logger.error(f"[DashVectorStore] Collection 获取/创建失败: {exc}")
-            return None
+            _logger.error(f"[ChromaStore] 删除会话记忆失败: {exc}")
+            return False
 
     # ─── 文档存储 ─────────────────────────────────────────────────────────────
 
@@ -375,8 +420,8 @@ class DashVectorStore:
         if not docs:
             return 0
 
-        collection = self.get_or_create_collection()
-        if collection is None:
+        lc_store = self._get_vectorstore()
+        if lc_store is None:
             return 0
 
         try:
@@ -385,22 +430,17 @@ class DashVectorStore:
             metadatas = [doc.to_metadata() for doc in docs]
             ids = [self._make_doc_id(doc) for doc in docs]
 
-            # 使用 LangChain DashVector 的 add_texts 方法
-            lc_store = self._get_vectorstore()
-            if lc_store is None:
-                return 0
-
             lc_store.add_texts(
                 texts=texts,
                 metadatas=metadatas,
                 ids=ids,
             )
 
-            _logger.info(f"[DashVectorStore] 存储了 {len(docs)} 个文档")
+            _logger.info(f"[ChromaStore] 存储了 {len(docs)} 个文档")
             return len(docs)
 
         except Exception as exc:
-            _logger.error(f"[DashVectorStore] 存储文档失败: {exc}")
+            _logger.error(f"[ChromaStore] 存储文档失败: {exc}")
             return 0
 
     def store_suggestions(
@@ -530,7 +570,7 @@ class DashVectorStore:
                 counts["dependency"] = stored
                 total_stored += stored
 
-        _logger.info(f"[DashVectorStore] 综合存储完成: repo={repo_url}, 共 {total_stored} 条")
+        _logger.info(f"[ChromaStore] 综合存储完成: repo={repo_url}, 共 {total_stored} 条")
         return {"success": True, "counts": counts, "total": total_stored}
 
     # ─── 辅助方法 ─────────────────────────────────────────────────────────────
@@ -719,45 +759,37 @@ class DashVectorStore:
         Returns:
             SearchResult 列表（按相似度降序）
         """
-        collection = self.get_or_create_collection()
-        if collection is None:
+        lc_store = self._get_vectorstore()
+        if lc_store is None:
             return []
 
         try:
-            # 使用 LangChain 的 similarity_search_with_score
-            lc_store = self._get_vectorstore()
-            if lc_store is None:
-                return []
-
-            # 构建过滤条件
-            filter_dict = {}
-            if category:
-                filter_dict["category"] = category
-            if priority:
-                filter_dict["priority"] = priority
+            # 构建 Chroma 过滤表达式（where 子句）
+            where_filter = self._build_where_filter(category, priority)
 
             # 执行检索
-            if filter_dict:
-                docs_and_scores = lc_store.similarity_search_with_score(
+            if where_filter:
+                docs_and_scores = lc_store.similarity_search_with_relevance_scores(
                     query,
                     k=top_k,
-                    filter=filter_dict if filter_dict else None,
+                    filter=where_filter,
                 )
             else:
-                docs_and_scores = lc_store.similarity_search_with_score(
+                docs_and_scores = lc_store.similarity_search_with_relevance_scores(
                     query,
                     k=top_k,
                 )
 
             results = []
             for doc, score in docs_and_scores:
+                # Chroma 的 relevance_score 就是余弦相似度（0-1），直接用
                 results.append(SearchResult.from_langchain_doc(doc, score))
 
-            _logger.debug(f"[DashVectorStore] 检索 query='{query}', 返回 {len(results)} 条")
+            _logger.debug(f"[ChromaStore] 检索 query='{query}', 返回 {len(results)} 条")
             return results
 
         except Exception as exc:
-            _logger.error(f"[DashVectorStore] 检索失败: {exc}")
+            _logger.error(f"[ChromaStore] 检索失败: {exc}")
             return []
 
     def retrieve_by_repo(
@@ -775,17 +807,12 @@ class DashVectorStore:
         Returns:
             SearchResult 列表
         """
-        collection = self.get_or_create_collection()
-        if collection is None:
+        lc_store = self._get_vectorstore()
+        if lc_store is None:
             return []
 
         try:
-            # 使用 repo_url 作为过滤条件
-            lc_store = self._get_vectorstore()
-            if lc_store is None:
-                return []
-
-            docs_and_scores = lc_store.similarity_search_with_score(
+            docs_and_scores = lc_store.similarity_search_with_relevance_scores(
                 f"repo:{repo_url} analysis suggestion",
                 k=top_k,
                 filter={"repo_url": repo_url},
@@ -798,7 +825,7 @@ class DashVectorStore:
             return results
 
         except Exception as exc:
-            _logger.error(f"[DashVectorStore] 按仓库检索失败: {exc}")
+            _logger.error(f"[ChromaStore] 按仓库检索失败: {exc}")
             return []
 
     def retrieve_best_practices(self, top_k: int = 3) -> list[SearchResult]:
@@ -826,42 +853,85 @@ class DashVectorStore:
         Returns:
             是否成功
         """
-        collection = self.get_or_create_collection()
-        if collection is None:
-            return False
-
         try:
-            # 检索所有匹配的文档 ID
-            all_ids = []
-            top_k = 100
-            offset = 0
+            collection = self._get_or_create_collection()
+            if collection is None:
+                return False
 
-            while True:
-                response = collection.query(
-                    vector=[0.0] * DIMENSION,
-                    topk=top_k,
-                    filter=f'repo_url == "{repo_url}"',
-                    output_fields=["id"],
-                )
-                if not response or not response.output:
-                    break
-
-                ids = [doc.id for doc in response.output if doc.id]
-                all_ids.extend(ids)
-
-                if len(ids) < top_k:
-                    break
-                offset += top_k
-
-            if all_ids:
-                collection.delete(ids=all_ids)
-                _logger.info(f"[DashVectorStore] 删除仓库 {repo_url} 的 {len(all_ids)} 条记忆")
+            # 批量删除该 repo_url 的所有文档
+            try:
+                results = collection.get(where={"repo_url": repo_url})
+                if results and results.get("ids"):
+                    collection.delete(ids=results["ids"])
+                    _logger.info(f"[ChromaStore] 删除仓库 {repo_url} 的 {len(results['ids'])} 条记忆")
+            except Exception:
+                # 回退：全量扫描
+                all_docs = collection.get(limit=10000)
+                if all_docs and all_docs.get("metadatas"):
+                    ids_to_delete = [
+                        all_docs["ids"][i]
+                        for i, m in enumerate(all_docs["metadatas"])
+                        if m and m.get("repo_url") == repo_url
+                    ]
+                    if ids_to_delete:
+                        collection.delete(ids=ids_to_delete)
+                        _logger.info(f"[ChromaStore] 删除仓库 {repo_url} 的 {len(ids_to_delete)} 条记忆")
 
             return True
 
         except Exception as exc:
-            _logger.error(f"[DashVectorStore] 删除记忆失败: {exc}")
+            _logger.error(f"[ChromaStore] 删除记忆失败: {exc}")
             return False
+
+    def get_by_session_and_category(
+        self,
+        session_id: str,
+        category: str,
+        top_k: int = 50,
+    ) -> list[SearchResult]:
+        """
+        按 session_id 和 category 直接取文档（绕过语义检索）。
+
+        Args:
+            session_id: 会话 ID
+            category: 文档类别，如 "conversation_profile"
+            top_k: 最多返回条数
+
+        Returns:
+            SearchResult 列表（score 固定为 1.0，表示直接取而非相似度匹配）
+        """
+        try:
+            collection = self._get_or_create_collection()
+            if collection is None:
+                return []
+
+            results = collection.get(
+                where={"$and": [{"session_id": session_id}, {"category": category}]},
+                limit=top_k,
+            )
+
+            search_results = []
+            if results and results.get("documents"):
+                chroma_ids = results.get("ids", [])
+                for i, doc_content in enumerate(results["documents"]):
+                    metadata = results["metadatas"][i] if results.get("metadatas") else {}
+                    # 注入 Chroma 原生 ID，确保后续可删除
+                    chroma_id = chroma_ids[i] if i < len(chroma_ids) else None
+                    if chroma_id:
+                        metadata["id"] = chroma_id
+                    from langchain_core.documents import Document
+                    doc = Document(page_content=doc_content, metadata=metadata)
+                    search_results.append(SearchResult.from_langchain_doc(doc, score=1.0))
+
+            _logger.debug(
+                f"[ChromaStore] get_by_session_category: "
+                f"session={session_id}, category={category}, 返回 {len(search_results)} 条"
+            )
+            return search_results
+
+        except Exception as exc:
+            _logger.warning(f"[ChromaStore] get_by_session_category 失败: {exc}")
+            return []
 
     # ─── 工具方法 ─────────────────────────────────────────────────────────────
 
@@ -872,11 +942,17 @@ class DashVectorStore:
         return hashlib.md5(raw.encode()).hexdigest()[:16]
 
     @staticmethod
-    def _build_filter(category: Optional[str] = None, priority: Optional[str] = None) -> Optional[str]:
-        """构建 DashVector 过滤表达式。"""
-        parts = []
+    def _build_where_filter(
+        category: Optional[str] = None,
+        priority: Optional[str] = None,
+    ) -> Optional[dict]:
+        """构建 Chroma where 过滤子句（单个字段）。"""
+        if category and priority:
+            # Chroma where 只支持单字段，写成列表形式
+            # 实际使用时建议用 LangChain 的 filter 字符串语法
+            return None
         if category:
-            parts.append(f'category == "{category}"')
+            return {"category": category}
         if priority:
-            parts.append(f'priority == "{priority}"')
-        return " and ".join(parts) if parts else None
+            return {"priority": priority}
+        return None

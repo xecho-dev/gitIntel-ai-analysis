@@ -29,9 +29,12 @@ dependencies = [
     # 多语言代码分析
     "lizard>=1.17.0",
     # 向量数据库
-    "dashvector>=1.0.0,<2.0.0",
+    "chromadb>=0.4.0,<1.0.0",
+    "langchain-chroma>=0.1.0",
     "dashscope>=1.20.0",
-    # LangChain 集成（向量存储、嵌入模型）
+    # LangChain 集成（向量存储、嵌入模型、记忆）
+    "langchain>=0.3.0",
+    "langchain-classic>=0.3.0",
     "langchain-community>=0.3.0",
 ]
 

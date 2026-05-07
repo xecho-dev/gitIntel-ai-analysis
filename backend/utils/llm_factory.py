@@ -73,8 +73,13 @@ class TokenTrackingCallback:
         except Exception as e:
             _logger.debug(f"[TokenTracker] 提取 usage 失败: {e}")
 
+    def on_llm_new_token(self, token: str | None = None, **kwargs: Any) -> None:
+        """流式 token 回调（langchain-core >= 0.3 要求此方法存在）。"""
+
     def on_llm_error(self, error: Exception, **kwargs: Any) -> None:
-        _logger.warning(f"[TokenTracker][{self.agent_name}] LLM 调用失败: {error}")
+        model = os.getenv("OPENAI_MODEL", "")
+        model_str = f" ({model})" if model else ""
+        _logger.warning(f"[TokenTracker][{self.agent_name}]{model_str} LLM 调用失败: {error}")
 
 
 def get_token_stats() -> dict:
@@ -139,7 +144,7 @@ def _resolve_max_tokens(max_tokens: int | None) -> int | None:
     if max_tokens is not None:
         return max_tokens
     env_max = os.getenv("MAX_OUTPUT_TOKENS", "").strip()
-    return int(env_max) if env_max else 1024
+    return int(env_max) if env_max else 512
 
 
 @lru_cache

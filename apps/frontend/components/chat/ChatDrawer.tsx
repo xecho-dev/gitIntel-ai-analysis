@@ -326,14 +326,14 @@ function ChatBubble({ message, sources, expandedSources, onToggleSource, onFeedb
 
 // ─── Loading Indicator ────────────────────────────────────────────────
 
-function LoadingIndicator({ stage, message }: { stage: PipelineStage; message?: string }) {
+function LoadingIndicator({ stage, message, percent }: { stage: PipelineStage; message?: string; percent: number }) {
   return (
     <div className="flex gap-3">
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center">
         <Bot size={14} />
       </div>
       <div className="rounded-2xl rounded-tl-sm bg-[#1a2030] border border-white/5 px-4 py-3">
-        <PipelineIndicator stage={stage} percent={0} />
+        <PipelineIndicator stage={stage} percent={percent} />
         {message && (
           <p className="text-xs text-slate-400 mt-2">{message}</p>
         )}
@@ -709,6 +709,7 @@ export function ChatDrawer({ onClose }: ChatDrawerProps) {
                     key={msg.id}
                     stage={pipelineStage}
                     message={pipelineMessage}
+                    percent={pipelinePercent}
                   />
                 );
               }

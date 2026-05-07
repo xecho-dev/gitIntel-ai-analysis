@@ -16,15 +16,15 @@ _logger = logging.getLogger("gitintel")
 
 # ─── RAG Store 懒加载 ────────────────────────────────────────────────────────
 
-_rag_store: Optional["DashVectorStore"] = None
+_rag_store: Optional["ChromaStore"] = None
 
 
-def _get_rag_store() -> "DashVectorStore":
-    """懒加载 DashVector Store。"""
+def _get_rag_store() -> "ChromaStore":
+    """懒加载 Chroma Store。"""
     global _rag_store
     if _rag_store is None:
-        from memory.dashvector_store import DashVectorStore
-        _rag_store = DashVectorStore()
+        from memory.chromadb_store import ChromaStore
+        _rag_store = ChromaStore(collection_type="knowledge")
         _logger.info(f"[SuggestionAgent] RAG Store 初始化完成，可用: {_rag_store.is_available}")
     return _rag_store
 

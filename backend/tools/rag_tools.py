@@ -20,15 +20,15 @@ logger = logging.getLogger("gitintel")
 
 
 def _get_rag_store() -> Any:
-    """懒加载 DashVector Store（复用 suggestion.py 的实现）。"""
+    """懒加载 Chroma Store（复用 chromadb_store.py 的实现）。"""
     global _rag_store
     if _rag_store is None:
         try:
-            from memory.dashvector_store import DashVectorStore
-            _rag_store = DashVectorStore()
+            from memory.chromadb_store import ChromaStore
+            _rag_store = ChromaStore(collection_type="knowledge")
             logger.info(f"[rag_tools] RAG Store 初始化完成，可用: {_rag_store.is_available}")
         except ImportError:
-            logger.warning("[rag_tools] DashVectorStore 未安装，RAG 工具将不可用")
+            logger.warning("[rag_tools] ChromaStore 未安装，RAG 工具将不可用")
             _rag_store = None
     return _rag_store
 

@@ -20,7 +20,7 @@ from .context_processor import (
 )
 from .generator import RAGGenerator
 from .post_processor import post_process, ProcessedAnswer
-from .chat_pipeline import RAGPipeline, rag_chat_stream
+from .chat_pipeline import RAGPipeline
 
 __all__ = [
     # Query Processing
@@ -40,5 +40,4 @@ __all__ = [
     "ProcessedAnswer",
     # Pipeline
     "RAGPipeline",
-    "rag_chat_stream",
 ]

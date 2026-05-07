@@ -22,16 +22,14 @@ class DashScopeEmbedder:
     MODEL_NAME = "text-embedding-v1"
     DIMENSION = 1536  # text-embedding-v1 输出维度
 
-    def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None):
         """
         初始化 Embedder。
 
         Args:
             api_key: DashScope API 密钥，默认从环境变量读取
-            base_url: DashScope 端点，默认使用国际版
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
+        self.api_key = api_key or os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
 
         if not self.api_key:
             _logger.warning("[DashScopeEmbedder] 未设置 API 密钥，向量生成将不可用")
@@ -39,17 +37,13 @@ class DashScopeEmbedder:
             self._available = False
         else:
             try:
-                init_kwargs = {
-                    "dashscope_api_key": self.api_key,
-                }
-                if self.base_url:
-                    init_kwargs["dashscope_api_base"] = self.base_url
-
-                self._embeddings = DashScopeEmbeddings(**init_kwargs)
+                self._embeddings = DashScopeEmbeddings(
+                    dashscope_api_key=self.api_key,
+                )
                 self._available = True
                 key_preview = self.api_key[:8] + "..." if len(self.api_key) > 8 else "***"
                 _logger.debug(
-                    f"[DashScopeEmbedder] 初始化完成: base_url={self.base_url or 'default'}, api_key={key_preview}"
+                    f"[DashScopeEmbedder] 初始化完成: api_key={key_preview}"
                 )
             except Exception as e:
                 _logger.error(f"[DashScopeEmbedder] 初始化失败: {e}")

@@ -23,18 +23,6 @@ from services.database import (
 )
 
 
-def _format_history(messages: list) -> list[dict]:
-    """将数据库消息记录格式化为 Agent 所需的 history 列表。
-
-    仅保留最近 MAX_HISTORY_MESSAGES 条，兼顾多轮记忆与上下文大小控制。
-    """
-    MAX_HISTORY_MESSAGES = 10  # 约 5 轮对话（user + assistant），足够覆盖追问场景
-    return [
-        {"role": m.role, "content": m.content}
-        for m in messages
-        if m.role in ("user", "assistant") and m.content
-    ][-MAX_HISTORY_MESSAGES:]
-
 logger = logging.getLogger("gitintel")
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -124,14 +112,13 @@ async def api_send_message(body: SendMessageRequest, request: Request):
     save_chat_message(sb, body.session_id, "user", body.content)
 
     past_messages = get_chat_messages(sb, body.session_id)
-    history = _format_history(past_messages)
 
     collected_answer = ""
     collected_sources: list = []
     collected_intent = ""
     assistant_msg_id: str | None = None
 
-    pipeline = RAGPipeline()
+    pipeline = RAGPipeline(session_id=body.session_id, user_id=auth_user_id)
 
     async def event_stream() -> AsyncGenerator[str, None]:
         nonlocal collected_answer, collected_sources, collected_intent, assistant_msg_id
@@ -139,7 +126,7 @@ async def api_send_message(body: SendMessageRequest, request: Request):
         yield "data: {\"type\": \"connected\", \"message\": \"正在连接...\", \"percent\": 0}\n\n"
 
         try:
-            async for event in pipeline.chat(body.content, history=history):
+            async for event in pipeline.chat(body.content):
                 # RAG Pipeline 已包含 "data: " 前缀
                 # 如果没有 data: 前缀就加上
                 if not event.startswith("data: "):

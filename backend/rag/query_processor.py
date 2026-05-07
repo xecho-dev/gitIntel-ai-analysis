@@ -2,14 +2,24 @@
 Query Processor — 查询处理层。
 
 职责：
-  1. HyDE 假设文档生成（先用 LLM 生成"假设答案"，再用于检索）
-  2. LLM-Based 意图分类（factual / analytical / conversational / code_related）
-  3. LLM-Based 特殊标记检测（代码相关、仓库相关、技术栈）
+  1. LLM-Based 意图分类（factual / analytical / conversational / code_related）
+  2. LLM-Based 特殊标记检测（代码相关、仓库相关、技术栈）
+  3. Query Rewrite（改写用户查询，结合历史上下文）
   4. 关键词提取
   5. 语言检测
 
-HyDE 流程：
-  用户查询 → 生成假设文档 → 向量检索（用假设文档） → 真实文档
+检索架构：
+  用户输入 → Query Rewrite（主力） → 向量检索
+                                      ↓
+                               召回失败时
+                                      ↓
+                               HyDE 兜底（仅此时触发）
+                                      ↓
+                               生成回答
+
+Query Rewrite 流程：
+  用户查询 → 结合历史上下文 → 改写为完整的检索查询
+  例如："它怎么部署" + 历史("用户问了这个项目用 FastAPI") → "FastAPI 项目部署方法"
 """
 
 import re
@@ -66,10 +76,10 @@ QUERY_ANALYSIS_USER_PROMPT_TEMPLATE = """【用户查询】
 {{"intent": "...", "language": "...", "is_code_related": ..., "detected_tech_stack": [...], "repo_url": null或完整URL}}"""
 
 
-# ─── 假设文档缓存（避免重复生成）────────────────────────────────────────
+# ─── 缓存 ───────────────────────────────────────────────────────────────
 
-_hyde_cache: dict[str, str] = {}
 _query_analysis_cache: dict[str, dict] = {}
+_hyde_cache: dict[str, str] = {}
 _CACHE_MAX_SIZE = 200
 
 
@@ -79,6 +89,7 @@ _CACHE_MAX_SIZE = 200
 class ProcessedQuery:
     """处理后的查询对象"""
     original: str
+    rewritten_query: str  # Query Rewrite 后的查询
     keywords: list[str]
     expanded_terms: list[str]
     intent: str  # factual | analytical | conversational | code_related
@@ -87,9 +98,6 @@ class ProcessedQuery:
     is_repo_related: bool
     repo_url: Optional[str] = None
     detected_tech_stack: list[str] = field(default_factory=list)
-    # HyDE 字段
-    hyde_document: Optional[str] = None  # LLM 生成的假设文档
-    hyde_enabled: bool = False
 
 
 # ─── 查询分析（LLM-Based，替代规则穷举）────────────────────────────────
@@ -235,51 +243,23 @@ async def _generate_hyde_document(query: str, is_code_related: bool) -> Optional
         return None
 
 
-# ─── 基于 HyDE 提取扩展词 ───────────────────────────────────────────────
-
-def _expand_query_from_hyde(hyde_doc: Optional[str]) -> list[str]:
-    """
-    从假设文档中提取扩展词。
-    不再依赖硬编码的 TERM_MAPPINGS。
-    """
-    if not hyde_doc:
-        return []
-
-    expanded = []
-
-    # 从引号中提取术语
-    quoted = re.findall(r'[""「『]([^""」』]+)[""」』]', hyde_doc)
-    expanded.extend(t.strip().lower() for t in quoted if len(t.strip()) >= 2)
-
-    # 从代码块中提取标识符
-    code_blocks = re.findall(r'```[\s\S]*?```', hyde_doc)
-    for block in code_blocks:
-        identifiers = re.findall(r'\b([a-zA-Z_]\w{2,20})\b', block)
-        expanded.extend(i.lower() for i in identifiers)
-
-    # 从 backtick 中提取技术关键词
-    tech_terms = re.findall(r'`([^`]+)`', hyde_doc)
-    expanded.extend(t.strip().lower() for t in tech_terms if len(t) >= 2)
-
-    # 去重
-    seen = set()
-    for term in expanded:
-        term = term.strip()
-        if term and term not in seen and len(term) >= 2:
-            seen.add(term)
-
-    return list(seen)[:12]
-
 
 # ─── 主流程 ─────────────────────────────────────────────────────────────
 
-async def process_query(query: str, enable_hyde: bool = True) -> ProcessedQuery:
+async def process_query(
+    query: str,
+) -> ProcessedQuery:
     """
-    Query Processing 主函数：分析用户查询，并可选地生成 HyDE 假设文档。
+    Query Processing 主函数：分析用户查询。
 
     流程：
-      原始查询 → LLM 意图/语言/技术栈分析 → HyDE 生成假设文档
-              → 扩展词提取 → ProcessedQuery
+      原始查询 → LLM 意图分析 → 关键词提取 → ProcessedQuery
+
+    注意：HyDE 不在这里调用，而是在检索失败时作为兜底。
+    多层记忆上下文由 Generator 注入到 prompt，Query Rewrite 由 LLM 在生成阶段根据记忆上下文自动完成。
+
+    Args:
+        query: 原始用户查询
     """
     # 1. LLM 查询分析（意图、语言、技术栈、代码相关、仓库URL）
     analysis = await _analyze_query_llm(query)
@@ -299,35 +279,25 @@ async def process_query(query: str, enable_hyde: bool = True) -> ProcessedQuery:
         else:
             repo_url = url
 
-    # 2. 关键词提取（轻量规则，作为 HyDE 的补充信号）
+    # 2. 关键词提取
     keywords = _extract_keywords(query)
-
-    # 3. HyDE 假设文档生成
-    hyde_document: Optional[str] = None
-    if enable_hyde:
-        hyde_document = await _generate_hyde_document(query, is_code_related)
-
-    # 4. 扩展词（基于 HyDE 提取）
-    expanded_terms = _expand_query_from_hyde(hyde_document)
 
     _logger.info(
         f"[QueryProcessor] query='{query[:50]}...', "
         f"intent={intent}, lang={language}, "
         f"code={is_code_related}, repo={is_repo_related}, "
-        f"tech_stack={detected_tech_stack}, "
-        f"hyde={'✓' if hyde_document else '✗'}"
+        f"tech_stack={detected_tech_stack}"
     )
 
     return ProcessedQuery(
         original=query,
+        rewritten_query=query,
         keywords=keywords,
-        expanded_terms=expanded_terms,
+        expanded_terms=[],  # 扩展词由 HyDE 兜底时提取
         intent=intent,
         language=language,
         is_code_related=is_code_related,
         is_repo_related=is_repo_related,
         repo_url=repo_url,
         detected_tech_stack=detected_tech_stack,
-        hyde_document=hyde_document,
-        hyde_enabled=bool(hyde_document),
     )

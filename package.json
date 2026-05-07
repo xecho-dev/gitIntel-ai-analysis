@@ -10,7 +10,7 @@
     "test:frontend": "pnpm --filter @gitintel/frontend test",
     "dev:frontend": "pnpm --filter @gitintel/frontend dev",
     "dev:admin": "pnpm --filter @gitintel/admin dev",
-    "dev:backend": "cd backend && (cat ../deploy.env 2>/dev/null | grep -v '^#' | grep -v '^$' | xargs 2>/dev/null || true) && .venv/bin/python3 -c \"import sys; sys.argv = ['uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000', '--reload']; import uvicorn; uvicorn.main()\"",
+    "dev:backend": "cd backend && export $(cat .env 2>/dev/null | grep -v '^#' | grep -v '^$' | grep '=' | xargs) && PYTHONWARNINGS=ignore .venv/bin/python3 -c \"import sys; sys.argv = ['uvicorn', 'main:app', '--host', '0.0.0.0', '--port', '8000', '--reload']; import uvicorn; uvicorn.main()\"",
     "build:frontend": "pnpm --filter @gitintel/frontend build",
     "build:admin": "pnpm --filter @gitintel/admin build"
   },

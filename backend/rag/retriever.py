@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Optional
 
-from memory.dashvector_store import DashVectorStore, SearchResult
+from memory.chromadb_store import ChromaStore, SearchResult
 
 _logger = logging.getLogger("gitintel")
 
@@ -29,13 +29,13 @@ class MultiStrategyRetriever:
     - 混合检索：RRF（倒数排名融合）
     """
 
-    def __init__(self, vector_store: Optional[DashVectorStore] = None):
+    def __init__(self, vector_store: Optional[ChromaStore] = None):
         self.vector_store = vector_store or self._init_vector_store()
 
-    def _init_vector_store(self) -> Optional[DashVectorStore]:
-        """懒加载向量存储"""
+    def _init_vector_store(self) -> Optional[ChromaStore]:
+        """懒加载向量存储（gitintel_knowledge — RAG 知识库）。"""
         try:
-            return DashVectorStore()
+            return ChromaStore(collection_type="knowledge")
         except Exception as e:
             _logger.warning(f"[Retriever] 向量存储初始化失败: {e}")
             return None

@@ -22,12 +22,12 @@ logger = logging.getLogger("gitintel")
 
 
 def _get_rag_store() -> Any:
-    """懒加载 DashVector Store。"""
+    """懒加载 Chroma Store。"""
     global _rag_store
     if _rag_store is None:
         try:
-            from memory.dashvector_store import DashVectorStore
-            _rag_store = DashVectorStore()
+            from memory.chromadb_store import ChromaStore
+            _rag_store = ChromaStore(collection_type="knowledge")
         except ImportError:
             _rag_store = None
     return _rag_store
