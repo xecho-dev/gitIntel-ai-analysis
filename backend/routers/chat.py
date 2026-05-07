@@ -118,7 +118,12 @@ async def api_send_message(body: SendMessageRequest, request: Request):
     collected_intent = ""
     assistant_msg_id: str | None = None
 
-    pipeline = RAGPipeline(session_id=body.session_id, user_id=auth_user_id)
+    pipeline = RAGPipeline(
+        session_id=body.session_id,
+        user_id=auth_user_id,
+        enable_ragas_eval=body.enable_eval,
+        ragas_user_avatar=auth_user_id,
+    )
 
     async def event_stream() -> AsyncGenerator[str, None]:
         nonlocal collected_answer, collected_sources, collected_intent, assistant_msg_id

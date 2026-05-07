@@ -1,0 +1,11 @@
+question,ground_truth,category
+"这个项目的技术架构是怎样的？","该项目采用 Next.js 前端 + FastAPI Agent 层的前后端分离架构，前端使用 Zustand 状态管理，Agent 层使用 LangGraph 工作流编排。","architecture"
+"如何部署这个项目？","项目提供了 docker-compose.yml 和多阶段 Dockerfile，支持分别构建前端、后台和后端镜像，通过 Nginx 反向代理统一对外提供服务。","deployment"
+"代码质量分析使用了哪些指标？","代码质量分析使用 lizard 进行圈复杂度、代码行数、函数数量等指标，结合 tree-sitter 进行多语言 AST 分析。","quality"
+"RAG 检索使用了什么策略？","RAG 检索采用多策略混合检索，包括向量语义检索、关键词 BM25 检索和 RRF 倒数排名融合，还支持 HyDE 假设文档兜底。","rag"
+"如何进行依赖风险分析？","依赖风险分析通过解析 package.json/pyproject.toml/requirements.txt 等依赖文件，结合 OSV 数据库查询已知漏洞，并使用 LLM 生成风险评估报告。","dependency"
+"会话记忆是如何实现的？","会话记忆使用多层记忆系统，包括短期会话摘要记忆（ConversationSummaryMemory）、语义长期记忆（ChromaDB 向量存储）和画像记忆（按实体抽取）。","memory"
+"前端使用了哪些技术栈？","前端使用 Next.js App Router 架构，Tailwind CSS 样式，Zustand 状态管理，支持 SSE 流式响应和 BFF 路由代理。","frontend"
+"Agent 之间如何协作？","Agent 之间通过 LangGraph 工作流并行执行，各 Agent 独立产出结果后汇总到 SharedState，最后由编排层统一输出。","agent"
+"数据存储用了哪些方案？","结构化数据使用 Supabase PostgreSQL，向量数据使用 ChromaDB，文件存储使用 GitHub Gist API。","storage"
+"如何扩展新的 Agent？","新增 Agent 需要继承 BaseAgent 基类，实现 stream() 方法，在 analysis_graph.py 中注册到 Agent 列表即可参与并行执行。","extension"

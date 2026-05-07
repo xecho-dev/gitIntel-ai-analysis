@@ -6,6 +6,9 @@ RAG Pipeline — 主流程编排器。
   短期记忆：ConversationSummaryMemory，当前会话窗口，对话关闭即消失
   长期记忆：异步轻量抽取 + 分层向量存储 + 按需检索
 
+RAGAS 评测：
+  在 `evaluate=True` 时，生成回答后自动调用 RAGAS 评测模块，
+  评测结果附加在 DONE 事件的 `ragas_eval` 字段中。
 
 检索架构：
   用户输入
@@ -55,6 +58,7 @@ MultiStrategyRetriever	retriever.py	        向量检索 + 关键词检索 + 意
 ContextProcessor	    context_processor.py	上下文整理、token 限制、格式转换
 RAGGenerator        	generator.py	         LLM 流式生成
 MultiLayerMemory    	multi_memory.py	        多层记忆系统（短期会话记忆 + 长期分层记忆）
+RAGASEvaluator      	eval/ragas_evaluator.py	RAGAS 指标评测（faithfulness, answer_relevancy 等）
 """
 
 import json
@@ -111,6 +115,8 @@ class RAGPipeline:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         enable_multi_layer_memory: bool = True,
+        enable_ragas_eval: bool = False,
+        ragas_user_avatar: Optional[str] = None,
     ):
         self.retriever = MultiStrategyRetriever()
         self.generator = RAGGenerator(
@@ -125,6 +131,10 @@ class RAGPipeline:
         self.user_id = user_id or ""
         self.enable_multi_layer_memory = enable_multi_layer_memory
         self._multi_layer_memory: Optional[MultiLayerMemory] = None
+
+        # RAGAS 评测
+        self.enable_ragas_eval = enable_ragas_eval
+        self.ragas_user_avatar = ragas_user_avatar or "default"
 
     @property
     def multi_layer_memory(self) -> Optional[MultiLayerMemory]:
@@ -148,6 +158,49 @@ class RAGPipeline:
             self.generator.multi_layer_memory = self._multi_layer_memory
 
         return self._multi_layer_memory
+
+    async def evaluate(
+        self,
+        question: str,
+        answer: str,
+        retrieved_contexts: list[str],
+        ground_truth: Optional[str] = None,
+    ):
+        """
+        调用 RAGAS 对 RAG 回复进行质量评测。
+
+        Args:
+            question           : 用户问题
+            answer            : LLM 生成的回答
+            retrieved_contexts : 检索到的上下文原始文本列表
+            ground_truth      : 标准答案（可选）
+
+        Returns:
+            EvaluationResult | None（评测不可用或失败时返回 None）
+        """
+        if not self.enable_ragas_eval:
+            return None
+
+        try:
+            from eval.ragas_evaluator import RAGASEvaluator
+
+            evaluator = RAGASEvaluator(user_avatar=self.ragas_user_avatar)
+            result = await evaluator.evaluate(
+                question=question,
+                answer=answer,
+                retrieved_contexts=retrieved_contexts,
+                ground_truth=ground_truth,
+            )
+            _logger.info(
+                f"[RAGPipeline] RAGAS 评测完成: overall={result.overall_score:.3f}, "
+                f"faithfulness={result.faithfulness:.3f}, "
+                f"answer_relevancy={result.answer_relevancy:.3f}, "
+                f"context_precision={result.context_precision:.3f}"
+            )
+            return result
+        except Exception as exc:
+            _logger.warning(f"[RAGPipeline] RAGAS 评测失败: {exc}")
+            return None
 
     async def chat(
         self,
@@ -429,8 +482,28 @@ class RAGPipeline:
         # ── Step 6: Post-Processing ────────────────────────────────
         processed_answer = post_process(full_answer, processed_context)
 
+        # ── Step 6.5: RAGAS 评测（可选）─────────────────────────
+        ragas_eval_data = None
+        if self.enable_ragas_eval and full_answer:
+            context_raw_texts = [r.content for r in retrieval_results]
+            ragas_result = await self.evaluate(
+                question=question,
+                answer=full_answer,
+                retrieved_contexts=context_raw_texts,
+                ground_truth=None,
+            )
+            if ragas_result is not None:
+                ragas_eval_data = {
+                    "faithfulness": ragas_result.faithfulness,
+                    "answer_relevancy": ragas_result.answer_relevancy,
+                    "context_precision": ragas_result.context_precision,
+                    "overall_score": ragas_result.overall_score,
+                    "latency_ms": round(ragas_result.latency_ms, 2),
+                    "error": ragas_result.error,
+                }
+
         # ── Final: Done ───────────────────────────────────────────
-        yield self._sse_event(SSEEventType.DONE, {
+        done_payload = {
             "answer": full_answer,
             "full_text": full_answer,
             "citations": processed_answer.citations,
@@ -444,14 +517,19 @@ class RAGPipeline:
             } if self.multi_layer_memory else None,
             "message": "回答完成",
             "percent": 100,
-        })
+        }
+        if ragas_eval_data is not None:
+            done_payload["ragas_eval"] = ragas_eval_data
+
+        yield self._sse_event(SSEEventType.DONE, done_payload)
 
         _logger.info(
             f"[RAGPipeline] done: intent={processed_query.intent}, "
             f"sources={len(processed_context.chunks)}, "
             f"answer_len={len(full_answer)}, "
             f"quality={processed_answer.quality_score:.2f}, "
-            f"memory={self.multi_layer_memory is not None}"
+            f"memory={self.multi_layer_memory is not None}, "
+            f"ragas={'yes' if ragas_eval_data else 'no'}"
         )
 
     async def _process_query(self, question: str) -> ProcessedQuery:

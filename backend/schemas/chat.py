@@ -47,6 +47,7 @@ class ChatMessage(BaseModel):
 class SendMessageRequest(BaseModel):
     session_id: str
     content: str
+    enable_eval: bool = False  # 设为 True 时，对回复进行 RAGAS 评测
 
 
 class SendMessageResponse(BaseModel):
