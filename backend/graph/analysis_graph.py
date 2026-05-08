@@ -25,6 +25,7 @@ GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出（ReAct 纯�
 
 import asyncio
 import logging
+import time
 from typing import Any, Generator
 
 logger = logging.getLogger("gitintel")
@@ -794,14 +795,32 @@ def stream_analysis_sse(
         t.start()
         logger.debug(f"[stream_analysis_sse] 线程已启动，wait q.get()")
 
+        # 心跳配置：每 45 秒发送一次 keep-alive，防止 SSE 连接超时断开
+        heartbeat_interval = 45  # 秒
+        last_heartbeat_time = [time.time()]  # 用列表包装以便在嵌套函数中修改
+
+        # ── SSE 主循环 ──────────────────────────────────────────────────────────────
         while True:
-            chunk = q.get()
+            # 非阻塞检查队列（等待最多 heartbeat_interval 秒）
+            try:
+                chunk = q.get(timeout=heartbeat_interval)
+            except Exception:
+                # 队列超时，说明队列暂时为空，发送心跳
+                elapsed = time.time() - last_heartbeat_time[0]
+                if elapsed >= heartbeat_interval:
+                    last_heartbeat_time[0] = time.time()
+                    yield ": heartbeat\n\n"
+                    logger.debug(f"[stream_analysis_sse] 发送心跳，间隔 {elapsed:.1f}s")
+                continue
+
             if chunk is None:
                 logger.info(f"[stream_analysis_sse] 收到哨兵，退出循环")
                 break
+
             logger.debug(f"[stream_analysis_sse] 主线程收到 chunk: {type(chunk).__name__}")
             for sse in _dispatch_chunk(chunk, config, owner, repo, status_sent, result_sent):
                 yield sse
+                last_heartbeat_time[0] = time.time()  # 有数据发送时重置心跳计时器
 
         if exc_info:
             raise exc_info[0]
@@ -1205,10 +1224,28 @@ def build_initial_state(
 
     所有字段使用默认值，表示从头开始执行。
     如果 thread_id 已有 checkpoint，invoke 时会从 checkpoint 恢复而非用此初始状态。
+
+    如果 branch 未指定或为空字符串，则通过 GitHub API 获取仓库的默认分支。
     """
+    # 如果未指定 branch，获取仓库的默认分支
+    resolved_branch = branch
+    if not branch or branch == "main":
+        from tools.github_tools import get_default_branch
+
+        parsed = parse_repo_url(repo_url)
+        if parsed:
+            owner, repo = parsed
+            try:
+                resolved_branch = get_default_branch.invoke({"owner": owner, "repo": repo})
+            except Exception as e:
+                logger.warning(f"[build_initial_state] 获取默认分支失败，使用 'main': {e}")
+                resolved_branch = "main"
+        else:
+            resolved_branch = "main"
+
     return SharedState(
         repo_url=repo_url,
-        branch=branch,
+        branch=resolved_branch,
         file_contents={},
         loaded_files={},
         loaded_paths=[],

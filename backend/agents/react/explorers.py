@@ -544,6 +544,8 @@ class BaseExplorerAgent:
         self._llm = None   # 懒加载
         self._tools = None
         self.system_prompt = ""
+        self._file_contents: dict[str, str] | None = None
+        self._file_tree: list[dict] | None = None  # 缓存预加载的文件树
 
     # ── LLM / 工具懒加载 ──────────────────────────────────────────────────────
 
@@ -580,6 +582,16 @@ class BaseExplorerAgent:
         t0 = time.time()
 
         result = ExplorerResult(explorer_type=self.__class__.__name__)
+        self._file_contents = file_contents
+
+        if file_contents:
+            # 从预加载文件构建文件树（用于拦截 get_file_tree 调用）
+            self._file_tree = [
+                {"path": p, "type": "blob"}
+                for p in sorted(file_contents.keys())
+            ]
+        else:
+            self._file_tree = None
 
         if self.llm is None:
             raise RuntimeError(
@@ -917,6 +929,38 @@ class BaseExplorerAgent:
         # 获取 tool_call_id
         tc_id = tc.get("id") or f"call_{iteration}_{tool_name}"
 
+        # ── 缓存命中拦截：参数不变时直接返回缓存结果 ──────────────────────
+        # get_file_tree：当 file_contents 已预加载时，直接返回文件列表
+        if tool_name == "get_file_tree" and self._file_tree is not None:
+            obs = json.dumps(self._file_tree, ensure_ascii=False)
+            logger.info(
+                f"[{self.__class__.__name__}] get_file_tree CACHED "
+                f"({len(self._file_tree)} paths from preload)"
+            )
+            return {
+                "log": {"tool": tool_name, "args": args, "result": obs[:500], "cached": True},
+                "message": ToolMessage(content=obs[:_TOOL_RESULT_TRUNCATE], tool_call_id=tc_id),
+                "error": "",
+            }
+
+        # get_repo_info：当 repo_info 已预加载时，直接返回
+        # （目前预加载不包含 repo_info，但框架已预留扩展能力）
+
+        # read_file_content：当文件已在 file_contents 中时，直接返回
+        if tool_name == "read_file_content" and self._file_contents is not None:
+            path = args.get("path", "")
+            if path in self._file_contents:
+                content = self._file_contents[path]
+                obs = content[:_TOOL_RESULT_TRUNCATE]
+                logger.info(
+                    f"[{self.__class__.__name__}] read_file_content CACHED {path}"
+                )
+                return {
+                    "log": {"tool": tool_name, "args": args, "result": obs[:500], "cached": True},
+                    "message": ToolMessage(content=obs, tool_call_id=tc_id),
+                    "error": "",
+                }
+
         def sync_invoke():
             for t in self.tools:
                 if t.name == tool_name:
@@ -1046,20 +1090,25 @@ class BaseExplorerAgent:
                     parts.append(f"- {f}\n")
                 parts.append("\n")
 
-            if len(file_contents) > 20:
-                parts.append(f"_... 还有 {len(file_contents) - 20} 个文件未显示_\n")
+            # 提供完整文件路径列表（已预加载），避免 LLM 重复调用 get_file_tree
+            all_paths = sorted(file_contents.keys())
+            parts.append(f"\n## 完整文件路径列表（{len(all_paths)} 个文件，已预加载）\n")
+            for p in all_paths:
+                parts.append(f"- {p}\n")
 
             parts.append(
                 "\n📌 **行动指南**：\n"
-                "1. 基于以上结构线索，猜测可能的技术方向\n"
-                "2. 用 get_file_tree 确认目录结构\n"
-                "3. 用 read_file_content 或 search_code 验证猜测\n"
+                "1. 基于以上文件路径，识别可能的技术方向\n"
+                "2. 直接用 read_file_content 或 search_code 验证猜测\n"
+                "3. **get_file_tree 已无需调用**（文件路径已在上方完整列出）\n"
                 "4. 至少完成 3 次工具调用才能给出结论\n"
             )
         else:
             parts.append(
-                "\n仓库尚未预加载文件，请通过工具自行探索。\n"
-                "请先用 get_file_tree 了解整体结构，然后用其他工具深入分析。"
+                "\n📌 **行动指南**：\n"
+                "1. 先用 get_file_tree 了解整体结构\n"
+                "2. 用 read_file_content 或 search_code 验证猜测\n"
+                "3. 至少完成 3 次工具调用才能给出结论\n"
             )
 
         return "".join(parts)

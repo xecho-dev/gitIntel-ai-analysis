@@ -147,12 +147,13 @@ class ReActSuggestionAgent:
     def __init__(self):
         from utils.llm_factory import get_llm_with_tracking
         self.llm = self._get_llm()
+        self._file_contents: dict[str, str] | None = None  # Agent 层本地缓存
 
     @staticmethod
     def _get_llm():
         try:
             from utils.llm_factory import get_llm_with_tracking
-            return get_llm_with_tracking(agent_name="ReActSuggestion", max_tokens=_MAX_OUTPUT_TOKENS)
+            return get_llm_with_tracking(agent_name="优化建议生成", max_tokens=_MAX_OUTPUT_TOKENS)
         except ImportError:
             logger.warning("[ReActSuggestion] 无法导入 llm_factory")
             return None
@@ -175,6 +176,12 @@ class ReActSuggestionAgent:
     ) -> AsyncGenerator[dict, None]:
         """流式生成优化建议。"""
         import httpx
+
+        self._file_contents = file_contents
+        self._file_tree: list[dict] | None = (
+            [{"path": p, "type": "blob"} for p in sorted(file_contents.keys())]
+            if file_contents else None
+        )
 
         owner, repo = self._parse_repo(repo_path)
         ref = branch or "main"
@@ -535,6 +542,21 @@ class ReActSuggestionAgent:
     ) -> str:
         """执行单个工具。"""
         import asyncio
+
+        # ── Agent 层本地缓存拦截：file_contents 已预加载时直接返回 ─────────────
+        # 覆盖 read_file_content 和 get_file_tree，避免重复网络请求
+        if tool_name == "get_file_tree" and self._file_tree is not None:
+            import json as _json
+            obs = _json.dumps(self._file_tree, ensure_ascii=False)
+            logger.info(f"[ReActSuggestion] get_file_tree CACHED ({len(self._file_tree)} paths from preload)")
+            return obs[:_TOOL_RESULT_TRUNCATE]
+
+        if tool_name == "read_file_content" and self._file_contents is not None:
+            path = args.get("path", "")
+            if path in self._file_contents:
+                content = self._file_contents[path]
+                logger.info(f"[ReActSuggestion] read_file_content CACHED {path}")
+                return content[:_TOOL_RESULT_TRUNCATE]
 
         # 对于需要 owner/repo 的 GitHub 工具，确保参数正确
         if tool_name in ("read_file_content", "get_file_tree", "search_code",

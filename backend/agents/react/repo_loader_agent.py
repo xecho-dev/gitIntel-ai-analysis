@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, Optional
 
 from pydantic import BaseModel, Field
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from tools.github_tools import (
     get_repo_info, get_file_tree, read_file_content,
     get_file_blobs, search_code, get_commit_history,
@@ -194,7 +194,7 @@ class ReActRepoLoaderAgent:
         """懒加载 LLM client（带 Token 追踪）。"""
         try:
             from utils.llm_factory import get_llm_with_tracking
-            llm = get_llm_with_tracking(agent_name="ReActRepoLoader", max_tokens=_MAX_OUTPUT_TOKENS)
+            llm = get_llm_with_tracking(agent_name="智能仓库加载", max_tokens=_MAX_OUTPUT_TOKENS)
             if llm is None:
                 logger.warning("[ReActRepoLoader] LLM 不可用，将使用规则模式")
             return llm
@@ -246,8 +246,8 @@ class ReActRepoLoaderAgent:
         )
         result.all_tree_paths = [t["path"] for t in tree if t.get("type") == "blob"]
         initial_context = await self._build_initial_context(owner, repo, branch, result.sha, info, tree)
-        messages = [
-            SystemMessage(content=REACT_SYSTEM_PROMPT),
+        system_message = SystemMessage(content=REACT_SYSTEM_PROMPT)
+        conversation_messages: list = [
             HumanMessage(content=initial_context),
         ]
 
@@ -259,18 +259,12 @@ class ReActRepoLoaderAgent:
                 break
 
             try:
-                msg_count_before = len(messages)
                 step_result = await self._run_single_step(
-                    owner, repo, branch, result.sha, result, messages, iteration
+                    owner, repo, branch, result.sha, result,
+                    system_message, conversation_messages, iteration,
                 )
-                # 只追加本步新增的消息（避免历史重复追加）
-                messages.extend(step_result["messages"])
-
-                # 防止消息历史无限膨胀：压缩对话历史，避免破坏 tool_calls 消息链
-                # 当消息超过 8 条时，将之前的对话轮压缩为摘要 + 最近 2 轮完整对话
-                # 保证 SystemMessage 之后只有 HumanMessage + AIMessage(tool_calls) + ToolMessage 结构
-                if len(messages) > 8:
-                    self._compress_history(messages)
+                # 只追加本轮次的 HumanMessage 到对话历史
+                conversation_messages.extend(step_result.get("conversation_additions", []))
 
                 if step_result["is_sufficient"]:
                     result.is_sufficient = True
@@ -278,9 +272,6 @@ class ReActRepoLoaderAgent:
                     logger.info(f"[ReActRepoLoader] Agent 认为信息足够，停止探索")
                     break
 
-                # 工具失败重试：如果本步有工具失败但 LLM 已继续（生成了新工具调用），
-                # 保持当前消息状态，让 LLM 在下一轮看到失败信息并决定如何处理。
-                # 只在连续 3 次迭代都无新进展时停止。
                 if step_result.get("had_tool_error"):
                     consecutive_no_progress += 1
                     if consecutive_no_progress >= 3:
@@ -291,9 +282,6 @@ class ReActRepoLoaderAgent:
 
             except Exception as e:
                 logger.error(f"[ReActRepoLoader] 迭代 {iteration + 1} 异常: {e}")
-                # LLM 调用失败（如 400）时，必须回滚这些部分追加的消息，
-                # 避免破坏下一轮的消息链。
-                messages[:] = messages[:msg_count_before]
                 result.errors.append(f"迭代 {iteration + 1}: {str(e)}")
                 if len(result.errors) >= 3:
                     logger.warning("[ReActRepoLoader] 错误过多，停止探索")
@@ -367,42 +355,49 @@ class ReActRepoLoaderAgent:
         self,
         owner: str, repo: str, branch: str, sha: str,
         result: ExplorationResult,
-        messages: list,
+        system_message: SystemMessage,
+        conversation_messages: list,
         iteration: int,
     ) -> dict:
-        """执行单步 ReAct 循环，使用结构化输出。"""
+        """执行单步 ReAct 循环，使用结构化输出。
+
+        内部维护独立的本地消息列表 step_messages，与外层 conversation_messages 完全隔离，
+        保证 tool_calls/ToolMessage 配对不会被历史压缩逻辑破坏。
+        """
         import time
 
-        # 记录本步新增消息的起始位置（用于外层正确追加和回滚）
-        start_idx = len(messages)
+        step_messages: list = [system_message] + list(conversation_messages)
 
-        # 注入上下文信息
+        # 注入上下文信息（作为 HumanMessage）
         context = self._build_iteration_context(owner, repo, sha, result, iteration)
-        messages.append(HumanMessage(content=context))
+        step_messages.append(HumanMessage(content=context))
 
         # 使用结构化输出，强制 LLM 返回 ExplorationOutput
         llm_with_output = self.llm.with_structured_output(ExplorationOutput)
-        structured_output: ExplorationOutput = await llm_with_output.ainvoke(messages)
+        ai_msg: Any = await llm_with_output.ainvoke(step_messages)
 
         # 记录推理过程
         result.tool_calls.append(ToolCall(
             iteration=iteration,
-            thought=structured_output.thought,
+            thought=ai_msg.thought if hasattr(ai_msg, 'thought') else getattr(ai_msg, 'parsed', ai_msg).thought,
             tool_name="(reasoning)",
             tool_args={},
-            observation=structured_output.summary,
+            observation=ai_msg.summary if hasattr(ai_msg, 'summary') else getattr(ai_msg, 'parsed', ai_msg).summary,
         ))
+
+        # 提取 ExplorationOutput（with_structured_output 可能返回 Pydantic 实例或底座 AIMessage）
+        structured_output: ExplorationOutput = getattr(ai_msg, 'parsed', ai_msg)
 
         # 检查是否结束
         if structured_output.is_sufficient or structured_output.action is None:
             return {
                 "is_sufficient": True,
                 "summary": structured_output.summary,
-                "messages": messages[start_idx:],
+                "conversation_additions": [],   # 本步只追加了 HumanMessage，无状态变更
                 "had_tool_error": False,
             }
 
-        # 执行工具调用
+        # ── 工具调用 ──────────────────────────────────────────────────────────
         had_tool_error = False
         tool_name = structured_output.action.name
         tool_args = structured_output.action.args
@@ -414,24 +409,6 @@ class ReActRepoLoaderAgent:
             )
             elapsed = (time.time() - t0) * 1000
 
-            # 使用 ToolMessage 添加观察结果
-            messages.append(
-                ToolMessage(
-                    content=raw_result[:_TOOL_RESULT_TRUNCATE],
-                    tool_call_id=f"call_{iteration}_{tool_name}",
-                )
-            )
-
-            # 记录工具调用
-            result.tool_calls.append(ToolCall(
-                iteration=iteration,
-                thought=structured_output.thought,
-                tool_name=tool_name,
-                tool_args=tool_args,
-                observation=raw_result[:_TOOL_RESULT_TRUNCATE],
-                elapsed_ms=round(elapsed, 1),
-            ))
-
             logger.debug(
                 f"[ReActRepoLoader] 迭代 {iteration + 1}: "
                 f"{tool_name} -> {len(raw_result)} chars, {elapsed:.0f}ms"
@@ -441,30 +418,26 @@ class ReActRepoLoaderAgent:
             elapsed = time.time() - t0
             error_msg = f"[工具执行错误] {type(e).__name__}: {str(e)}"
             result.errors.append(error_msg)
-
-            # 追加错误信息到对话，让 LLM 在下一轮决定如何处理
-            messages.append(
-                ToolMessage(
-                    content=error_msg,
-                    tool_call_id=f"call_{iteration}_{tool_name}",
-                )
-            )
-
+            raw_result = error_msg
             logger.warning(f"[ReActRepoLoader] 工具执行失败: {e}")
-            result.tool_calls.append(ToolCall(
-                iteration=iteration,
-                thought=structured_output.thought,
-                tool_name=tool_name,
-                tool_args=tool_args,
-                error=str(e),
-                elapsed_ms=round(elapsed * 1000, 1),
-            ))
             had_tool_error = True
 
+        # 记录工具调用
+        tool_observation = raw_result[:_TOOL_RESULT_TRUNCATE]
+        result.tool_calls.append(ToolCall(
+            iteration=iteration,
+            thought=structured_output.thought,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            observation=tool_observation,
+            elapsed_ms=round(elapsed * 1000, 1),
+        ))
+
+        # 本步的 conversation 增量 = HumanMessage（仅限工具调用轮次）
         return {
             "is_sufficient": False,
             "summary": structured_output.summary,
-            "messages": messages[start_idx:],
+            "conversation_additions": [HumanMessage(content=context)],
             "had_tool_error": had_tool_error,
         }
 
@@ -561,46 +534,6 @@ class ReActRepoLoaderAgent:
         parts.append(f"\n请决定下一步行动（调用工具）：")
         return "\n".join(parts)
 
-    def _compress_history(self, messages: list) -> None:
-        """压缩消息历史，保留 SystemMessage 和最近的完整对话轮。
-
-        压缩策略：保留 SystemMessage + 摘要 + 最近 2 轮完整对话，
-        防止消息无限增长导致 token 爆炸。
-        关键：必须保留完整三元组（Human + AI(tool_calls) + ToolMessage），
-        避免 dangling ToolMessage 导致下一轮 LLM 调用报 400 错误。
-        """
-        system = messages[0]
-        # messages 结构：[SystemMsg(0), HumanMsg(1), AIMsg(2), ToolMsg(3), HumanMsg(4), AIMsg(5), ToolMsg(6), ...]
-        history = messages[1:]  # 跳过 SystemMsg
-
-        # 保留最后 6 条消息（2 轮完整对话），避免 dangling ToolMessage
-        # 当 history=8 时：history[:-3]=[H1,A1,T1,H2,A2], history[-3:]=[T2,H3,A3] - T2 是 dangling
-        # 改为 history[-6:] = [H2,A2,T2,H3,A3,T3] - 2 轮完整对话
-        keep_count = 6
-        if len(history) <= keep_count:
-            return
-
-        # 提取摘要信息：统计历史中的工具调用
-        summary_lines = ["## 前期探索摘要"]
-        seen = set()
-        for msg in history[:-keep_count]:  # 跳过最后 6 条
-            if isinstance(msg, HumanMessage):
-                text = msg.content or ""
-                for line in text.split("\n"):
-                    stripped = line.strip()
-                    if stripped.startswith("## ") or stripped.startswith("### "):
-                        key = stripped[:60]
-                        if key not in seen:
-                            seen.add(key)
-                            summary_lines.append(f"  {stripped}")
-                    elif stripped.startswith("已加载"):
-                        if stripped not in seen:
-                            seen.add(stripped)
-                            summary_lines.append(f"  {stripped}")
-
-        summary_msg = HumanMessage(content="\n".join(summary_lines))
-        # 保留 SystemMsg + 摘要 + 最后 6 条（2 轮完整的 Human + AI(tool_calls) + Tool 三元组）
-        messages[:] = [system, summary_msg] + history[-keep_count:]
 
 
 def _get_tool_index(tool_name: str) -> int:

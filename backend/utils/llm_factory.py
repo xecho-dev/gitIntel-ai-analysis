@@ -33,6 +33,7 @@ class TokenTrackingCallback:
     # LangChain 内部回调管理器期望的属性（用于过滤和错误处理）
     ignore_chat_model: bool = False
     ignore_llm: bool = False
+    ignore_chain: bool = False
     ignore_retriever: bool = True
     ignore_custom: bool = True
     raise_error: bool = False
@@ -72,6 +73,14 @@ class TokenTrackingCallback:
             )
         except Exception as e:
             _logger.debug(f"[TokenTracker] 提取 usage 失败: {e}")
+
+    def on_chain_start(
+        self, serialized: Any, inputs: Any, **kwargs: Any
+    ) -> None:
+        """LangChain chain 生命周期回调。"""
+
+    def on_chain_end(self, outputs: Any, **kwargs: Any) -> None:
+        """LangChain chain 生命周期回调。"""
 
     def on_llm_new_token(self, token: str | None = None, **kwargs: Any) -> None:
         """流式 token 回调（langchain-core >= 0.3 要求此方法存在）。"""
@@ -209,6 +218,8 @@ class LLMWithTracking:
             max_tokens=_resolve_max_tokens(max_tokens),
         )
         self._callback = TokenTrackingCallback(agent_name=agent_name)
+        # 供 .with_config(run_name=...) 使用，让 LangSmith trace 显示中文名称
+        self._run_name = agent_name
 
     def bind_tools(self, tools: list, **kwargs: Any):
         """绑定工具（支持 function calling）。
@@ -221,7 +232,8 @@ class LLMWithTracking:
             raise RuntimeError("LLM 不可用")
         kwargs.setdefault("strict", False)
         return self._llm.bind_tools(tools, **kwargs).with_config(
-            callbacks=[self._callback]
+            callbacks=[self._callback],
+            run_name=self._run_name,
         )
 
     def with_structured_output(self, schema: Any, **kwargs: Any) -> Any:
@@ -234,24 +246,27 @@ class LLMWithTracking:
         if self._llm is None:
             raise RuntimeError("LLM 不可用")
         return self._llm.with_structured_output(schema, **kwargs).with_config(
-            callbacks=[self._callback]
+            callbacks=[self._callback],
+            run_name=self._run_name,
         )
 
     async def ainvoke(self, messages: Any, **kwargs: Any) -> Any:
         """异步直接调用（无工具绑定）。"""
         if self._llm is None:
             raise RuntimeError("LLM 不可用")
-        return await self._llm.with_config(callbacks=[self._callback]).ainvoke(
-            messages, **kwargs
-        )
+        return await self._llm.with_config(
+            callbacks=[self._callback],
+            run_name=self._run_name,
+        ).ainvoke(messages, **kwargs)
 
     async def astream(self, messages: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
         """异步流式调用（逐 token 返回）。"""
         if self._llm is None:
             raise RuntimeError("LLM 不可用")
-        async for chunk in self._llm.with_config(callbacks=[self._callback]).astream(
-            messages, **kwargs
-        ):
+        async for chunk in self._llm.with_config(
+            callbacks=[self._callback],
+            run_name=self._run_name,
+        ).astream(messages, **kwargs):
             yield chunk
 
 
