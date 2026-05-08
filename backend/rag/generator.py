@@ -268,7 +268,7 @@ class RAGGenerator:
             effective_temperature = 0.5
 
         llm = get_llm_with_tracking(
-            agent_name="rag_generator",
+            agent_name="知识库问答生成",
             model=self.model,
             temperature=effective_temperature,
         )

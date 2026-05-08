@@ -127,7 +127,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             return event_str
 
         try:
-            for event in stream_analysis_sse(req.repo_url, req.branch, thread_id=thread_id):
+            for event in stream_analysis_sse(req.repo_url, req.branch, thread_id=thread_id, run_name=req.run_name):
                 collected = collect(event)
                 if collected:
                     yield collected

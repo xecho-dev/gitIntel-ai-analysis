@@ -224,6 +224,19 @@ class LLMWithTracking:
             callbacks=[self._callback]
         )
 
+    def with_structured_output(self, schema: Any, **kwargs: Any) -> Any:
+        """返回带 Token 追踪的结构化输出 runnable。
+
+        Args:
+            schema: Pydantic 模型或 dict schema
+            **kwargs: 透传给底层 with_structured_output
+        """
+        if self._llm is None:
+            raise RuntimeError("LLM 不可用")
+        return self._llm.with_structured_output(schema, **kwargs).with_config(
+            callbacks=[self._callback]
+        )
+
     async def ainvoke(self, messages: Any, **kwargs: Any) -> Any:
         """异步直接调用（无工具绑定）。"""
         if self._llm is None:

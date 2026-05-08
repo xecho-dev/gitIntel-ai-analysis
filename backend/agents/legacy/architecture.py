@@ -34,7 +34,7 @@ _MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
 def _get_llm():
     """懒加载 LLM client（通过统一工厂，支持 Token 追踪）。"""
     from utils.llm_factory import get_llm_with_tracking
-    return get_llm_with_tracking(agent_name="ArchitectureAgent", max_tokens=_MAX_OUTPUT_TOKENS)
+    return get_llm_with_tracking(agent_name="架构分析", max_tokens=_MAX_OUTPUT_TOKENS)
 
 
 def _build_arch_context(

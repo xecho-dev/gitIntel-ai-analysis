@@ -638,11 +638,11 @@ def _build_graph() -> StateGraph:
     """
     graph = StateGraph(state_schema=SharedState)
 
-    # 节点注册
-    graph.add_node("react_loader", node_react_loader)
-    graph.add_node("explorer", node_explorer)
-    graph.add_node("architecture", node_architecture)
-    graph.add_node("react_suggestion", node_react_suggestion)
+    # 节点注册（metadata 设置 LangSmith trace 中的 run_name，方便在 Dashboard 中追踪）
+    graph.add_node("react_loader", node_react_loader, metadata={"run_name": "智能仓库加载"})
+    graph.add_node("explorer", node_explorer, metadata={"run_name": "并行多维探索"})
+    graph.add_node("architecture", node_architecture, metadata={"run_name": "架构评估"})
+    graph.add_node("react_suggestion", node_react_suggestion, metadata={"run_name": "优化建议生成"})
 
     # 线性流程
     graph.set_entry_point("react_loader")
@@ -709,6 +709,7 @@ def stream_analysis_sse(
     repo_url: str,
     branch: str = "main",
     thread_id: str | None = None,
+    run_name: str | None = None,
 ) -> Generator[str, None, None]:
     """SSE 流式接口：LangGraph 工作流 + 实时 SSE 事件（ReAct 纯模式）。
 
@@ -718,6 +719,7 @@ def stream_analysis_sse(
         repo_url: GitHub 仓库 URL
         branch: 分支名（默认 main）
         thread_id: 可选的 thread ID（用于 LangGraph checkpoint 断点续传）
+        run_name: LangSmith trace 名称，默认使用 "{owner}/{repo}@{branch}" 格式
     """
     logger.info(f"[stream_analysis_sse] 开始: repo={repo_url}, branch={branch}, thread={thread_id}")
 
@@ -739,7 +741,9 @@ def stream_analysis_sse(
     config: dict[str, Any] = {
         "configurable": {
             "thread_id": thread_id or f"{repo_url}::{branch}",
-        }
+        },
+        # LangSmith trace 名称，方便在 Dashboard 中追踪
+        "run_name": run_name or f"{owner}/{repo}@{branch}",
     }
 
     initial_state = build_initial_state(repo_url, branch)
@@ -1176,12 +1180,16 @@ def run_analysis_sync(
     repo_url: str,
     branch: str = "main",
     thread_id: str | None = None,
+    run_name: str | None = None,
 ) -> dict:
     """同步运行 LangGraph 工作流，直接返回最终结果。"""
+    parsed = parse_repo_url(repo_url)
+    owner, repo = parsed if parsed else ("", "")
     config: dict[str, Any] = {
         "configurable": {
             "thread_id": thread_id or f"{repo_url}::{branch}",
-        }
+        },
+        "run_name": run_name or f"{owner}/{repo}@{branch}",
     }
 
     initial_state = build_initial_state(repo_url, branch)

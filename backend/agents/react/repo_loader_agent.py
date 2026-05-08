@@ -25,8 +25,9 @@ import json
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Optional
 
+from pydantic import BaseModel, Field
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from tools.github_tools import (
     get_repo_info, get_file_tree, read_file_content,
@@ -38,6 +39,25 @@ from tools.github_tools import (
 from tools.code_tools import parse_file_ast, summarize_code_file
 
 logger = logging.getLogger("gitintel")
+
+
+# ─── 结构化输出模型 ────────────────────────────────────────────────────────────
+
+class ToolAction(BaseModel):
+    """工具调用参数"""
+    name: str = Field(description="工具名称")
+    args: dict = Field(description="工具参数，包含 owner, repo, paths 等")
+
+
+class ExplorationOutput(BaseModel):
+    """强制 LLM 每轮返回的结构化输出"""
+    thought: str = Field(description="当前推理思考，说明为什么选择这个行动")
+    action: Optional[ToolAction] = Field(
+        default=None,
+        description="如果要调用工具，填写工具名称和参数；如已收集足够信息则填 null"
+    )
+    is_sufficient: bool = Field(description="是否已收集足够信息可停止探索")
+    summary: str = Field(description="探索总结，必须包含：技术栈、主要模块、关键文件、架构特点")
 
 # ─── Token 预算配置（可由环境变量覆盖）───────────────────────────────────────
 
@@ -105,15 +125,11 @@ REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分
 
 **注意**：初始上下文已包含完整文件树，使用 get_file_blobs 直接批量加载，不要重复获取文件树。
 
-输出格式（每轮）：
-  Thought: <思考>
-  Action: {"name": "get_file_blobs", "args": {"owner": "...", "repo": "...", "paths": ["文件路径1", "文件路径2"], "ref": "..."}}
-  Observation: <关键信息>
-
-结束时输出：
-  is_sufficient: true
-  summary: |
-    <探索总结：技术栈、主要模块及职责、关键文件清单(最多15个)、架构特点>"""
+**重要**：你的输出必须严格遵循以下 JSON 格式，包含四个必填字段：
+- thought: 当前推理思考
+- action: 工具调用（格式: {"name": "工具名", "args": {...}}），如已收集足够信息则填 null
+- is_sufficient: 是否已收集足够信息
+- summary: 探索总结（必须包含：技术栈、主要模块、关键文件、架构特点）"""
 
 
 # ─── 推理记录结构 ────────────────────────────────────────────────────────────
@@ -215,8 +231,7 @@ class ReActRepoLoaderAgent:
         consecutive_no_progress = 0
 
         if self.llm is None:
-            # LLM 不可用时，使用规则模式（基于文件树做启发式选择）
-            return await self._explore_rule_based(owner, repo, branch, result, max_f)
+            raise RuntimeError("[ReActRepoLoader] LLM 不可用，无法执行探索")
 
         try:
             result.sha = await self._get_sha(owner, repo, branch)
@@ -284,8 +299,11 @@ class ReActRepoLoaderAgent:
                     logger.warning("[ReActRepoLoader] 错误过多，停止探索")
                     break
 
+        # 结构化输出确保每轮都有 summary，无需降级策略
+        # 如果所有迭代都未返回 is_sufficient=true，使用最后一次迭代的 summary
         if not result.summary:
-            result.summary = self._build_summary(result)
+            result.summary = "已加载文件但未生成总结"
+            result.is_sufficient = False
 
         logger.info(
             f"[ReActRepoLoader] 探索完成: "
@@ -352,7 +370,7 @@ class ReActRepoLoaderAgent:
         messages: list,
         iteration: int,
     ) -> dict:
-        """执行单步 ReAct 循环。"""
+        """执行单步 ReAct 循环，使用结构化输出。"""
         import time
 
         # 记录本步新增消息的起始位置（用于外层正确追加和回滚）
@@ -362,134 +380,93 @@ class ReActRepoLoaderAgent:
         context = self._build_iteration_context(owner, repo, sha, result, iteration)
         messages.append(HumanMessage(content=context))
 
-        # LLM 生成工具调用
-        # strict=False 适配 DashScope 代码模型（不支持严格的 function.arguments JSON 校验）
-        llm_with_tools = self.llm.bind_tools(
-            REACT_TOOLS,
-            parallel_tool_calls=False,  # 一次只调用一个工具（更可控）
-            strict=False,
-        )
+        # 使用结构化输出，强制 LLM 返回 ExplorationOutput
+        llm_with_output = self.llm.with_structured_output(ExplorationOutput)
+        structured_output: ExplorationOutput = await llm_with_output.ainvoke(messages)
 
-        response = await llm_with_tools.ainvoke(messages)
-        messages.append(response)
+        # 记录推理过程
+        result.tool_calls.append(ToolCall(
+            iteration=iteration,
+            thought=structured_output.thought,
+            tool_name="(reasoning)",
+            tool_args={},
+            observation=structured_output.summary,
+        ))
 
-        tool_calls = response.tool_calls or []
-        if not tool_calls:
-            # 尝试从文本 content 中解析 Action JSON（兼容不返回 tool_calls 的模型）
-            content = response.content or ""
-            parsed = self._parse_actions_from_text(content)
-            if parsed:
-                tool_calls = parsed
-                # 替换 response：补上 tool_calls，使后续 ToolMessage 能正确关联
-                response = AIMessage(
-                    content=content,
-                    tool_calls=[
-                        {"name": p["name"], "args": p["args"], "id": p["id"]}
-                        for p in parsed
-                    ],
-                )
-                messages[-1] = response  # 替换掉原来的无 tool_calls 响应
-                logger.info(
-                    f"[ReActRepoLoader] 迭代 {iteration + 1}: "
-                    f"从文本中解析到 {len(tool_calls)} 个工具调用"
-                )
-
-        if not tool_calls:
-            # LLM 没有调用工具，可能是结束信号
-            content = response.content or ""
-            is_sufficient = "is_sufficient: true" in content.lower()
-            summary = ""
-            if is_sufficient:
-                # 提取 summary
-                m = content.lower().split("summary:")
-                if len(m) > 1:
-                    summary = m[1].split("is_sufficient")[0].strip()
-                else:
-                    summary = content
+        # 检查是否结束
+        if structured_output.is_sufficient or structured_output.action is None:
             return {
-                "is_sufficient": is_sufficient,
-                "summary": summary,
+                "is_sufficient": True,
+                "summary": structured_output.summary,
                 "messages": messages[start_idx:],
                 "had_tool_error": False,
             }
 
         # 执行工具调用
         had_tool_error = False
-        for tc in tool_calls:
-            tool_name = tc["name"]
-            tool_args = tc["args"]
+        tool_name = structured_output.action.name
+        tool_args = structured_output.action.args
 
-            t0 = time.time()
-            try:
-                raw_result = await self._execute_tool(
-                    owner, repo, sha, result, tool_name, tool_args
-                )
-                elapsed = (time.time() - t0) * 1000
+        t0 = time.time()
+        try:
+            raw_result = await self._execute_tool(
+                owner, repo, sha, result, tool_name, tool_args
+            )
+            elapsed = (time.time() - t0) * 1000
 
-                call = ToolCall(
-                    iteration=iteration,
-                    thought=response.content or "",
-                    tool_name=tool_name,
-                    tool_args=tool_args,
-                    observation=raw_result[:_TOOL_RESULT_TRUNCATE],
-                    elapsed_ms=round(elapsed, 1),
+            # 使用 ToolMessage 添加观察结果
+            messages.append(
+                ToolMessage(
+                    content=raw_result[:_TOOL_RESULT_TRUNCATE],
+                    tool_call_id=f"call_{iteration}_{tool_name}",
                 )
-                result.tool_calls.append(call)
+            )
 
-                # 使用 ToolMessage 添加观察结果（Function Calling 规范要求）
-                # 安全提取 tool_call_id：response.tool_calls 是 LangChain 标准化后的，
-                # 每个条目有 id/name/args，优先级最高；其余兜底
-                tc_id = None
-                if response.tool_calls:
-                    for _tc in response.tool_calls:
-                        if _tc.get("name") == tool_name:
-                            tc_id = _tc.get("id")
-                            break
-                tc_id = tc_id or tc.get("id") or f"call_{iteration}_{tool_name}"
-                messages.append(
-                    ToolMessage(
-                        content=raw_result[:_TOOL_RESULT_TRUNCATE],
-                        tool_call_id=tc_id,
-                    )
-                )
-                logger.debug(
-                    f"[ReActRepoLoader] 迭代 {iteration + 1}: "
-                    f"{tool_name} -> {len(raw_result)} chars, {elapsed:.0f}ms, tc_id={tc_id}"
-                )
+            # 记录工具调用
+            result.tool_calls.append(ToolCall(
+                iteration=iteration,
+                thought=structured_output.thought,
+                tool_name=tool_name,
+                tool_args=tool_args,
+                observation=raw_result[:_TOOL_RESULT_TRUNCATE],
+                elapsed_ms=round(elapsed, 1),
+            ))
 
-            except Exception as e:
-                elapsed = time.time() - t0
-                error_msg = f"[工具执行错误] {type(e).__name__}: {str(e)}"
-                result.errors.append(error_msg)
-                # 工具执行失败时追加 ToolMessage（带 tool_call_id），让 LLM 看到错误信息。
-                # 不再回滚消息，保持完整的对话链。
-                tc_id = None
-                if response.tool_calls:
-                    for _tc in response.tool_calls:
-                        if _tc.get("name") == tool_name:
-                            tc_id = _tc.get("id")
-                            break
-                tc_id = tc_id or tc.get("id") or f"call_{iteration}_{tool_name}"
-                messages.append(
-                    ToolMessage(
-                        content=error_msg,
-                        tool_call_id=tc_id,
-                    )
-                )
-                logger.warning(f"[ReActRepoLoader] 工具执行失败: {e}")
-                result.tool_calls.append(ToolCall(
-                    iteration=iteration,
-                    thought=response.content or "",
-                    tool_name=tool_name,
-                    tool_args=tool_args,
-                    error=str(e),
-                    elapsed_ms=round(elapsed * 1000, 1),
-                ))
-                # 不回滚，让错误信息参与下一轮 LLM 推理
-                had_tool_error = True
+            logger.debug(
+                f"[ReActRepoLoader] 迭代 {iteration + 1}: "
+                f"{tool_name} -> {len(raw_result)} chars, {elapsed:.0f}ms"
+            )
 
-        return {"is_sufficient": False, "summary": "", "messages": messages[start_idx:],
-                "had_tool_error": had_tool_error}
+        except Exception as e:
+            elapsed = time.time() - t0
+            error_msg = f"[工具执行错误] {type(e).__name__}: {str(e)}"
+            result.errors.append(error_msg)
+
+            # 追加错误信息到对话，让 LLM 在下一轮决定如何处理
+            messages.append(
+                ToolMessage(
+                    content=error_msg,
+                    tool_call_id=f"call_{iteration}_{tool_name}",
+                )
+            )
+
+            logger.warning(f"[ReActRepoLoader] 工具执行失败: {e}")
+            result.tool_calls.append(ToolCall(
+                iteration=iteration,
+                thought=structured_output.thought,
+                tool_name=tool_name,
+                tool_args=tool_args,
+                error=str(e),
+                elapsed_ms=round(elapsed * 1000, 1),
+            ))
+            had_tool_error = True
+
+        return {
+            "is_sufficient": False,
+            "summary": structured_output.summary,
+            "messages": messages[start_idx:],
+            "had_tool_error": had_tool_error,
+        }
 
     async def _execute_tool(
         self,
@@ -624,182 +601,6 @@ class ReActRepoLoaderAgent:
         summary_msg = HumanMessage(content="\n".join(summary_lines))
         # 保留 SystemMsg + 摘要 + 最后 6 条（2 轮完整的 Human + AI(tool_calls) + Tool 三元组）
         messages[:] = [system, summary_msg] + history[-keep_count:]
-
-    @staticmethod
-    def _parse_actions_from_text(content: str) -> list[dict]:
-        """从 LLM 返回的文本内容中解析 Action JSON（兼容不返回 tool_calls 的模型）。
-
-        适配通义千问等模型在 bind_tools 时仍输出纯文本而非 structured tool_calls 的情况。
-        """
-        import json
-        import re
-
-        _KNOWN_TOOLS = {
-            "get_repo_info", "get_file_tree", "read_file_content",
-            "get_file_blobs", "search_code", "get_commit_history",
-            "get_pull_requests", "get_default_branch",
-            "parse_file_ast", "summarize_code_file",
-        }
-
-        results: list[dict] = []
-
-        # 从 "Action: {" 开始，用平衡括号解析整个 JSON 块
-        for block_match in re.finditer(r'Action:\s*\{', content):
-            brace_start = block_match.end()  # 位置在第一个 { 之后
-            count = 1
-            found_end = -1
-            for i, c in enumerate(content[brace_start:]):
-                if c == '{':
-                    count += 1
-                elif c == '}':
-                    count -= 1
-                    if count == 0:
-                        found_end = i
-                        break
-            if found_end < 0:
-                continue
-            # 提取 Action 块内容（不含首尾 { }），再包上 { } 形成完整 JSON
-            # found_end 是相对于 brace_start 的偏移量，本身已指向末尾 }
-            inner = '{' + content[brace_start:brace_start + found_end] + '}'
-            # 还原转义换行符（LLM 输出中 \n 可能被转义）
-            inner_fixed = inner.replace("\\n", "\n").replace('\\"', '"')
-            try:
-                obj = json.loads(inner_fixed)
-                name = obj.get("name", "")
-                args = obj.get("args", {})
-                if name in _KNOWN_TOOLS and isinstance(args, dict):
-                    results.append({
-                        "name": name,
-                        "args": args,
-                        "id": f"call_parsed_{len(results)}",
-                    })
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        return results
-
-    def _build_summary(self, result: ExplorationResult) -> str:
-        """从探索过程构建总结。"""
-        loaded = result.loaded_paths
-        if not loaded:
-            return "未能加载任何文件。"
-
-        # 从文件路径推断技术栈
-        tech_indicators: dict[str, set] = {
-            "语言": set(), "框架": set(), "配置": set(), "目录": set(),
-        }
-        for p in loaded:
-            lower = p.lower()
-            # 语言
-            if p.endswith(".py"): tech_indicators["语言"].add("Python")
-            if p.endswith(".ts") or p.endswith(".tsx"): tech_indicators["语言"].add("TypeScript")
-            if p.endswith(".js") or p.endswith(".jsx"): tech_indicators["语言"].add("JavaScript")
-            if p.endswith(".go"): tech_indicators["语言"].add("Go")
-            if p.endswith(".rs"): tech_indicators["语言"].add("Rust")
-            if p.endswith(".java"): tech_indicators["语言"].add("Java")
-            if p.endswith(".rb"): tech_indicators["语言"].add("Ruby")
-            if p.endswith(".kt"): tech_indicators["语言"].add("Kotlin")
-            # 框架
-            if "fastapi" in lower or "flask" in lower or "django" in lower: tech_indicators["框架"].add("FastAPI/Flask/Django")
-            if "react" in lower: tech_indicators["框架"].add("React")
-            if "next" in lower: tech_indicators["框架"].add("Next.js")
-            if "vue" in lower: tech_indicators["框架"].add("Vue")
-            if "angular" in lower: tech_indicators["框架"].add("Angular")
-            if "langchain" in lower or "langgraph" in lower: tech_indicators["框架"].add("LangChain/LangGraph")
-            if "express" in lower: tech_indicators["框架"].add("Express")
-            # 配置
-            if p in ("package.json", "requirements.txt", "go.mod", "Cargo.toml",
-                      "Gemfile", "composer.json", "pyproject.toml"):
-                tech_indicators["配置"].add(p)
-            # 目录
-            if "/" in p:
-                d = p.split("/")[0]
-                if d not in ("src", "lib", "app", "components", "pages", "tests"):
-                    tech_indicators["目录"].add(d)
-
-        summary_parts = [
-            f"## 探索总结\n",
-            f"探索了 {result.total_iterations} 轮，加载了 {len(loaded)} 个文件。\n",
-        ]
-        if tech_indicators["语言"]:
-            summary_parts.append(f"**语言**: {', '.join(sorted(tech_indicators['语言']))}")
-        if tech_indicators["框架"]:
-            summary_parts.append(f"**框架**: {', '.join(sorted(tech_indicators['框架']))}")
-        if tech_indicators["配置"]:
-            summary_parts.append(f"**配置文件**: {', '.join(sorted(tech_indicators['配置']))}")
-        if tech_indicators["目录"]:
-            dirs = sorted(tech_indicators["目录"])[:8]
-            summary_parts.append(f"**主要目录**: {', '.join(dirs)}")
-        summary_parts.append(f"\n**关键文件**: {', '.join(loaded[:10])}")
-        if len(loaded) > 10:
-            summary_parts.append(f" ... 等 {len(loaded)} 个文件")
-
-        return "\n".join(summary_parts)
-
-    async def _explore_rule_based(
-        self, owner: str, repo: str, branch: str,
-        result: ExplorationResult, max_files: int
-    ) -> ExplorationResult:
-        """规则模式：当 LLM 不可用时的降级策略。"""
-        logger.warning("[ReActRepoLoader] LLM 不可用，使用规则模式（启发式加载）")
-
-        try:
-            result.sha = await self._get_sha(owner, repo, branch)
-            tree_raw = get_file_tree.invoke({"owner": owner, "repo": repo, "ref": result.sha})
-            tree = json.loads(tree_raw)
-        except Exception as e:
-            result.errors.append(f"规则模式初始化失败: {e}")
-            return result
-
-        blobs = [t for t in tree if t.get("type") == "blob"]
-
-        # 启发式优先级
-        priority_patterns = [
-            # P0: 入口 + 配置
-            lambda p: p in ("package.json", "requirements.txt", "go.mod", "Cargo.toml",
-                             "pyproject.toml", "Pipfile", "Gemfile", "composer.json",
-                             "Makefile", "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
-                             "tsconfig.json", "jsconfig.json", "vite.config.ts", "vite.config.js",
-                             "next.config.ts", "next.config.js", "tailwind.config.ts",
-                             "README.md", "README.rst"),
-            # P1: 源码入口
-            lambda p: any(p.startswith(x) for x in (
-                "src/", "lib/", "app/", "cmd/", "internal/", "pkg/", "core/",
-            )) and not any(x in p for x in ("test", "spec", "__pycache__", "node_modules")),
-            # P2: 其他源码
-            lambda p: not any(x in p for x in ("test", "spec", "__pycache__", "node_modules", ".git"))
-                     and p.rsplit(".", 1)[-1] in ("py", "ts", "tsx", "js", "jsx", "go", "rs", "java"),
-        ]
-
-        selected: list[dict] = []
-        for pattern in priority_patterns:
-            for blob in blobs:
-                path = blob["path"]
-                if pattern(path) and path not in [b["path"] for b in selected]:
-                    selected.append(blob)
-                    if len(selected) >= max_files:
-                        break
-            if len(selected) >= max_files:
-                break
-
-        # 批量加载
-        paths = [b["path"] for b in selected]
-        try:
-            blobs_raw = get_file_blobs.invoke({
-                "owner": owner, "repo": repo,
-                "paths": paths, "ref": result.sha or branch,
-            })
-            blobs_dict = json.loads(blobs_raw)
-            result.loaded_files = blobs_dict
-            result.loaded_paths = list(blobs_dict.keys())
-        except Exception as e:
-            result.errors.append(f"批量加载失败: {e}")
-
-        result.is_sufficient = True
-        result.summary = self._build_summary(result)
-        result.total_iterations = 1
-
-        return result
 
 
 def _get_tool_index(tool_name: str) -> int:

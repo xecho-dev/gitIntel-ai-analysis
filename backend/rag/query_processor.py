@@ -116,7 +116,7 @@ async def _analyze_query_llm(query: str) -> dict:
         from utils.llm_factory import get_llm_with_tracking
 
         llm = get_llm_with_tracking(
-            agent_name="query_analyzer",
+            agent_name="RAG查询分析",
             model=None,
             temperature=0.0,  # 分析不需要创造性，一致性更重要
             max_tokens=256,
@@ -198,7 +198,7 @@ async def _generate_hyde_document(query: str, is_code_related: bool) -> Optional
         from utils.llm_factory import get_llm_with_tracking
 
         llm = get_llm_with_tracking(
-            agent_name="hyde_generator",
+            agent_name="HyDE假设文档生成",
             model=None,
             temperature=0.7,  # HyDE 需要一定创造性
             max_tokens=512,

@@ -553,7 +553,7 @@ class BaseExplorerAgent:
             try:
                 from utils.llm_factory import get_llm_with_tracking
                 self._llm = get_llm_with_tracking(
-                    agent_name=self.__class__.__name__,
+                    agent_name=self._get_agent_name(),
                     max_tokens=_MAX_OUTPUT_TOKENS,
                 )
             except ImportError:
@@ -1080,7 +1080,7 @@ class TechStackExplorer(BaseExplorerAgent):
         self.system_prompt = _TECH_STACK_EXPLORER_INSTRUCTIONS
 
     def _get_agent_name(self) -> str:
-        return "TechStackExplorer"
+        return "技术栈识别"
 
 
 class QualityExplorer(BaseExplorerAgent):
@@ -1091,7 +1091,7 @@ class QualityExplorer(BaseExplorerAgent):
         self.system_prompt = _QUALITY_EXPLORER_INSTRUCTIONS
 
     def _get_agent_name(self) -> str:
-        return "QualityExplorer"
+        return "代码质量探索"
 
 
 class ArchitectureExplorer(BaseExplorerAgent):
@@ -1102,7 +1102,7 @@ class ArchitectureExplorer(BaseExplorerAgent):
         self.system_prompt = _ARCHITECTURE_EXPLORER_INSTRUCTIONS
 
     def _get_agent_name(self) -> str:
-        return "ArchitectureExplorer"
+        return "架构模式探索"
 
 
 # ─── 编排器 ────────────────────────────────────────────────────────────────
