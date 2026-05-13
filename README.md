@@ -4,190 +4,495 @@
 
 ![GitIntel Banner](images/home.png)
 
-### AI 驱动的 GitHub 仓库智能分析工具
+### AI-Powered GitHub Repository Analysis
 
-对任意公开仓库进行深度扫描，自动输出架构质量、代码健康度、依赖风险和优化建议。
+Deep scan any public repository, automatically generate architecture quality, code health, dependency risks, and optimization suggestions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)](https://fastapi.tiangolo.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.1-blue)](https://langchain-ai.github.io/langgraph/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)](https://fastapi.tiangolo.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.2-blue)](https://langchain-ai.github.io/langgraph/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
 
 </div>
 
 ---
 
-## 功能特性
+## Features
 
-| 功能 | 说明 |
-|---|---|
-| **架构分析** | 解析目录结构与模块组织，生成架构图与组件说明 |
-| **代码质量** | 扫描常见代码问题（重复代码、命名规范等），给出健康度评分 |
-| **依赖风险** | 分析 `package.json` / `requirements.txt`，识别过时、高风险依赖 |
-| **优化建议** | 基于分析结果，给出可落地的代码重构与性能优化建议 |
-| **SSE 流式输出** | 分析过程实时推送，用户无需等待完整结果 |
-| **历史记录** | 登录用户可保存、浏览、删除分析历史 |
-| **GitHub OAuth** | 通过 NextAuth.js + Supabase 完成 GitHub 登录 |
-| **健康度评分** | 综合四个维度的评分，以可视化卡片展示最终结果 |
-
----
-
-## 核心流程
-
-![核心流程](images/mermaid.png)
+| Feature | Description |
+|---------|-------------|
+| **ReAct Agent** | Reasoning + Acting pattern for intelligent code exploration |
+| **Architecture Analysis** | Parse directory structure, generate architecture diagrams |
+| **Code Quality** | Scan common issues, health score with 5-dimension LLM scoring |
+| **Dependency Risk** | Analyze `package.json` / `requirements.txt`, identify outdated dependencies |
+| **Optimization Suggestions** | RAG-enhanced actionable refactoring recommendations |
+| **SSE Streaming** | Real-time analysis progress, no waiting for full results |
+| **Reflection Mechanism** | Self-correction with confidence scoring and 4-dimension evaluation |
+| **GitHub OAuth** | NextAuth.js v5 + Supabase GitHub login |
+| **Health Score** | Comprehensive 5-dimension scoring with visual cards |
+| **AI Assistant** | RAG-powered intelligent Q&A with multi-layer memory system |
 
 ---
 
-## 分析结果示例
-
-![PR Analysis Result](images/pr.png)
-
----
-
-### 主要 Agent
-
-| Agent | 职责 |
-|---|---|
-| `RepoLoaderAgent` | 获取文件树 + AI 分类 P0/P1/P2 + 渐进式加载 |
-| `CodeParserAgent` | AST 解析代码结构（函数/类/导入/语义分块） |
-| `TechStackAgent` | 识别技术栈（语言/框架/基础设施） |
-| `QualityAgent` | 代码质量评分（健康度/复杂度/测试覆盖率） |
-| `DependencyAgent` | 依赖风险分析（版本/漏洞/弃用警告） |
-| `ArchitectureAgent` | 架构评估（分层/组件/模式识别） |
-| `SuggestionAgent` | RAG 增强的优化建议生成 |
-
----
-
-## 技术栈
-
-### 前端
-
-| 类别 | 技术 |
-|---|---|
-| 框架 | Next.js 15 (App Router) |
-| UI 样式 | Tailwind CSS v4 |
-| 状态管理 | Zustand |
-| 动画 | Framer Motion |
-| 图表 | Recharts |
-| 图标 | Lucide React |
-| 认证 | NextAuth.js (GitHub Provider) |
-| 数据库客户端 | `@supabase/supabase-js` |
-
-### 后端
-
-| 类别 | 技术 |
-|---|---|
-| 框架 | FastAPI |
-| 工作流 | LangGraph |
-| HTTP 客户端 | httpx / litellm |
-| 数据验证 | Pydantic v2 |
-| 数据库 ORM | Supabase Python Client |
-| 部署 | uvicorn (ASGI) |
-
----
-
-## 目录结构
+## Architecture
 
 ```
-gitintel-ai-analysis/
-├── frontend/                 # Next.js 前端（Vercel 部署）
-│   ├── app/
-│   │   ├── page.tsx          # 首页（输入仓库 URL 开始分析）
-│   │   ├── layout.tsx
-│   │   └── globals.css
-│   ├── components/
-│   │   └── Providers.tsx     # NextAuth & Supabase Provider
-│   ├── lib/
-│   │   ├── api.ts            # BFF 调用（含 SSE 消费逻辑）
-│   │   ├── auth.ts           # NextAuth 配置
-│   │   └── supabase.ts       # Supabase 客户端
-│   ├── store/
-│   │   └── useAppStore.ts    # Zustand 全局状态
-│   ├── middleware.ts         # 路由中间件
-│   ├── next.config.ts
-│   └── package.json
-│
-├── backend/                  # FastAPI Agent 层（独立部署）
-│   ├── agents/
-│   │   ├── base_agent.py     # Agent 基类（流式输出接口）
-│   │   ├── architecture.py   # 架构分析 Agent
-│   │   ├── quality.py        # 代码质量 Agent
-│   │   ├── dependency.py     # 依赖风险 Agent
-│   │   └── optimization.py   # 优化建议 Agent
-│   ├── graph/
-│   │   ├── state.py          # SharedState 定义
-│   │   └── analysis_graph.py # LangGraph 并行工作流
-│   ├── middleware/
-│   │   └── auth.py           # JWT 鉴权中间件
-│   ├── schemas/
-│   │   ├── request.py        # 请求 Pydantic 模型
-│   │   ├── response.py       # 响应 Pydantic 模型
-│   │   └── history.py         # 历史记录模型
-│   ├── services/
-│   │   └── database.py        # Supabase 数据库操作
-│   ├── main.py               # FastAPI 入口，路由定义
-│   ├── supabase_client.py    # Supabase 客户端工厂
-│   └── requirements.txt
-│
-├── packages/
-│   └── types/
-│       └── index.ts          # 前后端共享 TypeScript 类型
-│
-├── supabase/
-│   └── migrations/
-│       └── 001_initial_schema.sql   # 数据库建表 SQL
-│
-├── pnpm-workspace.yaml        # pnpm workspace 配置
-├── turbo.json                 # Turborepo 构建流水线
-└── package.json              # 根 workspace 元信息
+┌─────────────────────────────────────────────────────────────┐
+│  Frontend (Next.js 15)                                      │
+│  App Router + Tailwind CSS                                  │
+│  Zustand State Management                                   │
+│  Port: 3000                                                 │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP / SSE Streaming
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  BFF Layer (Next.js Route Handler)                           │
+│  apps/frontend/app/api/**/route.ts                          │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Agent Layer (FastAPI + LangGraph)                          │
+│  ReAct Agents + RAG + Streaming                             │
+│  Port: 8000                                                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 环境变量
+## Tech Stack
 
-### 前端（`frontend/.env.local`）
+### Frontend
+
+| Category | Technology |
+|----------|------------|
+| Framework | Next.js 15 (App Router) |
+| UI Framework | Umi.js 4 (Admin) |
+| React | React 19 |
+| State Management | Zustand |
+| Charts | Recharts |
+| Styling | Tailwind CSS v3/v4 |
+| Authentication | NextAuth.js v5 (GitHub Provider) |
+| Database Client | `@supabase/supabase-js` |
+
+### Backend
+
+| Category | Technology |
+|----------|------------|
+| Framework | FastAPI 0.115+ |
+| Workflow | LangGraph |
+| Code Analysis | Tree-sitter (Python, TypeScript, etc.) |
+| Vector Store | ChromaDB + LangChain |
+| LLM Integration | LangChain + DashScope |
+| Database ORM | Supabase Python Client |
+| Deployment | uvicorn (ASGI) |
+
+---
+
+## Project Structure
+
+```
+gitintel-ai-analysis/                     # Root (pnpm workspace)
+│
+├── apps/                                  # Application layer
+│   ├── frontend/                          # Next.js Frontend (Port 3000)
+│   │   ├── app/                           # Next.js App Router
+│   │   │   ├── page.tsx                   # Landing page
+│   │   │   ├── layout.tsx                 # Root layout
+│   │   │   ├── workspace/                # Main workspace
+│   │   │   ├── login/                    # Login page
+│   │   │   ├── history/                  # History page
+│   │   │   ├── account/                  # Account page
+│   │   │   └── api/                      # BFF Route Handlers
+│   │   │       ├── analyze/              # Analysis endpoint
+│   │   │       ├── history/              # History endpoints
+│   │   │       ├── auth/                 # Auth endpoints
+│   │   │       ├── chat/                 # Chat endpoints
+│   │   │       └── pr/                   # PR endpoints
+│   │   ├── components/                    # React components
+│   │   │   ├── agents/                    # Agent result cards
+│   │   │   ├── layout/                    # Layout components
+│   │   │   ├── ui/                       # Shared UI components
+│   │   │   └── landing/                  # Landing page sections
+│   │   ├── store/                         # Zustand stores
+│   │   │   ├── useAppStore.ts            # App state
+│   │   │   └── useChatStore.ts           # Chat state
+│   │   └── lib/                           # Utilities
+│   │       ├── api.ts                     # BFF API client (SSE)
+│   │       ├── auth.ts                   # NextAuth config
+│   │       ├── supabase.ts               # Supabase client
+│   │       └── utils.ts                   # Helper functions
+│   │
+│   └── admin/                             # Umi.js Admin (Port 3001)
+│       ├── src/
+│       │   ├── pages/                    # Admin pages
+│       │   │   ├── dashboard.tsx         # Dashboard
+│       │   │   ├── users.tsx             # User management
+│       │   │   ├── analysis-history.tsx  # Analysis history
+│       │   │   ├── audit.tsx             # Audit logs
+│       │   │   └── settings.tsx          # Settings
+│       │   ├── layouts/                   # Admin layouts
+│       │   ├── components/                # Admin components
+│       │   ├── services/                  # API services
+│       │   └── models/                    # Umi models
+│       └── .umirc.ts                      # Umi config
+│
+├── backend/                               # FastAPI Agent Layer (Port 8000)
+│   ├── agents/                            # Agent implementations
+│   │   ├── react/                        # ReAct pattern agents
+│   │   │   ├── base_agent.py            # Base ReAct agent
+│   │   │   ├── repo_loader_agent.py     # Repo loading agent
+│   │   │   ├── suggestion_agent.py      # Suggestion agent
+│   │   │   ├── reflection_agent.py      # Reflection mechanism
+│   │   │   ├── explorers.py             # Explorer orchestrator
+│   │   │   ├── tool_wrapper.py         # Tool wrapper
+│   │   │   └── error_loop_detector.py  # Error detection
+│   │   └── legacy/                      # Legacy implementations
+│   │       ├── architecture.py          # Architecture agent
+│   │       ├── quality.py               # Quality agent
+│   │       ├── dependency.py            # Dependency agent
+│   │       ├── tech_stack.py           # Tech stack detection
+│   │       ├── code_parser.py          # Code parser
+│   │       └── optimization.py          # Optimization agent
+│   │
+│   ├── graph/                            # LangGraph workflow
+│   │   ├── state.py                    # SharedState definition
+│   │   ├── analysis_graph.py           # Main workflow orchestration
+│   │   └── executor.py                 # Workflow executor
+│   │
+│   ├── routers/                          # FastAPI routers
+│   │   ├── analysis.py                 # Analysis endpoints
+│   │   ├── history.py                  # History endpoints
+│   │   ├── user.py                     # User endpoints
+│   │   ├── chat.py                     # Chat endpoints
+│   │   ├── pr.py                       # PR generation endpoints
+│   │   ├── git_ops.py                 # Git operations
+│   │   ├── export.py                   # Export endpoints
+│   │   └── admin/                      # Admin endpoints
+│   │
+│   ├── tools/                            # Agent tools
+│   │   ├── code_tools.py              # Code analysis tools
+│   │   ├── github_tools.py            # GitHub API tools
+│   │   ├── rag_tools.py              # RAG tools
+│   │   └── chat_tools.py             # Chat tools
+│   │
+│   ├── rag/                              # RAG system
+│   │   ├── query_processor.py         # Query processing
+│   │   ├── generator.py               # Response generation
+│   │   ├── retriever.py              # Retrieval
+│   │   ├── context_processor.py      # Context processing
+│   │   └── post_processor.py         # Post-processing
+│   │
+│   ├── memory/                           # Vector memory
+│   │   ├── chromadb_store.py         # ChromaDB integration
+│   │   ├── embeddings.py             # Embedding generation
+│   │   └── multi_memory.py           # Multi-memory manager
+│   │
+│   ├── services/                         # Business services
+│   │   ├── database.py              # Database operations
+│   │   ├── pdf_service.py           # PDF generation
+│   │   ├── image_generation.py      # Image generation
+│   │   ├── github_pr_service.py     # GitHub PR service
+│   │   ├── git_service.py           # Git service
+│   │   └── langsmith_service.py     # LangSmith tracing
+│   │
+│   ├── schemas/                          # Pydantic models
+│   │   ├── request.py               # Request models
+│   │   ├── response.py              # Response models
+│   │   ├── history.py               # History models
+│   │   └── chat.py                  # Chat models
+│   │
+│   ├── middleware/                       # FastAPI middleware
+│   │   ├── auth.py                 # Authentication
+│   │   └── admin_auth.py          # Admin authentication
+│   │
+│   ├── utils/                            # Utilities
+│   │   ├── llm_factory.py         # LLM factory
+│   │   ├── code_parser.py         # Code parser utilities
+│   │   ├── tree_filter.py         # Tree filtering
+│   │   └── tool_result.py         # Tool result processing
+│   │
+│   ├── eval/                              # Evaluation
+│   │   ├── rag_eval.py            # RAG evaluation
+│   │   └── ragas_evaluator.py    # RAGAs evaluator
+│   │
+│   ├── tests/                            # Tests
+│   │   ├── test_agents/           # Agent tests
+│   │   ├── test_graph/            # Graph tests
+│   │   └── test_api/              # API tests
+│   │
+│   ├── main.py                        # FastAPI entry point
+│   └── pyproject.toml               # Python dependencies
+│
+├── packages/                             # Shared packages
+│   ├── types/                           # Shared TypeScript types
+│   │   └── index.ts                   # Type definitions
+│   │                                    # (AnalyzeRequest, AgentEvent,
+│   │                                    #  AnalysisResult, HistoryItem, etc.)
+│   └── ui/                             # Shared UI components
+│       └── src/
+│           ├── button.tsx
+│           ├── dialog.tsx
+│           ├── tooltip.tsx
+│           ├── avatar.tsx
+│           ├── skeleton.tsx
+│           ├── collapsible.tsx
+│           └── resizable.tsx
+│
+├── deploy/                              # Deployment configs
+│   └── ...
+│
+├── Dockerfile.frontend                 # Frontend Docker image
+├── Dockerfile.admin                     # Admin Docker image
+├── Dockerfile.backend                  # Backend Docker image
+├── docker-compose.yml                  # Docker Compose config
+├── pnpm-workspace.yaml                # pnpm workspace config
+├── turbo.json                         # Turborepo pipeline
+└── package.json                       # Root workspace metadata
+```
+
+---
+
+## Core Agents
+
+| Agent | Responsibility |
+|-------|----------------|
+| `ReActRepoLoaderAgent` | Intelligent file tree loading with ReAct reasoning |
+| `ReActSuggestionAgent` | RAG-enhanced optimization suggestions |
+| `ReActReflectionAgent` | Self-correction with confidence scoring |
+| `ExplorerOrchestrator` | Parallel multi-explorer coordination |
+| `QualityExplorer` | Code quality analysis (complexity, duplication, etc.) |
+| `TechStackExplorer` | Technology stack detection |
+| `DependencyExplorer` | Dependency risk analysis |
+
+### Reflection Mechanism
+
+The `ReActReflectionAgent` provides 4-dimension evaluation for analysis quality:
+
+| Dimension | Description |
+|-----------|-------------|
+| **Completeness** | Is the analysis missing important code parts? |
+| **Accuracy** | Are conclusions evidence-based? |
+| **Actionability** | Are suggestions specific and executable? |
+| **Risk Assessment** | Potential misjudgments or risks? |
+
+Output includes confidence scores (0.0-1.0) and improvement suggestions for re-running agents.
+
+---
+
+## AI Assistant (RAG Chat)
+
+The built-in AI Assistant provides intelligent Q&A powered by RAG pipeline with multi-layer memory system.
+
+### RAG Pipeline Architecture
+
+```
+User Input
+     │
+     ▼
+┌─────────────────────┐
+│ 1. Query Rewrite    │  ⭐ Intent classification, keyword extraction
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ 2. Vector Retrieval │  ← Initial retrieval
+└──────────┬──────────┘
+           │
+      No results?
+           │
+       ┌───┴───┐
+       │       │
+      Yes      No
+       │       │
+       ▼       ▼
+┌─────────────────┐   ┌─────────────────────┐
+│ 3. HyDE Fallback│   │ Context Processing  │
+│ (Hypothetical   │   │                    │
+│  Document)      │   │                    │
+└────────┬────────┘   └─────────────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│ 4. Context          │
+│    Processing        │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ 5. LLM Streaming    │
+│    Generation        │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ 6. Multi-Layer      │
+│    Memory Save       │
+└─────────────────────┘
+```
+
+### Multi-Layer Memory System
+
+| Layer | Description | Scope |
+|-------|-------------|--------|
+| **Short-term** | Conversation window memory | Current session |
+| **Long-term** | Semantic memory (ChromaDB) | Cross-session |
+| **Profile** | User preferences and patterns | Persistent |
+
+### RAG Components
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| `QueryProcessor` | `rag/query_processor.py` | Intent classification, keyword expansion |
+| `MultiStrategyRetriever` | `rag/retriever.py` | Vector + keyword retrieval + RRF fusion |
+| `ContextProcessor` | `rag/context_processor.py` | Context filtering, token budget control |
+| `RAGGenerator` | `rag/generator.py` | LLM streaming generation |
+| `MultiLayerMemory` | `memory/multi_memory.py` | Multi-layer memory management |
+| `RAGASEvaluator` | `eval/ragas_evaluator.py` | Quality metrics (faithfulness, answer_relevancy) |
+
+### Chat API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/chat/sessions` | Create chat session |
+| `GET` | `/api/chat/sessions` | List all sessions |
+| `GET` | `/api/chat/sessions/{id}/messages` | Get session messages |
+| `POST` | `/api/chat/send` | Send message (SSE streaming) |
+| `DELETE` | `/api/chat/sessions/{id}` | Delete session |
+
+---
+
+## Analysis Flow
+
+```
+User Input (GitHub URL)
+        │
+        ▼
+┌───────────────────┐
+│  BFF Route Handler │  apps/frontend/app/api/analyze/route.ts
+└─────────┬─────────┘
+          │ HTTP POST
+          ▼
+┌───────────────────┐
+│  FastAPI /analyze │  backend/routers/analysis.py
+└─────────┬─────────┘
+          │ SSE Stream
+          ▼
+┌───────────────────┐
+│  LangGraph        │  backend/graph/analysis_graph.py
+│  Workflow         │
+└─────────┬─────────┘
+          │
+    ┌─────┼─────┬─────────────┐
+    ▼     ▼     ▼             ▼
+┌───────┐ ┌───┐ ┌──────────┐ ┌──────────┐
+│ Repo  │ │Exp│ │Explorer   │ │Suggestion │
+│Loader │ │   │ │Orchestrator│ │  Agent   │
+└───┬───┘ └───┘ └────┬─────┘ └────┬─────┘
+    │                │            │
+    └───────┬────────┴────────────┘
+            │ SSE Events
+            ▼
+┌───────────────────┐
+│  Reflection       │  4-dimension evaluation
+│  Agent            │  (Completeness, Accuracy,
+└─────────┬─────────┘  Actionability, Risk)
+          │ Confidence Score
+          ▼
+┌───────────────────┐
+│  Streaming Results │  Real-time UI Updates
+└───────────────────┘
+```
+
+### Stage 1: Repository Loading (ReAct)
+- `ReActRepoLoaderAgent` analyzes file tree with ReAct reasoning
+- P0/P1/P2 file classification based on importance
+- Progressive file loading based on analysis needs
+
+### Stage 2: Code Structure Parsing
+- Tree-sitter AST parsing for Python, TypeScript, etc.
+- Function/class/import extraction
+- Semantic chunking for better context
+
+### Stage 3: Parallel Exploration
+- `ExplorerOrchestrator` coordinates multiple explorers
+- `QualityExplorer`: Complexity, duplication, code smells
+- `TechStackExplorer`: Languages, frameworks, infrastructure
+- `DependencyExplorer`: Version risks, vulnerabilities
+
+### Stage 4: Architecture Evaluation
+- Component relationship analysis
+- Architecture pattern recognition
+- Hot spot identification
+
+### Stage 5: Optimization Suggestions
+- `ReActSuggestionAgent` generates actionable recommendations
+- RAG-enhanced context awareness
+- Priority-based suggestion ranking
+
+### Stage 6: Reflection (Self-Correction)
+- `ReActReflectionAgent` reviews all outputs
+- 4-dimension evaluation with confidence scoring
+- Decides if agents need re-running
+
+---
+
+## Environment Variables
+
+### Frontend (`apps/frontend/.env.local`)
 
 ```env
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your_nextauth_secret
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
+# NextAuth v5
+AUTH_SECRET=your_auth_secret
+AUTH_URL=http://localhost:3000
+AUTH_GITHUB_ID=your_github_client_id
+AUTH_GITHUB_SECRET=your_github_client_secret
 
-# Agent 层（可选，BFF 也可直接用相对路径）
-AGENT_API_URL=http://localhost:8000
+# Agent API
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-### 后端（`backend/.env`）
+### Backend (`backend/.env`)
 
 ```env
-# Supabase 服务端密钥（管理后台操作）
-SUPABASE_URL=https://your-project.supabase.co
+# GitHub Token (for API access)
+GITHUB_TOKEN=ghp_your_token
 
-# JWT 鉴权（与 NextAuth JWT Secret 保持一致）
-JWT_SECRET=your_jwt_secret
+# OpenAI / DashScope
+OPENAI_API_KEY=your_api_key
+OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+OPENAI_MODEL=qwen-plus
+
+# Supabase
+SUPABASE_SERVICE_KEY=your_service_key
+
+# Token Control
+MAX_OUTPUT_TOKENS=1024
+EXPLORER_MAX_ITERATIONS=4
+REPO_LOADER_MAX_ITERATIONS=8
+TOOL_RESULT_TRUNCATE=2000
 ```
 
-> 参考 `.env.example` 文件获取所有变量的完整列表。
+> Reference `deploy.env.example` for all available variables.
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 前置条件
+### Prerequisites
 
-- Node.js ≥ 18
-- pnpm ≥ 10
+- Node.js >= 18
+- pnpm >= 9
 - Python 3.12+
-- Supabase 项目（本地或云端）
-- GitHub OAuth App（[创建地址](https://github.com/settings/applications/new)）
+- Supabase project
+- GitHub OAuth App
 
-### 1. 克隆 & 安装依赖
+### 1. Install Dependencies
 
 ```bash
 git clone https://github.com/xecho-dev/GitIntel-AI-Analysis.git
@@ -195,99 +500,92 @@ cd gitintel-ai-analysis
 pnpm install
 ```
 
-### 2. 配置环境变量
+### 2. Configure Environment
 
 ```bash
-cp .env.example .env          # 根目录
-cp frontend/.env.example frontend/.env.local
-cp backend/.env.example backend/.env
+cp deploy.env.example deploy.env        # Root directory
+cp apps/frontend/.env.example apps/frontend/.env.local
 ```
 
-按上文填写所有变量的值。
+Fill in all required variables in `deploy.env` and `.env.local`.
 
-### 3. 初始化数据库
-
-在 Supabase SQL Editor 中执行：
-
-```sql
--- 复制 supabase/migrations/001_initial_schema.sql 的内容粘贴执行
-```
-
-### 4. 启动开发服务
+### 3. Start Development
 
 ```bash
-# 同时启动前后端（推荐）
+# Start all services (recommended)
 pnpm dev
 
-# 或单独启动
-pnpm dev:frontend   # 前端 → http://localhost:3000
-pnpm dev:backend     # 后端 → http://localhost:8000
+# Or start individually
+pnpm dev:frontend   # Frontend → http://localhost:3000
+pnpm dev:admin      # Admin → http://localhost:3001
+pnpm dev:backend    # Backend → http://localhost:8000
 ```
 
 ---
 
-## API 文档
+## API Documentation
 
-Agent 层 Swagger 文档（启动后访问）：
+### Core Endpoints
 
-```
-http://localhost:8000/docs
-```
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/health` | Health check | Public |
+| `POST` | `/api/analyze` | Start repository analysis (SSE) | JWT |
+| `GET` | `/api/analysis/{id}` | Get analysis result | JWT |
+| `GET` | `/api/history` | Paginated analysis history | JWT |
+| `POST` | `/api/history/save` | Save analysis result | JWT |
+| `DELETE` | `/api/history/{id}` | Delete history item | JWT |
+| `POST` | `/api/chat/send` | Send chat message | JWT |
+| `POST` | `/api/pr/generate` | Generate PR description | JWT |
+| `POST` | `/api/pr/create` | Create GitHub PR | JWT |
 
-### 核心端点
+### SSE Event Format
 
-| 方法 | 路径 | 说明 | 认证 |
-|---|---|---|---|
-| `GET` | `/health` | 健康检查 | 公开 |
-| `POST` | `/api/analyze` | 启动仓库分析（SSE 流式） | JWT |
-| `GET` | `/api/history` | 分页获取分析历史 | JWT |
-| `POST` | `/api/history/save` | 保存分析结果 | JWT |
-| `DELETE` | `/api/history/{id}` | 删除单条历史 | JWT |
-| `GET` | `/api/user/profile` | 获取用户资料 | JWT |
-| `POST` | `/api/user/profile` | 更新用户资料 | JWT |
-
-### SSE 流式响应格式
-
-每个事件为 JSON 行：
+Each event is a JSON line:
 
 ```json
-{"type": "status", "agent": "architecture", "message": "正在扫描项目目录...", "percent": 10, "data": null}
-{"type": "progress", "agent": "architecture", "message": "目录扫描完成", "percent": 30, "data": null}
-{"type": "result", "agent": "architecture", "message": "架构分析完成", "percent": 100, "data": {...}}
-...
-{"type": "error", "agent": "quality", "message": "Agent 执行失败: ...", "percent": 0, "data": null}
+{"type": "status", "agent": "fetch_tree_classify", "message": "Loading repository...", "percent": 10, "data": null}
+{"type": "progress", "agent": "load_p0", "message": "Loading critical files...", "percent": 30, "data": null}
+{"type": "result", "agent": "code_parser_final", "message": "Analysis complete", "percent": 100, "data": {...}}
+{"type": "error", "agent": "quality", "message": "Analysis failed: ...", "percent": 0, "data": null}
 data: [DONE]
 ```
 
-`type` 取值：`status` | `progress` | `result` | `error` | `done`
+`type` values: `status` | `progress` | `result` | `error`
 
 ---
 
-## 部署
+## Deployment
 
-### Docker Compose (推荐)
-
-一键启动所有服务：
+### Docker Compose (Recommended)
 
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
-### 手动部署
+### Manual Deployment
 
-#### 前端 + BFF
+#### Frontend
 
 ```bash
-cd frontend
+cd apps/frontend
 pnpm install
 pnpm build
-docker build -t gitintel-frontend .
+docker build -f Dockerfile.frontend -t gitintel-frontend .
 docker run -p 3000:3000 gitintel-frontend
 ```
 
-需要设置的环境变量：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`、`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`。
+#### Admin
 
-#### 后端
+```bash
+cd apps/admin
+pnpm install
+pnpm build
+docker build -f Dockerfile.admin -t gitintel-admin .
+docker run -p 3001:3001 gitintel-admin
+```
+
+#### Backend
 
 ```bash
 cd backend
@@ -295,28 +593,59 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-需要设置的环境变量：`SUPABASE_URL`、`JWT_SECRET`。
+---
 
-### Supabase
+## Shared Types
 
-1. 在 [Supabase](https://supabase.com) 创建项目
-2. 在 SQL Editor 执行 `supabase/migrations/001_initial_schema.sql`
-3. 获取 `SUPABASE_URL`、填入后端 `.env`
+All cross-layer types are defined in `packages/types/index.ts`:
+
+```typescript
+// Request
+export interface AnalyzeRequest {
+  repoUrl: string;
+  branch?: string;
+}
+
+// SSE Event
+export interface AgentEvent {
+  type: "status" | "progress" | "result" | "error";
+  agent: AgentName;
+  message?: string;
+  percent?: number;
+  data?: unknown;
+}
+
+// Analysis Result
+export interface AnalysisResult {
+  repoLoader?: { ... };
+  codeParser?: { ... };
+  techStack?: { ... };
+  quality: QualityResult;
+  dependency: DependencyResult;
+  architecture: ArchitectureResult;
+  suggestion: OptimizationResult;
+}
+```
 
 ---
 
-## 开发指南
+## Development Guide
 
-### 添加新的 Agent
+### Adding a New Agent
 
-1. 在 `backend/agents/` 下新建文件（如 `security.py`）
-2. 继承 `BaseAgent`，实现 `stream()` 方法
-3. 在 `graph/analysis_graph.py` 中注册并行调度
-4. 前端 SSE 消费者无需修改（自动接收新 Agent 事件）
+1. Create agent file in `backend/agents/react/` (e.g., `security_agent.py`)
+2. Inherit from `BaseReActAgent`, implement `run()` method
+3. Register in `backend/graph/analysis_graph.py`
+4. Frontend SSE consumer updates automatically
 
-### 修改共享类型
+### Token Consumption Control
 
-所有跨层类型（`AgentEvent`、`AnalyzeRequest` 等）统一放在 `packages/types/index.ts`，前后端各自导入使用，禁止重复定义。
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAX_OUTPUT_TOKENS` | 1024 | Max LLM output per call |
+| `EXPLORER_MAX_ITERATIONS` | 4 | Max ReAct explorer iterations |
+| `REPO_LOADER_MAX_ITERATIONS` | 8 | Max repo loader iterations |
+| `TOOL_RESULT_TRUNCATE` | 2000 | Max chars per tool result |
 
 ---
 
