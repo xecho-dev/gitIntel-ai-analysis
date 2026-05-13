@@ -8,7 +8,8 @@ Agents — GitIntel Agent 层统一导出。
   ├── react/                    # ReAct 模式 Agent（当前主力）
   │   ├── repo_loader_agent.py  # ReActRepoLoaderAgent
   │   ├── suggestion_agent.py   # ReActSuggestionAgent
-  │   └── explorers.py          # ExplorerOrchestrator
+  │   ├── explorers.py          # ExplorerOrchestrator
+  │   └── reflection_agent.py   # ReActReflectionAgent
   └── legacy/                   # 旧版渐进式加载 Agent（保留，不再使用）
       ├── repo_loader.py        # RepoLoaderAgent
       ├── code_parser.py        # CodeParserAgent
@@ -31,7 +32,9 @@ from .base_agent import BaseAgent, AgentEvent, _make_event
 from .react import (
     ReActRepoLoaderAgent,
     ReActSuggestionAgent,
+    ReActReflectionAgent,
     ExplorerOrchestrator,
+    quick_confidence_check,
 )
 
 # ─── Legacy Agent（保留，不再使用）────────────────────────────────────────────
@@ -56,7 +59,9 @@ __all__ = [
     # ReAct 模式
     "ReActRepoLoaderAgent",
     "ReActSuggestionAgent",
+    "ReActReflectionAgent",
     "ExplorerOrchestrator",
+    "quick_confidence_check",
     # Legacy
     "RepoLoaderAgent",
     "GitHubPermissionError",

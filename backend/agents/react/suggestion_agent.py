@@ -1,23 +1,18 @@
 """
 ReActSuggestionAgent — 基于 ReAct 模式的优化建议生成 Agent。
 
-与旧版 SuggestionAgent 的核心区别：
-  - 旧版：一次性把所有上下文塞给 LLM，code_fix 是 guesswork
-  - 新版：Agent 可以主动调用工具验证问题、精确读取文件内容，生成可执行的 code_fix
+基于 LangChain create_agent 实现，充分利用：
+  - create_agent: 标准化的 ReAct Agent（LangGraph StateGraph）
+  - ainvoke: 单次执行，避免 astream_events + ainvoke 双重执行问题
+  - StructuredTool: 统一的工具接口
+  - ToolNode: LangGraph 内置的工具执行节点
+  - Agent callbacks: 自动收集工具调用记录
 
-工具集：
-  GitHub:  read_file_content, get_file_blobs, search_code
-  Code:    parse_file_ast, detect_code_smells, detect_imports
-  RAG:     rag_search_similar, rag_search_by_category
-
-工作流程：
-  1. 基于分析数据识别潜在问题
-  2. 对每个问题，调用工具验证：
-     - 搜索相关代码模式确认问题存在
-     - 读取具体文件确认精确位置
-     - 深度分析文件了解上下文
-  3. 基于验证结果，生成含精确 code_fix 的建议
-  4. 存储高优先级建议到 RAG
+保留独有的：
+  - RAG 集成
+  - 多源上下文构建
+  - 规则引擎兜底
+  - 流式输出（SSE）
 """
 import asyncio
 import json
@@ -27,9 +22,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Annotated, Any, AsyncGenerator
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain.agents import create_agent, AgentState
+from langchain_core.callbacks import AsyncCallbackHandler
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
 
-from tools.github_tools import read_file_content, search_code
+from agents.react.error_loop_detector import ErrorLoopDetector
+from agents.react.tool_wrapper import inject_context, ToolLoopInterrupt
+from tools.github_tools import batch_search_code
 from tools.code_tools import parse_file_ast, detect_code_smells, detect_imports
 from tools.rag_tools import (
     rag_search_similar, rag_search_by_category, rag_store_suggestion,
@@ -38,7 +38,7 @@ from tools.rag_tools import (
 
 logger = logging.getLogger("gitintel")
 
-# ─── Token 预算配置（可由环境变量覆盖）───────────────────────────────────────
+# ── Token 预算配置 ────────────────────────────────────────────────────────────
 
 _MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
 _TOOL_RESULT_TRUNCATE = int(os.getenv("TOOL_RESULT_TRUNCATE", "1500"))
@@ -46,9 +46,11 @@ _TOOL_RESULT_TRUNCATE = int(os.getenv("TOOL_RESULT_TRUNCATE", "1500"))
 
 # ─── 工具列表 ────────────────────────────────────────────────────────────────
 
-SUGGESTION_TOOLS = [
-    read_file_content,
-    search_code,
+# 原始工具列表（用于类型标注）
+# 注意：Suggestion Agent 不使用 read_file_content，避免重新读取大文件消耗 token
+# 只允许：批量搜索、AST 分析、代码异味检测、依赖分析、RAG
+_RAW_TOOLS = [
+    batch_search_code,
     parse_file_ast,
     detect_code_smells,
     detect_imports,
@@ -56,48 +58,60 @@ SUGGESTION_TOOLS = [
     rag_search_by_category,
 ]
 
+
+def _get_wrapped_tools(owner: str, repo: str, ref: str) -> list:
+    """获取包装后的工具列表，自动注入 owner/repo/ref 上下文。"""
+    return [inject_context(t, owner=owner, repo=repo, ref=ref) for t in _RAW_TOOLS]
+
+
 # ─── System Prompt ─────────────────────────────────────────────────────────────
 
-REACT_SUGGESTION_SYSTEM = """你是一名资深软件架构师，为 GitIntel 系统生成优化建议。
+REACT_SUGGESTION_SYSTEM = """你是一名资深软件架构师，基于代码分析结论生成优化建议。
 
-任务：基于代码分析数据，生成可操作的优化建议，每个建议必须：(1)经过工具验证 (2)包含精确的code_fix (3)给出可落地的改进步骤。
+【关键】你【不能】使用 read_file_content 工具读取源代码！
+所有分析工作已由其他 Agent 完成，你只需基于已有结论生成建议。
 
-工具使用规则：
-  **重要**：read_file_content, search_code 等 GitHub 工具只需要传入 path/query 参数，
-  owner/repo/ref 会自动注入，无需手动传入。
+已完成的工作（可信赖的输入）：
+  - ArchitectureAgent: 架构扫描完成
+  - QualityAgent: 代码质量分析完成（hotspots 已列出问题位置和类型）
+  - DependencyAgent: 依赖风险已评估
+  - CodeParserAgent: 代码结构已解析（largest_files 列出大文件）
 
-工具调用示例：
-  - read_file_content(path="src/main.js")  # 自动使用当前仓库
-  - search_code(query="authentication", language="python")  # 只需 query 和 language
+你的任务：
+  1. 基于【代码质量问题】列表（已由 QualityAgent 定位），理解每个问题
+  2. 使用 batch_search_code 搜索相关修复模式和最佳实践（返回简短片段）
+  3. 使用 detect_code_smells 在已有代码文件上做补充分析
+  4. 使用 RAG 检索类似项目的历史经验
 
-工作流：(Step1)用search_code确认问题存在→用read_file_content精确读文件→用detect_code_smells量化分析
-(Step2)code_fix.original必须是文件中实际存在的代码字符串
-(Step3)评估影响范围和关联修改
-
-关注类型：安全性(硬编码密码/Secret、SQL注入)、性能(N+1、缺少缓存)、可维护性(过长函数>50行、深度嵌套>4层)、测试覆盖、架构(循环依赖、紧耦合)。
+【禁止】
+  - 不要使用任何读取源码的工具（如 read_file_content）
+  - 不要试图重新分析代码发现问题（问题已由 QualityAgent 定位）
+  - 不要生成泛泛而谈的建议（每条必须有具体的文件位置和问题描述）
 
 输出 JSON 数组（不要markdown包裹）：
 [
   {
     "type": "security|performance|refactor|testing|complexity|architecture|general",
     "title": "中文标题，20字以内",
-    "description": "详细说明80-200字，包含步骤和原因",
+    "description": "详细说明80-200字，基于已有分析结论，重点说明修复方案",
     "priority": "high|medium|low",
     "category": "security|performance|maintainability|testing|architecture",
     "verified": true|false,
     "code_fix": {
-      "file": "精确路径",
+      "file": "hotspots 或 largest_files 中已有的文件路径",
       "type": "replace|add|remove",
-      "original": "文件中实际存在的代码（精确字符串）",
-      "updated": "修改后的代码",
+      "original": "根据问题描述推断的原始代码片段",
+      "updated": "建议的修改",
       "reason": "修改原因，20字以内"
     }
   }
 ]
 
-要求：返回3-6条建议按priority降序；verified=true必须有工具验证记录；
-code_fix.original必须是实际代码不是占位符；不要泛泛而谈，每条要有具体文件位置和修改方案。"""
+要求：返回3-6条建议按priority降序；verified=true基于已有分析结论标记；
+code_fix.file 必须来自已有的 hotspots 或 largest_files，不要猜测文件路径。"""
 
+
+# ─── 数据结构 ────────────────────────────────────────────────────────────────
 
 @dataclass
 class Suggestion:
@@ -115,19 +129,99 @@ class Suggestion:
 @dataclass
 class VerificationResult:
     tool_calls: list[dict] = field(default_factory=list)
-    verified_files: dict[str, str] = field(default_factory=dict)
     ast_results: dict[str, dict] = field(default_factory=dict)
-    smell_results: dict[str, list] = field(default_factory=dict)
+    smell_results: dict[str, list] = field(default_factory=list)
 
+
+# ─── LangChain Callback Handler ───────────────────────────────────────────────
+
+class SuggestionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
+    """通过 LangChain Agent callbacks 自动收集工具调用记录。
+
+    继承 ErrorLoopDetector，防止 LLM 在错误上反复重试导致死循环。
+    """
+
+    def __init__(self):
+        super().__init__()
+        AsyncCallbackHandler.__init__(self)
+        self.tool_calls: list[dict] = []
+        self.progress_events: list[dict] = []  # 累积进度事件，稍后 yield
+        self._in_tool = False
+        self._current_tool_name = ""
+        self._current_inputs: dict = {}
+
+    async def on_tool_start(
+        self, serialized: dict, input: Any = "", *, run_id: str, parent_run_id: str | None = None, **kwargs
+    ):
+        name = serialized.get("name", "unknown")
+        self._current_tool_name = name
+        self._current_inputs = input if isinstance(input, dict) else {}
+        self._in_tool = True
+
+    async def on_tool_end(
+        self, output: Any, *, run_id: str, parent_run_id: str | None = None, **kwargs
+    ):
+        if self._in_tool:
+            obs = str(output.content)[:_TOOL_RESULT_TRUNCATE] if hasattr(output, "content") else str(output)[:_TOOL_RESULT_TRUNCATE]
+            tool_call_count = len(self.tool_calls) + 1
+            self.tool_calls.append({
+                "iteration": tool_call_count,
+                "tool": self._current_tool_name,
+                "args": dict(self._current_inputs),
+                "result": obs[:500],
+            })
+            self._check_error_pattern(obs, self._current_tool_name)
+
+            # 累积进度事件
+            self.progress_events.append({
+                "type": "progress",
+                "agent": "optimization",
+                "message": f"[验证] {self._current_tool_name}: {obs[:80]}",
+                "percent": min(20 + tool_call_count * 12, 65),
+                "data": {"tool": self._current_tool_name, "result": obs[:150], "iteration": tool_call_count},
+            })
+
+        self._in_tool = False
+
+    async def on_tool_error(
+        self, error: Exception | str, *, run_id: str, parent_run_id: str | None = None, **kwargs
+    ):
+        if self._in_tool:
+            error_str = str(error)[:200]
+            tool_call_count = len(self.tool_calls) + 1
+            self.tool_calls.append({
+                "iteration": tool_call_count,
+                "tool": self._current_tool_name,
+                "args": dict(self._current_inputs),
+                "error": error_str,
+                "result": "",
+            })
+            self._check_error_pattern(error_str, self._current_tool_name)
+
+            # 累积错误进度事件
+            self.progress_events.append({
+                "type": "progress",
+                "agent": "optimization",
+                "message": f"[错误] {self._current_tool_name}: {error_str}",
+                "percent": min(20 + tool_call_count * 12, 65),
+                "data": {"tool": self._current_tool_name, "error": error_str, "iteration": tool_call_count},
+            })
+
+        self._in_tool = False
+
+
+# ─── 核心 Agent ──────────────────────────────────────────────────────────────
 
 class ReActSuggestionAgent:
     """基于 ReAct 模式的优化建议生成 Agent。
 
     特性：
+      - LangChain create_agent：标准化的 ReAct StateGraph，自动管理 Agent 循环
+      - ainvoke 单次执行：避免 astream_events + ainvoke 双重执行的复杂性
       - 主动验证：每个建议都经过工具验证，确保精确性
       - 精确修复：code_fix 的 original 来自真实文件内容
       - 历史增强：使用 RAG 搜索相似项目的经验
-      - 流式输出：支持实时 yield 验证进度
+      - 流式输出：支持通过 callback yield SSE 验证进度
 
     使用示例：
         agent = ReActSuggestionAgent()
@@ -140,17 +234,16 @@ class ReActSuggestionAgent:
             print(event)
     """
 
-    MAX_ITERATIONS = 4  # 默认 4 轮，控制 token 消耗
+    MAX_TOOL_CALLS = 4  # 重命名：正确表达限制的是 tool_call 次数，而非 iteration
     MAX_SUGGESTIONS = 6
     _id_counter = 0
 
     def __init__(self):
-        from utils.llm_factory import get_llm_with_tracking
-        self.llm = self._get_llm()
-        self._file_contents: dict[str, str] | None = None  # Agent 层本地缓存
+        self._llm: BaseChatModel | None = self._get_llm()
+        self._file_contents: dict[str, str] | None = None
 
     @staticmethod
-    def _get_llm():
+    def _get_llm() -> BaseChatModel | None:
         try:
             from utils.llm_factory import get_llm_with_tracking
             return get_llm_with_tracking(agent_name="优化建议生成", max_tokens=_MAX_OUTPUT_TOKENS)
@@ -174,19 +267,11 @@ class ReActSuggestionAgent:
         quality_result: dict | None = None,
         dependency_result: dict | None = None,
     ) -> AsyncGenerator[dict, None]:
-        """流式生成优化建议。"""
-        import httpx
-
+        """生成优化建议（使用 ainvoke 单次执行）。"""
         self._file_contents = file_contents
-        self._file_tree: list[dict] | None = (
-            [{"path": p, "type": "blob"} for p in sorted(file_contents.keys())]
-            if file_contents else None
-        )
-
         owner, repo = self._parse_repo(repo_path)
         ref = branch or "main"
 
-        # 确保分支存在：如果用户传入 main 但仓库实际是 master，自动修正
         if ref in ("main", ""):
             try:
                 from tools.github_tools import _get_default_branch_impl
@@ -197,7 +282,7 @@ class ReActSuggestionAgent:
             except Exception as e:
                 logger.warning(f"[ReActSuggestion] 获取默认分支失败: {e}")
 
-        # ── Step 1: 构建分析上下文 ────────────────────────────────
+        # ── Step 1: 构建分析上下文 ─────────────────────────────────────────────
         yield {
             "type": "status",
             "agent": "optimization",
@@ -215,7 +300,7 @@ class ReActSuggestionAgent:
             dependency_result=dependency_result,
         )
 
-        # ── Step 2: RAG 检索历史经验 ──────────────────────────────
+        # ── Step 2: RAG 检索历史经验 ──────────────────────────────────────────
         rag_results = []
         rag_available = True
 
@@ -241,7 +326,7 @@ class ReActSuggestionAgent:
             logger.warning(f"[ReActSuggestion] RAG 检索失败: {e}")
             rag_available = False
 
-        # ── Step 3: 初始建议生成（带工具调用） ──────────────────────
+        # ── Step 3: 使用 ainvoke 执行 ReAct 循环（单次执行，无双重调用）────────────
         yield {
             "type": "progress",
             "agent": "optimization",
@@ -250,8 +335,7 @@ class ReActSuggestionAgent:
             "data": None,
         }
 
-        if self.llm is None:
-            # LLM 不可用时，使用规则引擎
+        if self._llm is None:
             async for fallback_event in self._rule_based_fallback(
                 owner, repo, ref,
                 quality_result, dependency_result, file_contents
@@ -259,175 +343,97 @@ class ReActSuggestionAgent:
                 yield fallback_event
             return
 
-        # 构建初始消息
         verification = VerificationResult()
-        messages = [
-            SystemMessage(content=REACT_SUGGESTION_SYSTEM),
-            HumanMessage(content=context),
-        ]
+        # 使用包装后的工具，自动注入 owner/repo/ref 上下文
+        wrapped_tools = _get_wrapped_tools(owner, repo, ref)
+        agent = create_agent(
+            model=self._llm,
+            tools=wrapped_tools,
+            system_prompt=REACT_SUGGESTION_SYSTEM,
+        )
 
-        suggestions: list[dict] = []
-        iteration = 0
+        # 回调处理器：自动收集工具调用和进度事件
+        handler = SuggestionCallbackHandler()
 
-        while iteration < self.MAX_ITERATIONS:
-            iteration += 1
+        input_state: AgentState = {
+            "messages": [
+                HumanMessage(content=context),
+            ],
+            "jump_to": None,
+            "structured_response": None,
+        }
 
-            # ── DEBUG: 记录每次 LLM 调用前的消息结构 ──
-            msg_types = [f"{type(m).__name__}" for m in messages]
-            msg_summary = ",".join(msg_types)
-            # 检查是否有 dangling ToolMessage（Tool 在紧跟 Human 之后，没有中间的 AI）
-            has_dangling = False
-            for i in range(len(messages) - 1):
-                if (type(messages[i]).__name__ == "HumanMessage" and
-                    type(messages[i+1]).__name__ == "ToolMessage"):
-                    has_dangling = True
-                    break
-            logger.debug(f"[ReActSuggestion] 迭代 {iteration} 开始，消息数={len(messages)}, 结构={msg_summary}, dangling={has_dangling}")
+        final_messages = []
 
-            # LLM 生成建议（带工具调用）
-            # strict=False 适配 DashScope 代码模型（不支持严格的 function.arguments JSON 校验）
-            llm_with_tools = self.llm.bind_tools(
-                SUGGESTION_TOOLS,
-                parallel_tool_calls=True,  # 允许多个工具并行调用
-                strict=False,
+        try:
+            # ── 关键改动：只使用 ainvoke 单次执行 ─────────────────────────────────
+            # 不再使用 astream_events + ainvoke 双重调用
+            # 不再手动 break，依赖 create_agent 内置的 max_iterations 控制
+            yield {
+                "type": "progress",
+                "agent": "optimization",
+                "message": "Agent 正在执行（单次 ainvoke）...",
+                "percent": 20,
+                "data": None,
+            }
+
+            final_state = await agent.with_config(run_name="优化建议生成").ainvoke(
+                input_state,
+                config={
+                    "callbacks": [handler],
+                    "max_iterations": self.MAX_TOOL_CALLS,
+                },
+            )
+            final_messages = final_state.get("messages", [])
+
+            # 从回调中获取所有工具调用记录
+            all_tool_calls = handler.tool_calls
+            verification.tool_calls = all_tool_calls
+
+            logger.info(
+                f"[ReActSuggestion] create_agent 完成: "
+                f"{len(all_tool_calls)} 次工具调用"
             )
 
-            try:
-                response = await llm_with_tools.ainvoke(messages)
-                messages.append(response)
-            except Exception as e:
-                logger.error(f"[ReActSuggestion] 迭代 {iteration} LLM 调用失败 (400?): {e}")
-                # 移除本轮追加的 AI 消息，避免破坏消息链
-                if messages and hasattr(messages[-1], "tool_calls"):
-                    messages.pop()
-                break
+            # ── 统一 yield 所有进度事件 ─────────────────────────────────────────
+            # 注意：这些事件是在 ainvoke 执行期间累积的，
+            # 现在一次性 yield 给 SSE（不再是实时流，但避免了双重执行问题）
+            for progress_event in handler.progress_events:
+                yield progress_event
 
-            tool_calls = response.tool_calls or []
-            if not tool_calls:
-                # LLM 没有调用工具，可能已完成
-                break
+            # 检查是否因错误循环提前停止
+            if handler._stop_due_to_loop:
+                logger.warning(
+                    f"[ReActSuggestion] 因错误循环提前终止，"
+                    f"已完成 {len(all_tool_calls)} 次工具调用"
+                )
+                yield {
+                    "type": "progress",
+                    "agent": "optimization",
+                    "message": f"因错误循环提前终止，已完成 {len(all_tool_calls)} 次工具调用",
+                    "percent": 65,
+                    "data": {"stopped_due_to_loop": True, "tool_call_count": len(all_tool_calls)},
+                }
 
-            # 工具重试计数：同一工具连续失败超过 3 次则跳过，防止死循环
-            tool_retry_count: dict[str, int] = {}
+        except ToolLoopInterrupt as e:
+            logger.warning(
+                f"[ReActSuggestion] Agent 循环被打断（{e.tool_name} ×{e.count}），"
+                f"已完成 {len(handler.tool_calls)} 次工具调用"
+            )
+            yield {
+                "type": "progress",
+                "agent": "optimization",
+                "message": f"Agent 循环被打断（{e.tool_name} ×{e.count}），已完成 {len(handler.tool_calls)} 次工具调用",
+                "percent": 70,
+                "data": {"stopped_due_to_loop": True, "tool_call_count": len(handler.tool_calls)},
+            }
+            final_messages = []
 
-            # 执行工具调用
-            for tc in tool_calls:
-                tool_name = tc["name"]
-                tool_args = tc["args"]
+        except Exception as e:
+            logger.error(f"[ReActSuggestion] create_agent 执行失败: {e}", exc_info=True)
+            final_messages = []
 
-                # 从 response.tool_calls 中精确查找 tool_call_id
-                tc_id = None
-                if hasattr(response, "tool_calls") and response.tool_calls:
-                    for _tc in response.tool_calls:
-                        if _tc.get("name") == tool_name:
-                            tc_id = _tc.get("id")
-                            break
-                tc_id = tc_id or tc.get("id") or f"call_{iteration}_{tool_name}"
-
-                # 同一工具连续失败上限：超过 3 次则跳过
-                if tool_retry_count.get(tool_name, 0) >= 3:
-                    error_msg = f"[跳过] {tool_name} 已连续失败 3 次，不再重试"
-                    messages.append(
-                        ToolMessage(content=error_msg, tool_call_id=tc_id)
-                    )
-                    continue
-
-                try:
-                    result = await self._execute_tool(
-                        owner, repo, ref, verification, tool_name, tool_args
-                    )
-                    verification.tool_calls.append({
-                        "tool": tool_name, "args": tool_args, "result": result[:500]
-                    })
-                    # 重置该工具的失败计数
-                    tool_retry_count[tool_name] = 0
-
-                    # 实时 yield 工具执行进度
-                    yield {
-                        "type": "progress",
-                        "agent": "optimization",
-                        "message": f"[验证 {iteration}] {tool_name}: {result[:80]}",
-                        "percent": min(15 + iteration * 12, 65),
-                        "data": {"tool": tool_name, "result": result[:150]},
-                    }
-
-                    # 使用 ToolMessage 添加观察结果（Function Calling 规范要求）
-                    from langchain_core.messages import ToolMessage
-                    messages.append(
-                        ToolMessage(
-                            content=result[:_TOOL_RESULT_TRUNCATE],
-                            tool_call_id=tc_id,
-                        )
-                    )
-
-                except Exception as e:
-                    logger.warning(f"[ReActSuggestion] 工具执行失败: {tool_name}: {e}")
-                    from langchain_core.messages import ToolMessage
-                    # 错误信息发给 LLM，让它决定是重试还是换方案
-                    messages.append(
-                        ToolMessage(
-                            content=f"[错误] {type(e).__name__}: {str(e)}",
-                            tool_call_id=tc_id,
-                        )
-                    )
-                    tool_retry_count[tool_name] = tool_retry_count.get(tool_name, 0) + 1
-
-            # 防止消息历史无限膨胀：保留 SystemMessage + 初始 HumanMessage + 最近 2 轮完整对话
-            # 关键：必须保留完整的三元组（Human + AI(tool_calls) + ToolMessage），
-            # 避免 dangling ToolMessage 导致下一轮 LLM 调用报 400 错误。
-            #
-            # 策略：找到最后一个 HumanMessage 的位置（作为最后一轮的起始），
-            # 保留 [最后一个 Human, AI, Tool...] + 再往前一整轮。
-            if len(messages) > 8:
-                system = messages[0]
-                initial = messages[1]
-                history = messages[2:]  # 跳过 System 和初始 Human
-
-                if len(history) > 6:
-                    # 找到最后一个 HumanMessage 的索引（最后一轮的开始）
-                    last_human_idx = -1
-                    for i in range(len(history) - 1, -1, -1):
-                        if type(history[i]).__name__ == "HumanMessage":
-                            last_human_idx = i
-                            break
-
-                    if last_human_idx >= 0:
-                        # 保留: [System, Initial, Summary, 从最后一个 Human 开始的所有消息]
-                        # 再往前找一整轮（找到倒数第二个 Human）
-                        second_last_human_idx = -1
-                        for i in range(last_human_idx - 1, -1, -1):
-                            if type(history[i]).__name__ == "HumanMessage":
-                                second_last_human_idx = i
-                                break
-
-                        if second_last_human_idx >= 0:
-                            keep_from = second_last_human_idx
-                        else:
-                            keep_from = last_human_idx
-
-                        # 提取摘要（跳过保留的部分）
-                        summary_lines = ["## 前期建议摘要"]
-                        seen = set()
-                        for msg in history[:keep_from]:
-                            if isinstance(msg, HumanMessage):
-                                text = msg.content or ""
-                                for line in text.split("\n"):
-                                    stripped = line.strip()
-                                    if stripped.startswith("## ") or stripped.startswith("### "):
-                                        key = stripped[:60]
-                                        if key not in seen:
-                                            seen.add(key)
-                                            summary_lines.append(f"  {stripped}")
-
-                        summary_msg = HumanMessage(content="\n".join(summary_lines))
-                        messages[:] = [system, initial, summary_msg] + history[keep_from:]
-                        logger.debug(f"[ReActSuggestion] 压缩后消息数={len(messages)}, keep_from={keep_from}")
-
-            # 检查是否已收集到足够的验证信息
-            if len(verification.verified_files) >= 3 or len(verification.tool_calls) >= 8:
-                break
-
-        # ── Step 4: 生成最终建议 ────────────────────────────────
+        # ── Step 4: 生成最终建议 ──────────────────────────────────────────────
         yield {
             "type": "progress",
             "agent": "optimization",
@@ -436,25 +442,19 @@ class ReActSuggestionAgent:
             "data": None,
         }
 
-        # 让 LLM 基于验证结果生成精确建议
-        final_prompt = self._build_final_prompt(
-            context, verification, rag_results
-        )
-        messages.append(HumanMessage(content=final_prompt))
+        final_prompt = self._build_final_prompt(context, verification, rag_results)
+        messages_for_final = list(final_messages)
+        messages_for_final.append(HumanMessage(content=final_prompt))
 
         try:
-            final_response = await self.llm.ainvoke(messages)
+            final_response = await self._llm.ainvoke(messages_for_final)
             content = final_response.content.strip()
-
-            # 解析 JSON
             suggestions = self._parse_suggestions(content)
-
         except Exception as e:
             logger.error(f"[ReActSuggestion] 最终建议生成失败: {e}")
             suggestions = []
 
-        # ── Step 5: 存储建议到 RAG（多维度批量存储）──────────────
-        # loaded_count == 0（ReAct 加载失败）时不存 RAG，避免污染知识库
+        # ── Step 5: 存储建议到 RAG ───────────────────────────────────────────
         total_loaded_files = 0
         if code_parser_result and isinstance(code_parser_result, dict):
             total_loaded_files = code_parser_result.get("total_files", 0)
@@ -477,10 +477,7 @@ class ReActSuggestionAgent:
                             else:
                                 languages = [str(l) for l in langs]
 
-                    total_files = 0
-                    if code_parser_result and isinstance(code_parser_result, dict):
-                        total_files = code_parser_result.get("total_files", 0)
-                    project_scale = "small" if total_files <= 100 else ("medium" if total_files <= 500 else "large")
+                    project_scale = "small" if total_loaded_files <= 100 else ("medium" if total_loaded_files <= 500 else "large")
 
                     stored = 0
                     for sug in suggestions:
@@ -511,10 +508,10 @@ class ReActSuggestionAgent:
             except Exception as e:
                 logger.warning(f"[ReActSuggestion] RAG 存储失败: {e}")
 
-        # ── Step 6: 去重 + 排序 ─────────────────────────────────
+        # ── Step 6: 去重 + 排序 ─────────────────────────────────────────────
         suggestions = self._dedupe_and_sort(suggestions)
 
-        # ── Step 7: 输出最终结果 ────────────────────────────────
+        # ── Step 7: 输出最终结果 ─────────────────────────────────────────────
         yield {
             "type": "result",
             "agent": "optimization",
@@ -533,137 +530,7 @@ class ReActSuggestionAgent:
             },
         }
 
-    async def _execute_tool(
-        self,
-        owner: str, repo: str, ref: str,
-        verification: VerificationResult,
-        tool_name: str,
-        args: dict,
-    ) -> str:
-        """执行单个工具。"""
-        import asyncio
-
-        # ── Agent 层本地缓存拦截：file_contents 已预加载时直接返回 ─────────────
-        # 覆盖 read_file_content 和 get_file_tree，避免重复网络请求
-        if tool_name == "get_file_tree" and self._file_tree is not None:
-            import json as _json
-            obs = _json.dumps(self._file_tree, ensure_ascii=False)
-            logger.info(f"[ReActSuggestion] get_file_tree CACHED ({len(self._file_tree)} paths from preload)")
-            return obs[:_TOOL_RESULT_TRUNCATE]
-
-        if tool_name == "read_file_content" and self._file_contents is not None:
-            path = args.get("path", "")
-            if path in self._file_contents:
-                content = self._file_contents[path]
-                logger.info(f"[ReActSuggestion] read_file_content CACHED {path}")
-                return content[:_TOOL_RESULT_TRUNCATE]
-
-        # 对于需要 owner/repo 的 GitHub 工具，确保参数正确
-        if tool_name in ("read_file_content", "get_file_tree", "search_code",
-                         "get_file_blobs", "get_commit_history", "get_pull_requests"):
-            # 优先使用全局 owner/repo，避免 LLM 混淆参数
-            effective_args: dict = {"owner": owner, "repo": repo}
-            # read_file_content, get_file_tree, get_commit_history 需要 ref
-            if tool_name in ("read_file_content", "get_file_tree", "get_commit_history"):
-                effective_args["ref"] = ref
-            # 合并 LLM 传入的参数
-            effective_args.update({k: v for k, v in args.items() if k in (
-                "path", "paths", "query", "language", "state", "limit"
-            )})
-            tool_args = effective_args
-        elif tool_name in ("parse_file_ast", "detect_code_smells",
-                           "detect_imports", "detect_dependencies"):
-            # 代码分析工具需要 content 和 language，通过 verified_files 中已读文件反查
-            effective_args: dict = {}
-            content = args.get("content", "")
-            if not content:
-                # 从已验证的文件内容中查找
-                for path_key, file_content in verification.verified_files.items():
-                    if path_key and path_key in (args.get("file_path") or ""):
-                        content = file_content
-                        break
-                if not content and verification.verified_files:
-                    content = next(iter(verification.verified_files.values()), "")
-            effective_args["content"] = content
-            effective_args["language"] = args.get("language", "")
-            effective_args["file_path"] = args.get("file_path", "")
-            if tool_name == "parse_file_ast":
-                effective_args["language"] = args.get("language", "")
-            elif tool_name == "summarize_code_file":
-                effective_args["max_lines"] = args.get("max_lines", 80)
-            tool_args = effective_args
-        else:
-            tool_args = args
-
-        def sync_call():
-            return SUGGESTION_TOOLS[_get_suggestion_tool_index(tool_name)].invoke(tool_args)
-
-        result = await asyncio.get_running_loop().run_in_executor(None, sync_call)
-
-        # 打印返回结果类型，方便调试
-        logger.debug(f"[ReActSuggestion] {tool_name} 返回类型: {type(result).__name__}, 内容预览: {str(result)[:200]}")
-
-        # 更新验证结果
-        if tool_name == "read_file_content":
-            path = tool_args.get("path", "unknown")
-            verification.verified_files[path] = str(result)
-
-        elif tool_name == "parse_file_ast":
-            try:
-                verification.ast_results[tool_args.get("file_path", "")] = json.loads(result)
-            except json.JSONDecodeError:
-                verification.ast_results[tool_args.get("file_path", "")] = {"error": "parse failed", "raw": str(result)}
-
-        elif tool_name == "detect_code_smells":
-            try:
-                raw_result = result
-                if isinstance(result, str):
-                    try:
-                        parsed = json.loads(result)
-                    except json.JSONDecodeError:
-                        parsed = []
-                else:
-                    parsed = result
-
-                # 处理嵌套结构 {"output": "[]"} 的情况
-                if isinstance(parsed, dict):
-                    if "output" in parsed:
-                        inner = parsed["output"]
-                        if isinstance(inner, str):
-                            try:
-                                parsed = json.loads(inner)
-                            except json.JSONDecodeError:
-                                parsed = []
-                        else:
-                            parsed = inner
-                    elif "result" in parsed:
-                        inner = parsed["result"]
-                        if isinstance(inner, str):
-                            try:
-                                parsed = json.loads(inner)
-                            except json.JSONDecodeError:
-                                parsed = []
-                        else:
-                            parsed = inner
-
-                # 确保结果是列表（空列表 [] 也是合法的有效结果）
-                if isinstance(parsed, list):
-                    key = tool_args.get("file_path", "") or (
-                        tool_args.get("content", "")[:50] if tool_args.get("content") else "unknown"
-                    )
-                    verification.smell_results[key] = parsed
-                elif isinstance(parsed, dict) and "smells" in parsed:
-                    # 兜底：嵌套在 smells 键下
-                    key = tool_args.get("file_path", "") or "unknown"
-                    verification.smell_results[key] = parsed["smells"]
-                else:
-                    # 其他情况（空字符串、None 等）存为空列表
-                    verification.smell_results[tool_args.get("file_path", "") or "unknown"] = []
-            except (json.JSONDecodeError, TypeError, KeyError) as e:
-                logger.warning(f"[ReActSuggestion] detect_code_smells 解析失败: {e}, 原始: {str(result)[:200]}")
-                verification.smell_results[tool_args.get("file_path", "") or "unknown"] = []
-
-        return str(result)[:_TOOL_RESULT_TRUNCATE]
+    # ── 上下文构建 ──────────────────────────────────────────────────────────
 
     def _build_context(
         self,
@@ -678,7 +545,6 @@ class ReActSuggestionAgent:
         """构建发送给 LLM 的分析上下文。"""
         parts = [f"# 仓库优化建议生成任务\n仓库: {repo_path}@{branch}\n"]
 
-        # 技术栈
         if tech_stack_result and isinstance(tech_stack_result, dict):
             parts.append("【技术栈】")
             raw_langs = tech_stack_result.get('languages', []) or []
@@ -687,7 +553,6 @@ class ReActSuggestionAgent:
             else:
                 languages = [str(l) for l in raw_langs]
             parts.append(f"  语言: {', '.join(languages) if languages else '未知'}")
-            # frameworks 可能是字符串列表（_rule_based_fallback）或对象列表（LLM 输出）
             raw_fw = tech_stack_result.get('frameworks', []) or []
             if raw_fw and isinstance(raw_fw[0], dict):
                 fw_names = [f.get('name', '') for f in raw_fw if f.get('name')]
@@ -706,7 +571,6 @@ class ReActSuggestionAgent:
             parts.append(f"  配置文件: {', '.join(str(c) for c in config_files) if config_files else '无'}")
             parts.append("")
 
-        # 代码质量
         if quality_result and isinstance(quality_result, dict):
             parts.append("【代码质量】")
             parts.append(f"  健康度: {quality_result.get('health_score', '?')}/100")
@@ -716,8 +580,6 @@ class ReActSuggestionAgent:
             dup = quality_result.get("duplication")
             if dup and isinstance(dup, dict):
                 parts.append(f"  重复率: {dup.get('score', 0)}% ({dup.get('duplication_level', '?')})")
-
-            # 输出 QualityExplorer 发现的问题热点
             hotspots = quality_result.get("hotspots", [])
             if hotspots and isinstance(hotspots, list):
                 parts.append("  代码热点问题:")
@@ -729,17 +591,13 @@ class ReActSuggestionAgent:
                         severity = h.get("severity", "?")
                         desc = h.get("description", "")[:60]
                         parts.append(f"    - [{severity}] {t} @ {f}:{line} - {desc}...")
-
-            # 输出主要关注点
             concerns = quality_result.get("main_concerns", [])
             if concerns and isinstance(concerns, list):
                 parts.append("  主要关注:")
                 for c in concerns[:5]:
                     parts.append(f"    - {c}")
-
             parts.append("")
 
-        # 依赖风险
         if dependency_result and isinstance(dependency_result, dict):
             parts.append("【依赖风险】")
             parts.append(f"  总依赖: {dependency_result.get('total', 0)}")
@@ -756,57 +614,44 @@ class ReActSuggestionAgent:
                     parts.append(f"    - {name}@{version} ({risk})")
             parts.append("")
 
-        # 代码结构
         if code_parser_result and isinstance(code_parser_result, dict):
             cr = code_parser_result
-            lang_stats = cr.get("language_stats", {})
             largest = cr.get("largest_files", []) or []
             parts.append("【代码结构】")
             parts.append(f"  总文件: {cr.get('total_files', 0)}")
             parts.append(f"  总函数: {cr.get('total_functions', 0)}")
             parts.append(f"  总类: {cr.get('total_classes', 0)}")
             if largest and isinstance(largest[0], dict):
-                first = largest[0]
-                if isinstance(first, dict):
-                    path_name = first.get('path', 'unknown').split('/')[-1]
-                    lines = first.get('lines', 0)
-                    parts.append(f"  最大文件: {path_name}({lines}行)")
+                parts.append("  最大文件（可能导致性能问题）:")
+                for f in largest[:5]:
+                    if isinstance(f, dict):
+                        path = f.get('path', 'unknown')
+                        lines = f.get('lines', 0)
+                        parts.append(f"    - {path} ({lines}行)")
             parts.append("")
 
-        # 已加载的文件列表（包含内容预览，供工具调用参考）
-        if file_contents and isinstance(file_contents, dict):
-            paths = list(file_contents.keys())
-            parts.append("【可用文件】（包含内容预览，可使用工具读取）")
-            for p in paths[:20]:
-                content_preview = file_contents[p][:200].replace("\n", " ").strip() if file_contents.get(p) else ""
-                parts.append(f"  - {p}: {content_preview}...")
-            if len(paths) > 20:
-                parts.append(f"  ... 等 {len(paths)} 个文件")
-            parts.append("")
+        # 注意：不再包含 file_contents 预览，避免传递大量源码消耗 token
+        # 所有问题已由 QualityAgent 定位，Suggestion Agent 基于结论生成建议即可
 
-        parts.append("请生成优化建议，对每个问题使用工具验证，并给出精确的 code_fix。")
+        parts.append("请基于以上分析结论生成优化建议，code_fix.file 必须来自上述文件列表。")
         return "\n".join(parts)
 
     def _build_rag_query(self, tech_stack_result, quality_result, code_parser_result=None) -> str:
-        """构建 RAG 检索 query（找相似项目的历史经验）。
-
-        检索策略：
-          1. 技术栈（核心维度）：框架 + 语言
-          2. 项目规模：大型/中型/小型
-          3. 问题特征：高重复率、安全问题等
-        """
+        """构建 RAG 检索 query。"""
         query_parts = []
 
-        # 1. 技术栈（核心维度）
         if tech_stack_result and isinstance(tech_stack_result, dict):
             raw_fw = tech_stack_result.get("frameworks", []) or []
             if raw_fw and isinstance(raw_fw[0], dict):
                 query_parts.extend([f.get('name', '') for f in raw_fw[:3] if f.get('name')])
             else:
                 query_parts.extend([str(f) for f in raw_fw[:3]])
-            query_parts.extend(tech_stack_result.get("languages", [])[:2] or [])
+            raw_lang = tech_stack_result.get("languages", []) or []
+            if raw_lang and isinstance(raw_lang[0], dict):
+                query_parts.extend([l.get('name', '') for l in raw_lang[:2] if l.get('name')])
+            else:
+                query_parts.extend([str(l) for l in raw_lang[:2]])
 
-        # 2. 项目规模（补充维度）
         if code_parser_result and isinstance(code_parser_result, dict):
             total_files = code_parser_result.get("total_files", 0)
             if total_files > 500:
@@ -814,12 +659,10 @@ class ReActSuggestionAgent:
             elif total_files > 100:
                 query_parts.append("中型项目")
 
-        # 3. 问题特征（补充维度）
         if quality_result and isinstance(quality_result, dict):
             dup = quality_result.get("duplication", {})
             if dup.get("score", 0) > 15:
                 query_parts.append("高重复率")
-
             hotspots = quality_result.get("hotspots", [])
             if hotspots:
                 issue_types = set(h.get("type", "") for h in hotspots[:5] if isinstance(h, dict))
@@ -831,13 +674,11 @@ class ReActSuggestionAgent:
         self, context: str, verification: VerificationResult,
         rag_results: list
     ) -> str:
-        """构建最终建议生成 prompt（基于验证结果）。"""
-        parts = [f"\n## 验证结果汇总\n"]
+        """构建最终建议生成 prompt。"""
+        parts = [f"\n## 工具调用结果汇总\n"]
 
-        if verification.verified_files:
-            parts.append(f"已验证的文件 ({len(verification.verified_files)} 个):")
-            for path in list(verification.verified_files.keys())[:10]:
-                parts.append(f"  - {path}")
+        if verification.tool_calls:
+            parts.append(f"共进行了 {len(verification.tool_calls)} 次工具调用")
             parts.append("")
 
         if verification.smell_results:
@@ -856,22 +697,22 @@ class ReActSuggestionAgent:
                 parts.append(f"  {r.get('content', '')[:100]}")
             parts.append("")
 
-        parts.append("请基于以上验证结果和历史经验，生成最终的优化建议 JSON 数组。")
-        parts.append("每条建议必须包含 verified=true，code_fix.original 必须是上述已验证文件中实际存在的代码。")
+        parts.append("请基于以上工具调用结果和历史经验，生成最终的优化建议 JSON 数组。")
+        parts.append("每条建议的 verified=true 基于已有的分析结论，code_fix.file 必须来自 hotspots 或 largest_files。")
         return "\n".join(parts)
+
+    # ── JSON 解析 ───────────────────────────────────────────────────────────
 
     def _parse_suggestions(self, content: str) -> list[dict]:
         """解析 LLM 返回的建议 JSON。"""
         text = content.strip()
 
-        # 尝试直接解析
         if text.startswith("["):
             try:
                 return self._normalize_suggestions(json.loads(text))
             except json.JSONDecodeError:
                 pass
 
-        # 从 markdown 中提取
         match = re.search(r"\[[\s\S]*\]", text)
         if match:
             try:
@@ -879,7 +720,6 @@ class ReActSuggestionAgent:
             except json.JSONDecodeError:
                 pass
 
-        # 尝试提取 ```json 包裹的代码块
         json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
         if json_match:
             try:
@@ -887,7 +727,6 @@ class ReActSuggestionAgent:
             except json.JSONDecodeError:
                 pass
 
-        # 逐个提取完整对象
         return self._parse_truncated_json(text)
 
     def _parse_truncated_json(self, text: str) -> list[dict]:
@@ -994,6 +833,8 @@ class ReActSuggestionAgent:
             return parts[0], parts[1]
         return "", ""
 
+    # ── 规则引擎兜底 ────────────────────────────────────────────────────────
+
     async def _rule_based_fallback(
         self,
         owner: str, repo: str, ref: str,
@@ -1047,18 +888,10 @@ class ReActSuggestionAgent:
         }
 
 
-def _get_suggestion_tool_index(tool_name: str) -> int:
-    for i, t in enumerate(SUGGESTION_TOOLS):
-        if t.name == tool_name:
-            return i
-    raise ValueError(f"未知工具: {tool_name}")
-
-
-# ─── 规则引擎：内联实现（不再依赖 legacy SuggestionAgent） ───────────────────
-
+# ─── 规则建议实现 ──────────────────────────────────────────────────────────
 
 def _quality_suggestions_impl(qr: dict, next_id) -> list[dict]:
-    """基于代码质量数据的规则建议（LLM 兜底，内联实现）。"""
+    """基于代码质量数据的规则建议（LLM 兜底）。"""
     suggestions: list[dict] = []
 
     health = qr.get("health_score", 100)
@@ -1131,7 +964,7 @@ def _quality_suggestions_impl(qr: dict, next_id) -> list[dict]:
             "id": next_id(),
             "type": "refactor",
             "title": f"存在 {len(long_funcs)} 个超长 Python 函数 (> 50 行)",
-            "description": f"建议按职责拆分为更小的函数，提高可读性和可维护性。",
+            "description": "建议按职责拆分为更小的函数，提高可读性和可维护性。",
             "priority": "low",
             "category": "readability",
             "source": "rule",
@@ -1141,7 +974,7 @@ def _quality_suggestions_impl(qr: dict, next_id) -> list[dict]:
 
 
 def _dependency_suggestions_impl(dr: dict, next_id) -> list[dict]:
-    """基于依赖风险数据的规则建议（LLM 兜底，内联实现）。"""
+    """基于依赖风险数据的规则建议（LLM 兜底）。"""
     suggestions: list[dict] = []
 
     high = dr.get("high", 0)

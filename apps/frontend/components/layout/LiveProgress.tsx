@@ -12,6 +12,8 @@ const AGENT_LABELS: Record<string, string> = {
   dependency: "依赖风险",
   architecture: "架构评估",
   optimization: "优化建议",
+  reflection: "反思审查",
+  react_suggestion: "优化建议",
   final_result: "汇总",
 };
 
@@ -24,6 +26,8 @@ const AGENT_COLORS: Record<string, string> = {
   dependency: "text-orange-400",
   architecture: "text-emerald-400",
   optimization: "text-rose-400",
+  reflection: "text-amber-400",
+  react_suggestion: "text-rose-400",
   final_result: "text-indigo-400",
 };
 

@@ -82,6 +82,12 @@ class TokenTrackingCallback:
     def on_chain_end(self, outputs: Any, **kwargs: Any) -> None:
         """LangChain chain 生命周期回调。"""
 
+    def on_chain_error(
+        self, error: Exception, **kwargs: Any
+    ) -> None:
+        """LangChain chain 错误回调，防止错误被静默吞噬。"""
+        _logger.warning(f"[TokenTracker][{self.agent_name}] Chain 执行错误: {error}")
+
     def on_llm_new_token(self, token: str | None = None, **kwargs: Any) -> None:
         """流式 token 回调（langchain-core >= 0.3 要求此方法存在）。"""
 
@@ -136,7 +142,7 @@ def _make_chatopenai(
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(
-        model=model or os.getenv("OPENAI_MODEL", "qwen-plus-2025-04-28"),
+        model=model or os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"),
         temperature=temperature,
         openai_api_key=api_key,
         base_url=base_url or os.getenv(
@@ -308,7 +314,7 @@ def get_llm_with_callback(callback_handler, model: str | None = None,
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model=model or os.getenv("OPENAI_MODEL", "qwen-plus-2025-04-28"),
+            model=model or os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"),
             temperature=temperature,
             openai_api_key=api_key,
             base_url=os.getenv(

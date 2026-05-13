@@ -391,7 +391,7 @@ def run(args):
         print("[ERROR] .env 中未找到 OPENAI_API_KEY")
         sys.exit(1)
 
-    model = os.getenv("OPENAI_MODEL", "qwen-plus-2025-04-28")
+    model = os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02")
     base_url = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 
     # 设置实验名

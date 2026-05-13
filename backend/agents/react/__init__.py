@@ -10,19 +10,25 @@ React Agents — 基于 ReAct 模式的智能 Agent。
   ├── base_agent.py        # 共享基类（复制自 ../base_agent.py）
   ├── repo_loader_agent.py # ReActRepoLoaderAgent — 智能仓库加载
   ├── suggestion_agent.py  # ReActSuggestionAgent — 可验证的优化建议
-  └── explorers.py         # ExplorerOrchestrator + 子 Explorer
+  ├── explorers.py         # ExplorerOrchestrator + 子 Explorer
+  └── reflection_agent.py  # ReActReflectionAgent — 反思审查 Agent
 """
 
 from .base_agent import BaseAgent, AgentEvent, _make_event
-from .repo_loader_agent import ReActRepoLoaderAgent
+from .repo_loader_agent import ReActRepoLoaderAgent, ExplorationResult, FileSummary
 from .suggestion_agent import ReActSuggestionAgent
 from .explorers import ExplorerOrchestrator
+from .reflection_agent import ReActReflectionAgent, quick_confidence_check
 
 __all__ = [
     "BaseAgent",
     "AgentEvent",
     "_make_event",
     "ReActRepoLoaderAgent",
+    "ExplorationResult",
+    "FileSummary",
     "ReActSuggestionAgent",
     "ExplorerOrchestrator",
+    "ReActReflectionAgent",
+    "quick_confidence_check",
 ]

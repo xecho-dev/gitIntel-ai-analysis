@@ -14,7 +14,7 @@ Function Calling 动态调用，而非硬编码的工具调用。
   from tools import (
       # GitHub 工具
       get_repo_info, get_file_tree, read_file_content,
-      get_file_blobs, search_code, get_commit_history,
+      get_file_blobs, search_code, batch_search_code, get_commit_history,
       get_pull_requests, get_default_branch,
       # 代码分析工具
       parse_file_ast, calculate_complexity, detect_code_smells,
@@ -35,6 +35,7 @@ from tools.github_tools import (
     read_file_content,
     get_file_blobs,
     search_code,
+    batch_search_code,
     get_commit_history,
     get_pull_requests,
     get_default_branch,
@@ -76,6 +77,7 @@ ALL_TOOLS = [
     read_file_content,
     get_file_blobs,
     search_code,
+    batch_search_code,
     get_commit_history,
     get_pull_requests,
     get_default_branch,
@@ -99,7 +101,7 @@ ALL_TOOLS = [
 __all__ = [
     # GitHub
     "get_repo_info", "get_file_tree", "read_file_content", "get_file_blobs",
-    "search_code", "get_commit_history", "get_pull_requests", "get_default_branch",
+    "search_code", "batch_search_code", "get_commit_history", "get_pull_requests", "get_default_branch",
     # Code
     "parse_file_ast", "calculate_complexity", "detect_code_smells",
     "summarize_code_file", "detect_imports", "detect_dependencies",

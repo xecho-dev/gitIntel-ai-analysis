@@ -130,6 +130,12 @@ export interface AnalysisResult {
     p0_count: number;
     p1_count: number;
     p2_count: number;
+    /** GitHub API 返回的代码语言（前3），直接透传到前端展示 */
+    languages?: string[];
+    /** ReAct Agent 实际加载的源码文件数（snake_case，透传自后端） */
+    total_files?: number;
+    /** ReAct Agent 实际加载的文件路径数（snake_case，透传自后端） */
+    loaded_count?: number;
   };
   codeParser?: {
     total_files: number;

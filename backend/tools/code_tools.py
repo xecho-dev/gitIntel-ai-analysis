@@ -17,6 +17,8 @@ from typing import Any
 
 from langchain_core.tools import tool
 
+from utils.tool_result import ToolSuccess, ToolError
+
 # ─── Lizard 导入（多语言复杂度分析库）────────────────────────────────────────
 try:
     import lizard
@@ -92,6 +94,7 @@ _FUNC_KEYWORDS: dict[str, list[str]] = {
     "python": ["def ", "async def "],
     "javascript": ["function ", "const ", "let ", "async "],
     "typescript": ["function ", "const ", "let ", "async "],
+    "vue": ["function ", "const ", "let ", "async "],
     "go": ["func "],
     "rust": ["fn "],
     "java": ["public ", "private ", "protected ", "void ", "int ", "String ", "boolean ", "@"],
@@ -111,6 +114,7 @@ _IMPORT_KEYWORDS: dict[str, list[str]] = {
     "python": ["import ", "from "],
     "javascript": ["import ", "require("],
     "typescript": ["import ", "require("],
+    "vue": ["import ", "require("],
     "go": ["import ("],
     "rust": ["use "],
     "java": ["import "],
@@ -145,6 +149,18 @@ _STDLIB: dict[str, set[str]] = {
         "fs", "path", "os", "http", "https", "url", "querystring", "crypto",
         "buffer", "stream", "events", "util", "assert", "constants", "child_process",
         "cluster", "dgram", "dns", "domain", "net", "readline", "console", "process",
+    },
+    "vue": {
+        # Vue 生态
+        "vue", "vue-router", "pinia", "vuex", "vue-i18n", "vue-meta",
+        # 状态管理
+        "zustand", "redux", "mobx", "recoil",
+        # UI 框架
+        "element-plus", "ant-design-vue", "vuetify", "quasar", "naive-ui",
+        # 工具库
+        "axios", "fetch", "lodash", "dayjs", "moment",
+        # 打包/开发
+        "vite", "webpack", "@vitejs", "vite-plugin",
     },
     "go": {
         "fmt", "os", "io", "bufio", "strings", "strconv", "bytes", "net/http",
@@ -257,7 +273,9 @@ def parse_file_ast(file_path: str, content: str, language: str) -> str:
           - lines:     总行数
     """
     result = _parse_ast_impl(file_path, content, language)
-    return json.dumps(result, ensure_ascii=False)
+    if "error" in result:
+        return ToolError(result["error"]).to_str()
+    return ToolSuccess(result).to_str()
 
 
 @tool
@@ -281,7 +299,7 @@ def calculate_complexity(content: str, language: str) -> str:
           }
     """
     result = _calc_complexity_impl(content, language)
-    return json.dumps(result, ensure_ascii=False)
+    return ToolSuccess(result).to_str()
 
 
 @tool
@@ -303,7 +321,7 @@ def detect_code_smells(content: str, language: str, file_path: str = "") -> str:
                  magic_number, long_import, unused_code 等
     """
     result = _detect_smells_impl(content, language, file_path)
-    return json.dumps(result, ensure_ascii=False)
+    return ToolSuccess(result).to_str()
 
 
 @tool
@@ -348,7 +366,7 @@ def detect_imports(content: str, language: str) -> str:
         例如 Python: {module: "os", names: ["path"], alias: None, line: 3}
     """
     result = _detect_imports_impl(content, language)
-    return json.dumps(result, ensure_ascii=False)
+    return ToolSuccess(result).to_str()
 
 
 @tool
@@ -371,7 +389,7 @@ def detect_dependencies(content: str, language: str) -> str:
           }
     """
     result = _detect_deps_impl(content, language)
-    return json.dumps(result, ensure_ascii=False)
+    return ToolSuccess(result).to_str()
 
 
 # ─── 内部实现 ────────────────────────────────────────────────────────────────
@@ -814,44 +832,104 @@ def _detect_smells_impl(content: str, language: str, file_path: str = "") -> lis
 
 
 def _summarize_impl(content: str, language: str) -> str:
-    """生成文件摘要（多语言支持）。"""
+    """生成文件摘要（多语言支持）- 返回精炼的结构化信息。
+
+    原则：只返回关键结构信息，不要返回完整代码。
+    目标：让 LLM 能理解代码结构，但不会因完整代码而爆炸 token。
+    """
     lines = content.split("\n")
     total_lines = len(lines)
-
-    parts = [f"[文件摘要 — 共 {total_lines} 行，语言: {language}]"]
 
     # 获取该语言的关键字
     func_keywords = _FUNC_KEYWORDS.get(language, ["def ", "function "])
     import_keywords = _IMPORT_KEYWORDS.get(language, ["import "])
+    stdlib = _get_stdlib(language)
 
-    # 提取关键结构
-    structure: list[str] = []
-    for i, line in enumerate(lines[:150]):
+    # 精炼后的结构（限制数量）
+    functions: list[str] = []
+    classes: list[str] = []
+    imports: list[str] = []
+    purpose = "unknown"
+
+    for i, line in enumerate(lines[:200]):  # 只扫描前 200 行
         stripped = line.strip()
         if not stripped or stripped.startswith(("#", "//", "/*", "*", "*/", "--")):
             continue
 
-        # 函数/类定义
-        if any(stripped.startswith(kw) for kw in func_keywords):
-            structure.append(f"{i+1:4d}| {stripped[:80]}")
+        # 类定义
+        if language == "python" and "class " in stripped and ":" in stripped:
+            if len(classes) < 10:
+                match = re.search(r"class\s+(\w+)", stripped)
+                if match:
+                    class_name = match.group(1)
+                    bases = ""
+                    if "(" in stripped:
+                        base_match = re.search(r"\(([^)]+)\)", stripped)
+                        if base_match:
+                            bases = f"({base_match.group(1)})"
+                    classes.append(f"class {class_name}{bases}")
 
-        # 导入语句（仅显示前几条）
-        elif any(stripped.startswith(kw) for kw in import_keywords) and len(structure) < 50:
-            structure.append(f"{i+1:4d}| {stripped[:80]}")
+        # 函数/方法定义
+        elif any(stripped.startswith(kw) for kw in func_keywords if kw.strip()):
+            if len(functions) < 15:
+                # 提取函数名和参数
+                match = re.search(r"(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)", stripped)
+                if not match:
+                    match = re.search(r"(?:function|const|let|func|fn)\s+(\w+)", stripped)
+                if match:
+                    func_name = match.group(1)
+                    params = ""
+                    if match.lastindex and match.lastindex >= 2:
+                        params = match.group(2)
+                    # 跳过私有/测试函数
+                    if not func_name.startswith("_") and "test" not in func_name.lower():
+                        sig = f"{func_name}({params[:40]})" if params else func_name
+                        functions.append(sig)
 
-        # 配置文件检测
-        elif any(kw in stripped for kw in ["=", ": ", "{", "}"]) and len(structure) < 60:
-            # 可能是配置文件
-            if 2 < len(stripped) < 100:
-                structure.append(f"{i+1:4d}| {stripped[:80]}")
+        # 导入语句（只保留外部依赖，过滤标准库）
+        elif any(stripped.startswith(kw) for kw in import_keywords) and len(imports) < 20:
+            if language == "python":
+                if stripped.startswith("from "):
+                    match = re.match(r"from\s+([\w.]+)\s+import", stripped)
+                    if match:
+                        module = match.group(1)
+                        if module not in stdlib:
+                            imports.append(module)
+                elif stripped.startswith("import "):
+                    match = re.match(r"import\s+([\w.]+)", stripped)
+                    if match:
+                        module = match.group(1).split(" as ")[0].strip()
+                        if module not in stdlib:
+                            imports.append(module)
 
-    if structure:
-        parts.append("\n[关键结构]")
-        parts.extend(structure[:30])
-    else:
-        parts.append("\n[无明显结构特征]")
+    # 推断文件用途
+    path_indicators = {
+        "test": ["test_", "_test.py", ".test.", "tests/"],
+        "config": ["config", "settings", ".env", "config.py", "settings.py"],
+        "model": ["model", "schema", "entity", "data/"],
+        "view": ["view", "page", "component", "template"],
+        "api": ["route", "api", "endpoint", "handler"],
+        "service": ["service", "business", "usecase"],
+        "util": ["util", "helper", "tool", "common"],
+        "main": ["main.py", "__main__", "__init__"],
+    }
+    for purpose_name, indicators in path_indicators.items():
+        if any(ind in content[:500].lower() for ind in indicators):
+            purpose = purpose_name
+            break
 
-    return "\n".join(parts)
+    # 组装精炼后的摘要
+    result = {
+        "language": language,
+        "lines": total_lines,
+        "purpose": purpose,
+        "classes": classes,
+        "functions": functions,
+        "imports": imports,
+        "external_deps": [i for i in imports if i not in stdlib][:10],
+    }
+
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 def _detect_imports_impl(content: str, language: str) -> list[dict]:

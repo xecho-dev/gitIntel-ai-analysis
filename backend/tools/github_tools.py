@@ -7,6 +7,7 @@ GitHub 工具集 — 封装所有 GitHub API 操作，供 Agent 通过 Function 
   - read_file_content:    读取单个文件内容
   - get_file_blobs:       批量读取多个文件（并发，更高效）
   - search_code:          在仓库中搜索代码（GitHub Code Search）
+  - batch_search_code:    批量搜索代码（并发执行多个搜索查询）
   - get_commit_history:   获取最近提交历史
   - get_pull_requests:    获取 PR 列表
 
@@ -30,6 +31,8 @@ from typing import Any
 
 from langchain_core.tools import tool
 
+from utils.tool_result import ToolSuccess, ToolError, ToolWarn
+
 logger = logging.getLogger("gitintel")
 
 GITHUB_API_BASE = "https://api.github.com"
@@ -40,6 +43,28 @@ GITHUB_API_BASE = "https://api.github.com"
 # 缓存容量限制，防止大仓库撑爆内存
 _MAX_CACHE_ENTRIES_PER_TOOL = int(os.getenv("GITINTEL_MAX_CACHE_ENTRIES", "200"))
 _MAX_CACHED_FILE_SIZE = int(os.getenv("GITINTEL_MAX_CACHED_FILE_KB", "512")) * 1024  # 超过此大小的文件内容不缓存
+
+
+def _safe_async_run(coro_fn):
+    """安全执行异步函数，自动适配是否有运行中的 event loop。
+
+    在已有 loop 的环境（如 ReAct Agent 的 run_in_executor 调用栈）中，
+    直接 await 协程而非启动新的 loop，避免 "asyncio.run() cannot be called
+    from a running event loop" 错误。
+    """
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro_fn())
+
+    # 已有 loop，在当前线程中创建 task
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        async def _wrapper():
+            return await coro_fn()
+        future = executor.submit(asyncio.run, _wrapper())
+        return future.result()
 
 
 class _ToolCache:
@@ -155,8 +180,7 @@ async def _get_branch_sha_impl(owner: str, repo: str, branch: str) -> str:
 
 def get_branch_sha(owner: str, repo: str, branch: str) -> str:
     """同步封装：获取指定分支的当前 SHA。"""
-    import asyncio
-    return asyncio.run(_get_branch_sha_impl(owner, repo, branch))
+    return _safe_async_run(lambda: _get_branch_sha_impl(owner, repo, branch))
 
 
 async def _get_repo_info_impl(owner: str, repo: str) -> dict[str, Any]:
@@ -167,6 +191,19 @@ async def _get_repo_info_impl(owner: str, repo: str) -> dict[str, Any]:
         )
         resp.raise_for_status()
         data = resp.json()
+
+        # languages 需要单独调用 /repos/{owner}/{repo}/languages 端点获取
+        languages: dict[str, int] = {}
+        try:
+            lang_resp = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{repo}/languages",
+                headers=_get_headers(),
+            )
+            if lang_resp.status_code == 200:
+                languages = lang_resp.json()
+        except Exception:
+            pass  # languages 获取失败不影响主流程
+
         return {
             "owner": owner,
             "repo": repo,
@@ -176,6 +213,7 @@ async def _get_repo_info_impl(owner: str, repo: str) -> dict[str, Any]:
             "forks": data.get("forks_count", 0),
             "watchers": data.get("watchers_count", 0),
             "language": data.get("language", ""),
+            "languages": languages,  # dict: {"TypeScript": 12345, "Python": 6789}
             "topics": data.get("topics", []),
             "license": (data.get("license") or {}).get("name", ""),
             "created_at": data.get("created_at", ""),
@@ -286,7 +324,17 @@ async def _search_code_impl(
                 raise  # 第三次失败才上抛
 
             if resp.status_code == 200:
-                return resp.json().get("items", [])[:20]
+                items = resp.json().get("items", [])[:20]
+                # 只保留分析所需的字段，去掉巨大的 repository 对象和 text_matches
+                return [
+                    {
+                        "name": it.get("name", ""),
+                        "path": it.get("path", ""),
+                        "sha": (it.get("sha") or "")[:12],
+                        "url": it.get("html_url", ""),
+                    }
+                    for it in items
+                ]
 
             if resp.status_code == 404:
                 # 仓库太小或没有索引，不可搜索
@@ -320,6 +368,50 @@ async def _search_code_impl(
             return []
 
         return []
+
+
+async def _batch_search_code_impl(
+    owner: str, repo: str, queries: list[dict]
+) -> list[dict]:
+    """并发执行多个搜索查询。
+
+    每个元素格式：{"query": str, "language": str, "index": int}
+    返回：同顺序的结果列表，每个元素包含 index、results、query、language。
+    """
+    semaphore = asyncio.Semaphore(5)
+
+    async def fetch_one(item: dict) -> dict:
+        async with semaphore:
+            query = item.get("query", "")
+            language = item.get("language", "")
+            index = item.get("index", 0)
+            try:
+                results = await _search_code_impl(owner, repo, query, language)
+            except Exception as e:
+                logger.warning(
+                    f"[github_tools] batch_search_code query='{query}' failed: {e}"
+                )
+                results = []
+            return {
+                "index": index,
+                "query": query,
+                "language": language,
+                "results": results,
+            }
+
+    tasks = [fetch_one(item) for item in queries[:20]]
+    gathered = await asyncio.gather(*tasks, return_exceptions=True)
+
+    results: list[dict] = []
+    for item in gathered:
+        if isinstance(item, BaseException):
+            logger.warning(f"[github_tools] batch_search_code task failed: {item}")
+            results.append({"index": -1, "query": "", "language": "", "results": []})
+        else:
+            results.append(item)
+
+    results.sort(key=lambda x: x.get("index", 0))
+    return results
 
 
 async def _get_commit_history_impl(
@@ -403,13 +495,16 @@ def get_repo_info(owner: str, repo: str) -> str:
     Returns:
         JSON 格式的仓库基本信息字符串
     """
-    import asyncio
 
     def _uncached():
-        return asyncio.run(_get_repo_info_impl(owner, repo))
+        return _safe_async_run(lambda: _get_repo_info_impl(owner, repo))
 
-    data = _cached_call("get_repo_info", owner, repo, "", _uncached)
-    result = json.dumps(data, ensure_ascii=False)
+    try:
+        data = _cached_call("get_repo_info", owner, repo, "", _uncached)
+        result = ToolSuccess(data).to_str()
+    except Exception as e:
+        result = ToolError(f"获取仓库信息失败: {e}").to_str()
+
     logger.info(f"[github_tools] get_repo_info({owner}/{repo}) -> {len(result)} chars")
     return result
 
@@ -429,44 +524,59 @@ def get_file_tree(owner: str, repo: str, ref: str) -> str:
     Returns:
         JSON 数组字符串，每个元素包含 path, type (blob/tree), size, sha
     """
-    import asyncio
 
     def _uncached():
-        return asyncio.run(_get_file_tree_impl(owner, repo, ref))
+        return _safe_async_run(lambda: _get_file_tree_impl(owner, repo, ref))
 
-    data = _cached_call("get_file_tree", owner, repo, ref, _uncached)
-    result = json.dumps(data, ensure_ascii=False)
+    try:
+        data = _cached_call("get_file_tree", owner, repo, ref, _uncached)
+        result = ToolSuccess(data).to_str()
+    except Exception as e:
+        result = ToolError(f"获取文件树失败: {e}").to_str()
+
     tree_len = len(data) if isinstance(data, list) else 0
     logger.info(f"[github_tools] get_file_tree({owner}/{repo}@{ref}) -> {tree_len} items")
     return result
 
 
 @tool
-def read_file_content(owner: str, repo: str, path: str, ref: str) -> str:
+def read_file_content(path: str, owner: str = "", repo: str = "", ref: str = "") -> str:
     """读取 GitHub 仓库中单个文件的完整内容。
+
+    ⚠️ 【重要】owner/repo/ref 由系统自动注入，调用时【不要】传递这些参数！
+    如果你传递了 owner/repo/ref，它们会被系统忽略，使用当前仓库的上下文。
 
     用途：Agent 需要查看某个文件的实际代码内容时调用。
     适用于读取配置文件、入口文件、核心业务逻辑文件等。
 
     Args:
-        owner: 仓库所有者
-        repo:  仓库名
         path:  文件在仓库中的路径（如 "src/app.py"、"package.json"）
-        ref:   分支名或 SHA
+        owner: 【系统自动注入，不要传递】仓库所有者
+        repo:  【系统自动注入，不要传递】仓库名
+        ref:   【系统自动注入，不要传递】分支名或 SHA
 
     Returns:
         文件内容字符串。如果文件过大（> 500KB），自动截断到前 500KB。
+
+    正确调用示例：
+        ✅ read_file_content(path="src/index.js")
+        ✅ read_file_content(path="package.json")
+        ❌ read_file_content(owner="facebook", repo="react", path="README.md")  ← 不要这样！
     """
-    import asyncio
 
     def _uncached():
-        return asyncio.run(_read_file_content_impl(owner, repo, path, ref))
+        return _safe_async_run(lambda: _read_file_content_impl(owner, repo, path, ref))
 
-    content = _cached_call("read_file_content", owner, repo, ref, _uncached, path=path)
-    if len(content) > 512 * 1024:
-        content = content[:512 * 1024] + f"\n... [文件过大，已截断到 512KB，原始大小 {len(content)} 字节]"
-    logger.debug(f"[github_tools] read_file_content({owner}/{repo}/{path}@{ref}) -> {len(content)} chars")
-    return content
+    try:
+        content = _cached_call("read_file_content", owner, repo, ref, _uncached, path=path)
+        if len(content) > 512 * 1024:
+            content = content[:512 * 1024] + f"\n... [文件过大，已截断到 512KB，原始大小 {len(content)} 字节]"
+        result = ToolSuccess(content).to_str()
+    except Exception as e:
+        result = ToolError(f"读取文件失败: {e}").to_str()
+
+    logger.debug(f"[github_tools] read_file_content({owner}/{repo}/{path}@{ref}) -> {len(result)} chars")
+    return result
 
 
 @tool
@@ -502,7 +612,7 @@ def get_file_blobs(owner: str, repo: str, paths: list[str], ref: str) -> str:
         async def _fetch_missing():
             return await _get_file_blobs_impl(owner, repo, paths_to_fetch, ref)
 
-        blobs = asyncio.run(_fetch_missing())
+        blobs = _safe_async_run(_fetch_missing)
         for k, v in blobs.items():
             _tool_cache.set("read_file_content", owner, repo, ref, v, path=k)
             result_map[k] = v
@@ -512,35 +622,103 @@ def get_file_blobs(owner: str, repo: str, paths: list[str], ref: str) -> str:
         if len(v) > 200 * 1024:
             result_map[k] = v[:200 * 1024] + f"\n... [已截断到 200KB]"
 
-    result = json.dumps(result_map, ensure_ascii=False)
+    result = ToolSuccess(result_map).to_str()
     logger.info(f"[github_tools] get_file_blobs({owner}/{repo}) -> {len(result_map)} files ({len(paths_to_fetch)} fresh)")
     return result
 
 
 @tool
-def search_code(owner: str, repo: str, query: str, language: str = "") -> str:
-    """在 GitHub 仓库中搜索代码（使用 GitHub Code Search API）。
+def search_code(query: str, language: str = "", owner: str = "", repo: str = "") -> str:
+    """在当前仓库中搜索代码（使用 GitHub Code Search API）。
 
-    用途：Agent 可以主动搜索关键词，快速定位与特定概念相关的代码文件。
-    例如：搜索 "authentication" 找到认证相关文件，搜索 "api" 找到 API 相关文件。
+    ⚠️ 【重要】owner 和 repo 由系统自动注入，调用时【不要】传递这两个参数！
+    如果你传递了 owner/repo，它们会被系统忽略，使用当前仓库的上下文。
+
+    用途：快速定位与特定概念相关的代码文件。
+    例如：搜索 "useEffect" 找到 React Hook 使用位置。
 
     Args:
-        owner:    仓库所有者
-        repo:     仓库名
-        query:    搜索关键词（支持简单正则，如 "class User"、"def auth"）
-        language: 可选，限定编程语言（如 "python", "typescript", "go"）
+        query:    搜索关键词（支持简单正则，如 "class User"、"def auth"、"useState"）
+        language: 可选，限定编程语言（如 "python", "typescript", "javascript"）
+        owner:    【系统自动注入，不要传递】仓库所有者
+        repo:     【系统自动注入，不要传递】仓库名
 
     Returns:
-        JSON 数组字符串，每个元素包含 path, sha, text_matches 等信息，最多 20 条。
+        JSON 数组字符串，每个元素包含 path, sha, url 等基本信息，最多 20 条。
+
+    正确调用示例：
+        ✅ search_code(query="useEffect", language="javascript")
+        ✅ search_code(query="def authenticate", language="python")
+        ❌ search_code(owner="facebook", repo="react", query="useEffect")  ← 不要这样！
+
+    错误处理：
+        - query 为空：返回错误提示，请提供有效的搜索关键词
+        - 搜索结果为空：可能关键词不匹配，尝试更通用的词
     """
     import asyncio
 
-    async def _run():
-        return json.dumps(await _search_code_impl(owner, repo, query, language), ensure_ascii=False)
+    try:
+        async def _run():
+            return await _search_code_impl(owner, repo, query, language)
 
-    result = asyncio.run(_run())
-    items = json.loads(result)
+        items = _safe_async_run(_run)
+        result = ToolSuccess(items).to_str()
+    except Exception as e:
+        result = ToolError(f"搜索代码失败: {e}").to_str()
+        items = []
+
     logger.info(f"[github_tools] search_code({owner}/{repo}, '{query}') -> {len(items)} results")
+    return result
+
+
+@tool
+def batch_search_code(queries: list[dict], owner: str = "", repo: str = "") -> str:
+    """批量搜索代码（并发执行多个搜索查询，更高效）。
+
+    ⚠️ 【重要】owner 和 repo 由系统自动注入，调用时【不要】传递这两个参数！
+
+    用途：当需要同时搜索多个关键词时使用，比逐个调用 search_code 效率更高。
+    例如：同时搜索多个技术栈关键词，快速定位相关代码文件。
+
+    Args:
+        queries:  查询列表，每个元素为 dict，包含：
+            - query (str, 必填): 搜索关键词
+            - language (str, 可选): 限定编程语言，如 "python", "typescript"
+        owner:   【系统自动注入，不要传递】仓库所有者
+        repo:    【系统自动注入，不要传递】仓库名
+
+    Returns:
+        JSON 数组字符串，每个元素对应一个查询，包含：
+        - index: 查询在原列表中的顺序
+        - query: 搜索关键词
+        - language: 限定语言（无则为空字符串）
+        - results: 该查询的结果列表（最多 20 条，每条含 path, sha, url）
+
+    正确调用示例：
+        ✅ batch_search_code(queries=[{"query": "useEffect", "language": "javascript"}, {"query": "useState", "language": "javascript"}])
+        ✅ batch_search_code(queries=[{"query": "def auth"}, {"query": "class User"}, {"query": "async def"}])
+        ❌ batch_search_code(queries=[...], owner="facebook", repo="react")  ← 不要这样！
+
+    限制：
+        - queries 最多 20 个查询
+        - 每个查询内部逻辑与 search_code 一致（256 字符限制，无通配符等）
+        - 并发上限为 5，超过 5 个的查询会排队
+    """
+    try:
+        indexed = [
+            {"query": q.get("query", ""), "language": q.get("language", ""), "index": i}
+            for i, q in enumerate(queries[:20])
+        ]
+
+        async def _run():
+            return await _batch_search_code_impl(owner, repo, indexed)
+
+        data = _safe_async_run(_run)
+        result = ToolSuccess(data).to_str()
+    except Exception as e:
+        result = ToolError(f"批量搜索失败: {e}").to_str()
+
+    logger.info(f"[github_tools] batch_search_code({owner}/{repo}) -> {len(queries[:20])} queries")
     return result
 
 
@@ -560,15 +738,15 @@ def get_commit_history(owner: str, repo: str, ref: str = "main", limit: int = 30
     Returns:
         JSON 数组字符串，每条包含 sha, message, author, date
     """
-    import asyncio
+    try:
+        async def _run():
+            return await _get_commit_history_impl(owner, repo, ref, min(limit, 100))
 
-    async def _run():
-        return json.dumps(
-            await _get_commit_history_impl(owner, repo, ref, min(limit, 100)),
-            ensure_ascii=False,
-        )
+        data = _safe_async_run(_run)
+        result = ToolSuccess(data).to_str()
+    except Exception as e:
+        result = ToolError(f"获取提交历史失败: {e}").to_str()
 
-    result = asyncio.run(_run())
     return result
 
 
@@ -588,15 +766,15 @@ def get_pull_requests(owner: str, repo: str, state: str = "open", limit: int = 2
     Returns:
         JSON 数组字符串，每条包含 number, title, state, user, labels 等
     """
-    import asyncio
+    try:
+        async def _run():
+            return await _get_pull_requests_impl(owner, repo, state, min(limit, 100))
 
-    async def _run():
-        return json.dumps(
-            await _get_pull_requests_impl(owner, repo, state, min(limit, 100)),
-            ensure_ascii=False,
-        )
+        data = _safe_async_run(_run)
+        result = ToolSuccess(data).to_str()
+    except Exception as e:
+        result = ToolError(f"获取 PR 列表失败: {e}").to_str()
 
-    result = asyncio.run(_run())
     return result
 
 
@@ -614,11 +792,14 @@ def get_default_branch(owner: str, repo: str) -> str:
     Returns:
         默认分支名称字符串（如 "main"）
     """
-    import asyncio
-
     def _uncached():
-        return asyncio.run(_get_default_branch_impl(owner, repo))
+        return _safe_async_run(lambda: _get_default_branch_impl(owner, repo))
 
-    result = _cached_call("get_default_branch", owner, repo, "", _uncached)
+    try:
+        result = _cached_call("get_default_branch", owner, repo, "", _uncached)
+        result = ToolSuccess(result).to_str()
+    except Exception as e:
+        result = ToolError(f"获取默认分支失败: {e}").to_str()
+
     logger.debug(f"[github_tools] get_default_branch({owner}/{repo}) -> {result}")
     return result

@@ -1,9 +1,21 @@
 """
-GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出（ReAct 纯模式）。
+GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出（ReAct 纯模式 + 反思机制）。
 
-整体 Pipeline（线性，ReAct 自主探索）：
+整体 Pipeline（带反思）：
 
-    react_loader ──► explorer ──► architecture ──► react_suggestion ──► END
+    react_loader ──► explorer ──► architecture ──► react_suggestion
+                                                                 │
+                                                           ┌──────┴──────┐
+                                                           ▼             ▼
+                                                        [反思]        [反思]
+                                                           │             │
+                                                      needs_retry   needs_retry
+                                                           │             │
+                                                           ▼             ▼
+                                                     [重试?]        [重试?]
+                                                           │
+                                                           ▼
+                                                          END
 
 流程说明：
   1. react_loader: ReActRepoLoaderAgent 通过 Thought→Action→Observation 循环，
@@ -12,6 +24,13 @@ GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出（ReAct 纯�
      ArchitectureExplorer 自主探索
   3. architecture: 基于 explorer 结果 + code_parser 做架构评估
   4. react_suggestion: ReActSuggestionAgent 通过工具验证每个问题，生成精确可执行的 code_fix
+  5. reflection: ReActReflectionAgent 审视分析结果，决定是否需要重试
+
+反思机制：
+  - 每个关键节点后可选择性触发反思
+  - 反思 Agent 通过工具验证分析结论的准确性
+  - 支持置信度评估和自动重试决策
+  - 反思历史记录在 state 中，可追溯
 
 工作模式：
   - stream_analysis_sse() — SSE 流式接口（主要入口），实时推送进度
@@ -24,6 +43,7 @@ GitIntel 分析 Pipeline — LangGraph 工作流 + SSE 流式输出（ReAct 纯�
 """
 
 import asyncio
+import json
 import logging
 import time
 from typing import Any, Generator
@@ -36,6 +56,7 @@ from langgraph.graph import StateGraph, END
 from agents import (
     ReActRepoLoaderAgent,
     ReActSuggestionAgent,
+    ReActReflectionAgent,
     ExplorerOrchestrator,
 )
 from .state import SharedState
@@ -141,6 +162,9 @@ def node_react_loader(state: SharedState) -> dict:
                     "loaded_files": result.loaded_files,
                     "loaded_paths": result.loaded_paths,
                     "repo_sha": getattr(result, "sha", branch),
+                    "file_summaries": result.file_summaries,  # 提炼后的文件摘要
+                    "languages": result.languages,  # GitHub API 代码语言
+                    "all_tree_paths": result.all_tree_paths,  # 原始文件树所有文件路径
                 })
 
             loop.run_until_complete(consume())
@@ -166,10 +190,14 @@ def node_react_loader(state: SharedState) -> dict:
     loaded_files: dict[str, str] = {}
     loaded_paths: list[str] = []
     repo_sha = branch
+    file_summaries: dict = {}
+    all_tree_paths: list = []
     if result_ref:
         loaded_files = result_ref[0].get("loaded_files", {})
         loaded_paths = result_ref[0].get("loaded_paths", [])
         repo_sha = result_ref[0].get("repo_sha", branch)
+        file_summaries = result_ref[0].get("file_summaries", {})
+        all_tree_paths = result_ref[0].get("all_tree_paths", [])
 
     all_events = react_events + all_events
 
@@ -182,20 +210,30 @@ def node_react_loader(state: SharedState) -> dict:
             iterations = data.get("total_iterations", 0)
 
     if loaded_files:
+        # 从 result_ref 获取 file_summaries（由 ReActRepoLoaderAgent 提炼）
+        file_summaries = {}
+        if result_ref and result_ref[0].get("file_summaries"):
+            file_summaries = result_ref[0]["file_summaries"]
+
         logger.info(
             f"[node_react_loader] ReAct 完成: {len(loaded_files)} 个文件, "
-            f"{len(loaded_paths)} 条路径, {iterations} 轮"
+            f"{len(loaded_paths)} 条路径, {iterations} 轮, "
+            f"提炼摘要 {len(file_summaries)} 个"
         )
         return {
             "loaded_files": loaded_files,
             "loaded_paths": loaded_paths,
             "repo_sha": repo_sha,
             "file_contents": loaded_files,
+            "file_summaries": file_summaries,  # 提炼后的摘要，供 Explorer 使用
+            "all_tree_paths": all_tree_paths,  # 原始文件树所有文件路径
+            "total_tree_files": len(all_tree_paths),  # 原始文件总数（用于前端展示）
             "errors": exc_info,
             "react_events": all_events,
             "react_summary": summary,
             "react_iterations": iterations,
             "finished_agents": ["react_loader"],
+            "repo_languages": result_ref[0].get("languages", []) if result_ref else [],
         }
     else:
         logger.warning(f"[node_react_loader] ReAct 无结果")
@@ -206,6 +244,7 @@ def node_react_loader(state: SharedState) -> dict:
             "react_iterations": iterations,
             "finished_agents": [],
             "repo_sha": repo_sha,
+            "repo_languages": [],
         }
 
 
@@ -234,8 +273,10 @@ def node_explorer(state: SharedState) -> dict:
     owner, repo = parsed
     branch = state.get("branch", "main")
     file_contents = state.get("loaded_files") or {}
+    file_summaries = state.get("file_summaries") or {}
+    repo_languages: list = state.get("repo_languages") or []
 
-    logger.info(f"[node_explorer] 入参: file_contents={len(file_contents) if file_contents else 0} 个文件")
+    logger.info(f"[node_explorer] 入参: file_contents={len(file_contents) if file_contents else 0} 个文件, file_summaries={len(file_summaries)} 个, languages={repo_languages}")
 
     q: Any = _q_module.Queue()
     exc_info: list = []
@@ -300,6 +341,8 @@ def node_explorer(state: SharedState) -> dict:
                 results = await ExplorerOrchestrator().explore_all(
                     owner, repo, branch,
                     file_contents=file_contents or None,
+                    file_summaries=file_summaries or None,
+                    languages=repo_languages,
                 )
 
                 explorer_events.append({
@@ -540,8 +583,9 @@ def node_react_suggestion(state: SharedState) -> dict:
             "repo": repo,
             "branch": branch,
             "repo_sha": repo_sha,
-            "total_files": len(state.get("loaded_files", {})),
+            "total_files": state.get("total_tree_files", len(state.get("loaded_files", {}))),
             "loaded_count": len(state.get("loaded_paths", [])),
+            "languages": state.get("repo_languages", []),  # GitHub API 代码语言
         },
         "code_parser": state.get("code_parser_result"),
         "tech_stack": state.get("tech_stack_result"),
@@ -629,34 +673,388 @@ def _generate_fallback_suggestions(state: SharedState) -> dict:
 # ─── 构建 LangGraph ─────────────────────────────────────────────────────
 
 
+def node_reflector(state: SharedState) -> dict:
+    """节点 5：ReAct 模式的反思审查。
+
+    ReActReflectionAgent 审视分析结果，决定是否需要重试：
+      1. 快速评估整体置信度
+      2. 如果置信度过低，执行深度反思
+      3. 记录反思历史和决策理由
+      4. 决定重试策略或继续
+
+    反思策略：
+      - explorer 置信度 < 0.5 → 重试 explorer
+      - suggestion 置信度 < 0.5 → 重试 suggestion
+      - 置信度 >= 0.7 → 继续（质量良好）
+      - 反思轮次 >= 2 → 强制继续（防止无限循环）
+    """
+    import queue as _q_module
+    import threading
+
+    # 检查反思是否启用
+    reflection_enabled = state.get("reflection_enabled", True)
+    if not reflection_enabled:
+        logger.info("[node_reflector] 反思已禁用，跳过")
+        return {
+            "reflection_round": 0,
+            "needs_reflection": False,
+            "reflection_results": {},
+        }
+
+    # 获取分析结果
+    explorer_result = state.get("explorer_result") or {}
+    suggestion_result = state.get("suggestion_result") or {}
+    architecture_result = state.get("architecture_result") or {}
+    loaded_paths = state.get("loaded_paths", [])
+    loaded_files = state.get("loaded_files", {})
+
+    # 解析 owner/repo 用于工具上下文
+    repo_url = state.get("repo_url", "")
+    parsed = parse_repo_url(repo_url)
+    owner, repo = parsed if parsed else ("", "")
+    branch = state.get("branch", "main")
+
+    q: Any = _q_module.Queue()
+    exc_info: list = []
+    reflection_events: list[dict] = []
+
+    def run_reflection():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def consume():
+                from agents.react.reflection_agent import quick_confidence_check
+
+                # ── Step 1: 快速评估 ───────────────────────────────────
+                reflection_events.append({
+                    "type": "status",
+                    "agent": "reflection",
+                    "message": "正在进行快速置信度评估...",
+                    "percent": 10,
+                    "data": None,
+                })
+
+                # 评估各节点
+                explorer_check = quick_confidence_check("explorer", explorer_result)
+                suggestion_check = quick_confidence_check("suggestion", suggestion_result)
+                architecture_check = quick_confidence_check("architecture", architecture_result)
+
+                # 判断是否需要深度反思
+                needs_deep_reflection = (
+                    explorer_check.get("needs_deep_reflection", False) or
+                    suggestion_check.get("needs_deep_reflection", False) or
+                    architecture_check.get("needs_deep_reflection", False)
+                )
+
+                # ── Step 2: 执行深度反思（如需要）─────────────────────
+                reflection_results = {}
+                all_confidences: list[float] = []  # 统一收集所有置信度
+                reflection_round = state.get("reflection_round", 0) + 1
+
+                if needs_deep_reflection and reflection_round <= 2:
+                    reflection_events.append({
+                        "type": "status",
+                        "agent": "reflection",
+                        "message": "执行深度反思审查...",
+                        "percent": 30,
+                        "data": {
+                            "explorer_needs_reflection": explorer_check.get("needs_deep_reflection", False),
+                            "suggestion_needs_reflection": suggestion_check.get("needs_deep_reflection", False),
+                        },
+                    })
+
+                    # 构建反思上下文（仓库信息和文件树直接注入，无需工具调用）
+                    repo_info = state.get("repo_info") or {}
+
+                    context = {
+                        "loaded_paths": loaded_paths,
+                        "file_contents": loaded_files,
+                        "file_tree": [{"path": p, "type": "blob"} for p in loaded_paths],
+                        "repo_info": repo_info,
+                        "tech_stack_result": state.get("tech_stack_result"),
+                        "quality_result": state.get("quality_result"),
+                    }
+
+                    # 反思各节点
+                    agent = ReActReflectionAgent()
+
+                    if explorer_check.get("needs_deep_reflection", False):
+                        explorer_reflection = None
+                        async for ev in agent.reflect(
+                            analysis_type="explorer",
+                            analysis_result=explorer_result,
+                            context=context,
+                            owner=owner,
+                            repo=repo,
+                            ref=branch,
+                        ):
+                            if ev.get("type") == "result":
+                                explorer_reflection = ev.get("data", {})
+                            elif ev.get("type") in ("status", "progress"):
+                                reflection_events.append(ev)
+
+                        if explorer_reflection:
+                            reflection_results["explorer"] = explorer_reflection
+                            conf = explorer_reflection.get("overall_confidence", 0.5)
+                            all_confidences.append(conf)
+
+                    if suggestion_check.get("needs_deep_reflection", False):
+                        suggestion_reflection = None
+                        async for ev in agent.reflect(
+                            analysis_type="suggestion",
+                            analysis_result=suggestion_result,
+                            context=context,
+                            owner=owner,
+                            repo=repo,
+                            ref=branch,
+                        ):
+                            if ev.get("type") == "result":
+                                suggestion_reflection = ev.get("data", {})
+                            elif ev.get("type") in ("status", "progress"):
+                                reflection_events.append(ev)
+
+                        if suggestion_reflection:
+                            reflection_results["suggestion"] = suggestion_reflection
+                            conf = suggestion_reflection.get("overall_confidence", 0.5)
+                            all_confidences.append(conf)
+
+                    # 深度反思后，即使没有触发任何具体反思，也需要确保有置信度
+                    if not all_confidences:
+                        all_confidences.append(0.7)
+
+                else:
+                    # 不需要深度反思，使用快速评估结果
+                    if explorer_check:
+                        quick_score = explorer_check.get("quick_score", 0.7)
+                        reflection_results["explorer"] = {
+                            "analysis_type": "explorer",
+                            "overall_confidence": quick_score,
+                            "confidence_level": _score_to_level(quick_score),
+                            "needs_retry": explorer_check.get("needs_deep_reflection", False),
+                            "quick_check": True,
+                        }
+                        all_confidences.append(quick_score)
+
+                    if suggestion_check:
+                        quick_score = suggestion_check.get("quick_score", 0.7)
+                        reflection_results["suggestion"] = {
+                            "analysis_type": "suggestion",
+                            "overall_confidence": quick_score,
+                            "confidence_level": _score_to_level(quick_score),
+                            "needs_retry": suggestion_check.get("needs_deep_reflection", False),
+                            "quick_check": True,
+                        }
+                        all_confidences.append(quick_score)
+
+                    if architecture_check:
+                        quick_score = architecture_check.get("quick_score", 0.7)
+                        reflection_results["architecture"] = {
+                            "analysis_type": "architecture",
+                            "overall_confidence": quick_score,
+                            "confidence_level": _score_to_level(quick_score),
+                            "needs_retry": architecture_check.get("needs_deep_reflection", False),
+                            "quick_check": True,
+                        }
+                        all_confidences.append(quick_score)
+
+                # 计算整体置信度（确保不为空列表）
+                overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.7
+
+                # 记录反思历史
+                reflection_history = state.get("reflection_history", [])
+                reflection_history.append({
+                    "round": reflection_round,
+                    "timestamp": time.time(),
+                    "confidence": overall_confidence,
+                    "needs_deep_reflection": needs_deep_reflection,
+                    "results_summary": {
+                        k: v.get("overall_confidence", 0) for k, v in reflection_results.items()
+                    },
+                })
+
+                # 判断是否需要重试（只有置信度低于 0.5 时才重试）
+                needs_retry = overall_confidence < 0.5 or any(
+                    r.get("needs_retry", False) for r in reflection_results.values()
+                )
+
+                # 如果已达到最大反思轮次，不再重试
+                if reflection_round >= 2:
+                    needs_retry = False
+
+                reflection_events.append({
+                    "type": "result",
+                    "agent": "reflection",
+                    "message": f"反思完成: 置信度 {overall_confidence * 100:.0f}%, 需要重试: {needs_retry}",
+                    "percent": 100,
+                    "data": {
+                        "reflection_round": reflection_round,
+                        "overall_confidence": overall_confidence,
+                        "needs_retry": needs_retry,
+                        "reflection_results": reflection_results,
+                    },
+                })
+
+                # 保存结果供后续条件边使用
+                q.put({
+                    "reflection_results": reflection_results,
+                    "reflection_round": reflection_round,
+                    "reflection_history": reflection_history,
+                    "overall_confidence": overall_confidence,
+                    "needs_retry": needs_retry,
+                    "needs_reflection": needs_retry,  # 与 _should_retry 保持一致
+                    "last_reflection_confidence": overall_confidence,
+                })
+
+            loop.run_until_complete(consume())
+            loop.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"[node_reflector] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            exc_info.append(e)
+        finally:
+            q.put(None)
+
+    t = threading.Thread(target=run_reflection, daemon=True)
+    t.start()
+    t.join()
+
+    # 收集结果
+    all_events: list[dict] = []
+    while True:
+        item = q.get()
+        if item is None:
+            break
+        all_events.append(item)
+
+    result: dict = {}
+    for item in all_events:
+        if isinstance(item, dict) and "overall_confidence" in item:
+            result = item
+            break
+
+    if not result:
+        result = {
+            "reflection_results": {},
+            "reflection_round": 0,
+            "reflection_history": [],
+            "overall_confidence": 0.7,
+            "needs_retry": False,
+            "last_reflection_confidence": 0.7,
+        }
+
+    result["reflection_events"] = reflection_events + all_events
+    result["errors"] = exc_info
+
+    return result
+
+
+def _score_to_level(score: float) -> str:
+    """将置信度分数转换为等级。"""
+    if score >= 0.8:
+        return "high"
+    elif score >= 0.5:
+        return "medium"
+    else:
+        return "low"
+
+
+def _should_retry(state: SharedState) -> str:
+    """条件边：根据反思结果决定下一步。
+
+    策略：
+      - 反思轮次 >= 2 → 不再重试，继续
+      - explorer 置信度 < 0.5 → 重试 explorer
+      - suggestion 置信度 < 0.5 → 重试 suggestion
+      - 其他情况 → 继续
+    """
+    reflection_round = state.get("reflection_round", 0)
+    reflection_results = state.get("reflection_results", {})
+
+    # 达到最大反思轮次
+    if reflection_round >= 2:
+        logger.info(f"[_should_retry] 达到最大反思轮次 ({reflection_round})，继续执行")
+        return "continue"
+
+    # 检查是否需要重试
+    needs_retry = state.get("needs_reflection", False)
+
+    if not needs_retry:
+        return "continue"
+
+    # 检查各节点置信度
+    explorer_reflection = reflection_results.get("explorer", {})
+    suggestion_reflection = reflection_results.get("suggestion", {})
+
+    explorer_confidence = explorer_reflection.get("overall_confidence", 0.7)
+    suggestion_confidence = suggestion_reflection.get("overall_confidence", 0.7)
+
+    # 优先重试置信度最低的节点
+    if explorer_confidence < suggestion_confidence and explorer_confidence < 0.5:
+        if explorer_reflection.get("needs_retry", False):
+            return "retry_explorer"
+
+    if suggestion_confidence < 0.5:
+        if suggestion_reflection.get("needs_retry", False):
+            return "retry_suggestion"
+
+    return "continue"
+
+
 def _build_graph() -> StateGraph:
-    """构建并编译 LangGraph 工作流（ReAct 纯模式）。
+    """构建并编译 LangGraph 工作流（带反思机制）。
 
     图结构：
-      react_loader ──► explorer ──► architecture ──► react_suggestion ──► END
+      react_loader ──► explorer ──► architecture ──► react_suggestion ──► reflector ──► [条件边]
+                                                                                    │
+                              ┌─────────────────────────────────────────────────┘
+                              ▼
+                          retry_explorer / retry_suggestion / continue
+                              │                              │
+                              └──────────────────────────────┘
+                                                 │
+                                                 ▼
+                                                END
 
-    线性流程，无条件分支，每个节点执行完后直接进入下一个节点。
+    反思机制：
+      - 在 react_suggestion 节点后添加反思节点
+      - 反思结果通过条件边决定是否重试
+      - 最大反思轮次为 2 次，防止无限循环
     """
     graph = StateGraph(state_schema=SharedState)
 
     # 节点注册（metadata 设置 LangSmith trace 中的 run_name，方便在 Dashboard 中追踪）
     graph.add_node("react_loader", node_react_loader, metadata={"run_name": "智能仓库加载"})
-    graph.add_node("explorer", node_explorer, metadata={"run_name": "并行多维探索"})
+    graph.add_node("explorer", node_explorer, metadata={"run_name": "多维探索编排"})
     graph.add_node("architecture", node_architecture, metadata={"run_name": "架构评估"})
     graph.add_node("react_suggestion", node_react_suggestion, metadata={"run_name": "优化建议生成"})
+    graph.add_node("reflector", node_reflector, metadata={"run_name": "反思审查"})
 
-    # 线性流程
+    # 线性流程 + 反思节点
     graph.set_entry_point("react_loader")
     graph.add_edge("react_loader", "explorer")
     graph.add_edge("explorer", "architecture")
     graph.add_edge("architecture", "react_suggestion")
-    graph.add_edge("react_suggestion", END)
+    graph.add_edge("react_suggestion", "reflector")
+
+    # 条件边：反思节点决定下一步
+    graph.add_conditional_edges(
+        "reflector",
+        _should_retry,
+        {
+            "retry_explorer": "explorer",
+            "retry_suggestion": "react_suggestion",
+            "continue": END,
+        }
+    )
 
     return graph
 
 
-# 编译后的工作流（全局单例）
-_workflow = _build_graph().compile(checkpointer=_checkpointer)
+# 编译后的工作流（全局单例），全局默认 run_name 可被运行时 config 覆盖
+_workflow = _build_graph().compile(checkpointer=_checkpointer).with_config(
+    run_name="GitIntel 分析 Pipeline"
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -743,9 +1141,8 @@ def stream_analysis_sse(
         "configurable": {
             "thread_id": thread_id or f"{repo_url}::{branch}",
         },
-        # LangSmith trace 名称，方便在 Dashboard 中追踪
-        "run_name": run_name or f"{owner}/{repo}@{branch}",
     }
+    run_name_val = run_name or f"{owner}/{repo}@{branch}"
 
     initial_state = build_initial_state(repo_url, branch)
 
@@ -774,7 +1171,8 @@ def stream_analysis_sse(
                 async def consume():
                     logger.debug(f"[stream_analysis_sse] consume 开始")
                     count = 0
-                    async for chunk in _workflow.astream(initial_state, config=config):
+                    run_name_val = run_name or f"{owner}/{repo}@{branch}"
+                    async for chunk in _workflow.with_config(run_name=run_name_val).astream(initial_state, config=config):
                         q.put(chunk)
                         count += 1
                         logger.debug(f"[stream_analysis_sse] 线程 yield chunk {count}: {type(chunk).__name__}")
@@ -841,6 +1239,17 @@ def stream_analysis_sse(
 
         final_state = _workflow.get_state(config).values
         final_result = final_state.get("final_result") or {}
+
+        # 确保 final_result 被发送到前端（修复反思节点后 final_result 事件丢失的问题）
+        if final_result:
+            logger.info(f"[stream_analysis_sse] 发送 final_result: {list(final_result.keys())}")
+            yield format_sse_event({
+                "type": "result",
+                "agent": "final_result",
+                "message": "全部分析完成",
+                "percent": 100,
+                "data": final_result,
+            })
 
         yield "data: [DONE]\n\n"
 
@@ -957,6 +1366,7 @@ def _state_to_sse_events(
         react_events: list[dict] = state.get("react_events") or []
         loaded_files = state.get("loaded_files") or {}
         loaded_paths = state.get("loaded_paths") or []
+        total_tree_files = state.get("total_tree_files") or 0
 
         if "react_loader" not in status_sent:
             status_sent.add("react_loader")
@@ -988,6 +1398,7 @@ def _state_to_sse_events(
                     "percent": data.get("percent", 100),
                     "data": {
                         "total_iterations": data.get("total_iterations"),
+                        "total_tree_files": total_tree_files,
                         "loaded_count": len(loaded_paths),
                         "loaded_paths": data.get("loaded_paths", []),
                         "is_sufficient": data.get("is_sufficient"),
@@ -1116,6 +1527,8 @@ def _state_to_sse_events(
                 "data": None,
             }))
         if result:
+            total_tree_files = state.get("total_tree_files") or 0
+            arch_data_with_tree = {**result, "total_tree_files": total_tree_files}
             msg_done = "架构评估完成"
             if msg_done not in status_sent:
                 status_sent.add(msg_done)
@@ -1124,7 +1537,7 @@ def _state_to_sse_events(
                     "agent": "architecture",
                     "message": msg_done,
                     "percent": 91,
-                    "data": result,
+                    "data": arch_data_with_tree,
                 }))
             if "architecture" not in result_sent:
                 result_sent.add("architecture")
@@ -1133,7 +1546,7 @@ def _state_to_sse_events(
                     "agent": "architecture",
                     "message": "架构评估完成",
                     "percent": 91,
-                    "data": result,
+                    "data": arch_data_with_tree,
                 }))
 
     # ── react_suggestion ──────────────────────────────────────────────
@@ -1189,6 +1602,78 @@ def _state_to_sse_events(
                 "data": final_result,
             }))
 
+    # ── reflector (反思节点) ───────────────────────────────────────────
+    elif node_name == "reflector":
+        reflection_events: list[dict] = state.get("reflection_events") or []
+        reflection_results = state.get("reflection_results", {})
+        reflection_round = state.get("reflection_round", 0)
+        needs_retry = state.get("needs_reflection", False)
+
+        # 从 reflection_results 计算置信度（更可靠）
+        overall_confidence = state.get("overall_confidence", 0.0)
+        if overall_confidence == 0.0 and reflection_results:
+            # 从 reflection_results 计算置信度
+            confidences = [
+                r.get("overall_confidence", 0.7)
+                for r in reflection_results.values()
+                if isinstance(r, dict)
+            ]
+            if confidences:
+                overall_confidence = sum(confidences) / len(confidences)
+            else:
+                overall_confidence = 0.7  # 默认值
+
+        if "reflector" not in status_sent:
+            status_sent.add("reflector")
+            events.append(format_sse_event({
+                "type": "status",
+                "agent": "reflection",
+                "message": f"正在执行反思审查（第 {reflection_round} 轮）...",
+                "percent": 93,
+                "data": None,
+            }))
+
+        for ev in reflection_events:
+            if ev.get("type") == "status":
+                continue
+            ev_type = ev.get("type", "progress")
+            ev_percent = ev.get("percent", 94)
+            ev_message = ev.get("message") or "反思审查中..."
+            ev_data = ev.get("data")
+            events.append(format_sse_event({
+                "type": ev_type,
+                "agent": ev.get("agent", "reflection"),
+                "message": ev_message,
+                "percent": ev_percent,
+                "data": ev_data,
+            }))
+
+        if reflection_results and "reflection_result" not in result_sent:
+            result_sent.add("reflection_result")
+            confidence_level = "high" if overall_confidence >= 0.8 else ("medium" if overall_confidence >= 0.5 else "low")
+            events.append(format_sse_event({
+                "type": "result",
+                "agent": "reflection",
+                "message": f"反思完成: 置信度 {overall_confidence * 100:.0f}% ({confidence_level})",
+                "percent": 96,
+                "data": {
+                    "reflection_round": reflection_round,
+                    "overall_confidence": overall_confidence,
+                    "confidence_level": confidence_level,
+                    "needs_retry": needs_retry,
+                    "reflection_results": reflection_results,
+                },
+            }))
+
+            if needs_retry:
+                events.append(format_sse_event({
+                    "type": "status",
+                    "agent": "reflection",
+                    "message": "反思建议重试，质量需改进",
+                    "percent": 97,
+                    "data": {"needs_retry": True},
+                }))
+
     return events
 
 
@@ -1208,11 +1693,10 @@ def run_analysis_sync(
         "configurable": {
             "thread_id": thread_id or f"{repo_url}::{branch}",
         },
-        "run_name": run_name or f"{owner}/{repo}@{branch}",
     }
-
+    run_name_val = run_name or f"{owner}/{repo}@{branch}"
     initial_state = build_initial_state(repo_url, branch)
-    final_state = _workflow.invoke(initial_state, config=config)
+    final_state = _workflow.with_config(run_name=run_name_val).invoke(initial_state, config=config)
     return final_state.get("final_result") or {}
 
 
@@ -1225,31 +1709,45 @@ def build_initial_state(
     所有字段使用默认值，表示从头开始执行。
     如果 thread_id 已有 checkpoint，invoke 时会从 checkpoint 恢复而非用此初始状态。
 
-    如果 branch 未指定或为空字符串，则通过 GitHub API 获取仓库的默认分支。
+    通过 get_repo_info 一次性获取默认分支和代码语言（前3），用于：
+      - 解析正确的分支
+      - 预填充 repo_languages，供 Explorer 的 get_file_tree 过滤使用
     """
-    # 如果未指定 branch，获取仓库的默认分支
-    resolved_branch = branch
-    if not branch or branch == "main":
-        from tools.github_tools import get_default_branch
-
-        parsed = parse_repo_url(repo_url)
-        if parsed:
-            owner, repo = parsed
-            try:
-                resolved_branch = get_default_branch.invoke({"owner": owner, "repo": repo})
-            except Exception as e:
-                logger.warning(f"[build_initial_state] 获取默认分支失败，使用 'main': {e}")
-                resolved_branch = "main"
-        else:
-            resolved_branch = "main"
+    # 通过 get_repo_info 获取默认分支和代码语言（一次调用同时拿到两个值）
+    resolved_branch = branch or "main"
+    resolved_languages: list[str] = []
+    resolved_repo_info: dict = {}
+    parsed = parse_repo_url(repo_url)
+    if parsed:
+        owner, repo = parsed
+        try:
+            from tools.github_tools import get_repo_info
+            info_raw = get_repo_info.invoke({"owner": owner, "repo": repo})
+            info = json.loads(info_raw)
+            resolved_repo_info = info
+            # 总是优先使用 API 返回的默认分支（用户的 branch 参数可能是无效的）
+            # 如果用户没有明确指定分支，或指定的分支与 API 返回的不一致，使用 API 的默认值
+            api_default = info.get("default_branch", "main")
+            if not branch or branch.lower() in ("main", "master"):
+                resolved_branch = api_default
+                if branch and branch.lower() != api_default.lower():
+                    logger.info(f"[build_initial_state] 分支修正: {branch} -> {api_default}（仓库默认分支）")
+            # 预填充代码语言（前3），供 Explorer 的 get_file_tree 过滤使用
+            langs = info.get("languages") or {}
+            resolved_languages = list(langs.keys())[:3]
+        except Exception as e:
+            logger.warning(f"[build_initial_state] 获取仓库信息失败: {e}")
 
     return SharedState(
         repo_url=repo_url,
         branch=resolved_branch,
+        repo_info=resolved_repo_info,
+        repo_languages=resolved_languages,
         file_contents={},
         loaded_files={},
         loaded_paths=[],
         repo_sha=None,
+        file_summaries={},  # 文件提炼摘要（由 ReActRepoLoaderAgent 生成）
         code_parser_result=None,
         tech_stack_result=None,
         quality_result=None,
@@ -1266,4 +1764,12 @@ def build_initial_state(
         explorer_events=[],
         architecture_result=None,
         architecture_events=[],
+        # 反思机制字段
+        reflection_enabled=True,
+        reflection_round=0,
+        reflection_history=[],
+        reflection_results={},
+        reflection_enabled_nodes=[],
+        needs_reflection=False,
+        last_reflection_confidence=0.0,
     )

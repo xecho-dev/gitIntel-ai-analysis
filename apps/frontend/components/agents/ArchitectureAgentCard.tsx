@@ -6,7 +6,6 @@ import { useAppStore } from "@/store/useAppStore";
 
 interface ArchitectureData {
   complexity?: string;
-  components?: number;
   techStack?: string[];
   maintainability?: string;
   architectureStyle?: string;
@@ -14,6 +13,7 @@ interface ArchitectureData {
   hotSpots?: string[];
   summary?: string;
   llmPowered?: boolean;
+  total_tree_files?: number;
 }
 
 const COMPLEXITY_COLORS: Record<string, string> = {
@@ -29,6 +29,13 @@ export const ArchitectureAgentCard = () => {
 
   const archEvent = useAppStore((s) => s.agentEvents["architecture"]);
   const techStackEvent = useAppStore((s) => s.agentEvents["tech_stack"]);
+  const finalResult = useAppStore((s) => s.finalResult) as {
+    repoLoader?: {
+      languages?: string[];
+      /** snake_case，透传自后端 */
+      total_files?: number;
+    };
+  } | null;
 
   const archDone = finishedAgents.includes("architecture");
   const archData = archEvent?.data as ArchitectureData | undefined;
@@ -36,10 +43,17 @@ export const ArchitectureAgentCard = () => {
     languages?: string[];
     frameworks?: string[] | { name: string; confidence?: number; evidence?: string[] }[];
   } | undefined;
+  const repoLoaderLanguages = finalResult?.repoLoader?.languages ?? [];
 
   const frameworkNames: string[] = (techData?.frameworks ?? []).map((f) =>
     typeof f === "string" ? f : (f as { name: string }).name
   );
+
+  const hasTechStackData =
+    (archData?.techStack ?? []).length > 0 ||
+    (techData?.languages ?? []).length > 0 ||
+    frameworkNames.length > 0 ||
+    repoLoaderLanguages.length > 0;
 
   const isScanning = isAnalyzing || activeAgent === "architecture";
 
@@ -97,9 +111,9 @@ export const ArchitectureAgentCard = () => {
               </p>
             </div>
             <div className="bg-[#1c2330] rounded p-2 border border-white/5">
-              <p className="text-[9px] text-slate-600 uppercase mb-1">组件数</p>
+                <p className="text-[9px] text-slate-600 uppercase mb-1">文件数</p>
               <p className="text-sm font-bold text-blue-400">
-                {archData.components ?? "—"}
+                  {archData?.total_tree_files ?? finalResult?.repoLoader?.total_files ?? "—"}
               </p>
             </div>
             <div className="bg-[#1c2330] rounded p-2 border border-white/5">
@@ -119,12 +133,13 @@ export const ArchitectureAgentCard = () => {
             </div>
           </div>
 
-          {/* 技术栈标签 */}
-          {(archData.techStack ?? techData?.languages ?? frameworkNames.length > 0) && (
+          {/* 技术栈标签（GitHub API 语言 + LLM 推断语言 + 框架） */}
+          {hasTechStackData && (
             <div>
               <p className="text-[9px] text-slate-600 uppercase mb-1">技术栈</p>
               <div className="flex flex-wrap gap-1">
                 {[
+                  ...repoLoaderLanguages,         // GitHub API 代码语言（最优先）
                   ...(archData.techStack ?? []),
                   ...(techData?.languages ?? []),
                   ...frameworkNames,

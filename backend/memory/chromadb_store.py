@@ -765,7 +765,7 @@ class ChromaStore:
 
         try:
             # 构建 Chroma 过滤表达式（where 子句）
-            where_filter = self._build_where_filter(category, priority)
+            where_filter = ChromaStore._build_where_filter(category, priority)
 
             # 执行检索
             if where_filter:
