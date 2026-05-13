@@ -12,12 +12,15 @@
 这些工具让 Agent 能够动态选择分析哪些文件，而非一次性分析全部。
 """
 import json
+import logging
 import re
 from typing import Any
 
 from langchain_core.tools import tool
 
 from utils.tool_result import ToolSuccess, ToolError
+
+logger = logging.getLogger("gitintel")
 
 # ─── Lizard 导入（多语言复杂度分析库）────────────────────────────────────────
 try:
@@ -76,6 +79,108 @@ def _load_parser(language: str) -> Any | None:
         return parser
     except Exception:
         return None
+
+
+def _parse_ast_regex_fallback(content: str, language: str) -> dict[str, Any]:
+    """当 tree-sitter 不可用时，使用正则表达式解析 JavaScript/TypeScript。
+
+    这是一个兜底实现，提取基本的函数、类、导入信息。
+    不如 AST 精确，但对于反思验证场景足够用。
+    """
+    functions: list[dict] = []
+    classes: list[dict] = []
+    imports: list[str] = []
+    comments: list[dict] = []
+
+    lines = content.split("\n")
+
+    # JavaScript/TypeScript 函数匹配
+    # 支持: function name(), async function name(), const name = (), () => {}, class Name {}
+    func_patterns = [
+        # function declarations
+        re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\("),
+        # const/let/var arrow functions with name
+        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>"),
+        # const/let/var methods
+        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?function\b"),
+        # class methods (including private)
+        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{"),
+    ]
+
+    # TypeScript 函数匹配（带类型注解）
+    ts_func_patterns = [
+        re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[<(]"),
+        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*:\s*\w+\s*=\s*(?:async\s+)?\("),
+        # class methods with type annotations
+        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(\w+)\s*\([^)]*\)\s*:\s*\w+\s*\{"),
+    ]
+
+    # Class declarations
+    class_pattern = re.compile(r"^\s*(?:export\s+)?(?:abstract\s+)?class\s+(\w+)")
+
+    # Import statements
+    import_patterns = [
+        re.compile(r"^\s*import\s+.*from\s+['\"]([^'\"]+)['\"]"),
+        re.compile(r"^\s*import\s+['\"]([^'\"]+)['\"]"),
+        re.compile(r"^\s*const\s+\w+\s*=\s*require\s*\(['\"]([^'\"]+)['\"]\)"),
+    ]
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        # 跳过注释行
+        if stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*"):
+            if len(stripped) > 5:
+                comments.append({"line": i, "text": stripped[:100]})
+            continue
+
+        # 匹配类定义
+        class_match = class_pattern.match(line)
+        if class_match:
+            classes.append({
+                "name": class_match.group(1),
+                "start_line": i,
+                "end_line": i,
+                "bases": [],
+            })
+            continue
+
+        # 匹配函数定义（根据语言选择模式）
+        matched = False
+        patterns = ts_func_patterns if language in ("typescript", "tsx") else func_patterns
+        for pattern in patterns:
+            match = pattern.match(line)
+            if match:
+                func_name = match.group(1)
+                # 跳过私有方法、构造函数、getter/setter
+                if not func_name.startswith("_") and func_name not in ("constructor", "get", "set"):
+                    functions.append({
+                        "name": func_name,
+                        "start_line": i,
+                        "end_line": i,
+                        "parameters": "",
+                        "decorators": [],
+                    })
+                    matched = True
+                    break
+        if matched:
+            continue
+
+        # 匹配导入语句
+        for imp_pattern in import_patterns:
+            imp_match = imp_pattern.match(line)
+            if imp_match:
+                imports.append(f"import ... from '{imp_match.group(1)}'")
+                break
+
+    return {
+        "functions": functions,
+        "classes": classes,
+        "imports": imports,
+        "comments": comments,
+        "lines": len(lines),
+        "parser": "regex_fallback",
+    }
 
 
 # ─── 语言扩展名映射 ──────────────────────────────────────────────────────────
@@ -396,12 +501,20 @@ def detect_dependencies(content: str, language: str) -> str:
 
 
 def _parse_ast_impl(file_path: str, content: str, language: str) -> dict[str, Any]:
-    """解析 AST 的核心实现（多语言支持）。"""
+    """解析 AST 的核心实现（多语言支持）。
+
+    优先使用 tree-sitter，如果不可用则回退到正则表达式解析（仅支持 JavaScript/TypeScript）。
+    """
     if not language or language == "auto":
         language = _guess_language(file_path, content)
 
     parser = _load_parser(language)
     if parser is None:
+        # 当 tree-sitter 不可用时，对 JavaScript/TypeScript 使用正则表达式兜底
+        if language in ("javascript", "typescript", "tsx", "jsx"):
+            logger.debug(f"[code_tools] tree-sitter 不可用，使用正则表达式解析 {language}")
+            return _parse_ast_regex_fallback(content, language)
+
         return {
             "error": f"不支持的语言: {language}，或 tree-sitter 解析器未安装",
             "functions": [], "classes": [], "imports": [],
@@ -603,8 +716,83 @@ def _calc_complexity_with_lizard(content: str, language: str) -> dict[str, Any]:
         return _calc_complexity_fallback(content, language)
 
 
+def _calc_complexity_regex_fallback(content: str, language: str) -> dict[str, Any]:
+    """使用正则表达式估算 JavaScript/TypeScript 代码复杂度（兜底实现）。"""
+    funcs: list[dict] = []
+    lines = content.split("\n")
+
+    # JavaScript/TypeScript 函数模式
+    func_pattern = re.compile(
+        r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)|"
+        r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>)"
+    )
+
+    # 复杂度关键词（用于估算）
+    complexity_keywords = ["if", "else if", "for", "forEach", "while", "do", "switch", "case", "catch", "try"]
+
+    current_func: dict = {"name": "", "start": 0, "complexity": 1, "lines": []}
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        # 检测函数开始
+        func_match = func_pattern.search(line)
+        if func_match:
+            if current_func["name"] and current_func["lines"]:
+                funcs.append({
+                    "name": current_func["name"],
+                    "line": current_func["start"],
+                    "complexity": max(1, current_func["complexity"]),
+                    "nloc": len(current_func["lines"]),
+                    "parameters": 0,
+                })
+            func_name = func_match.group(1) or func_match.group(2)
+            current_func = {"name": func_name or "(anonymous)", "start": i, "complexity": 1, "lines": []}
+
+        if current_func["name"]:
+            current_func["lines"].append(i)
+            # 估算复杂度
+            lower = stripped.lower()
+            for kw in complexity_keywords:
+                if f" {kw}(" in lower or f" {kw} (" in lower:
+                    current_func["complexity"] += 1
+
+    # 记录最后一个函数
+    if current_func["name"] and current_func["lines"]:
+        funcs.append({
+            "name": current_func["name"],
+            "line": current_func["start"],
+            "complexity": max(1, current_func["complexity"]),
+            "nloc": len(current_func["lines"]),
+            "parameters": 0,
+        })
+
+    if funcs:
+        total = sum(f["complexity"] for f in funcs)
+        max_comp = max(f["complexity"] for f in funcs)
+        avg = total / len(funcs)
+        over = sum(1 for f in funcs if f["complexity"] > 10)
+        return {
+            "avg_complexity": round(avg, 2),
+            "max_complexity": max_comp,
+            "over_threshold_count": over,
+            "complex_functions": sorted(funcs, key=lambda x: x["complexity"], reverse=True)[:10],
+            "language": language,
+            "analyzer": "regex_fallback",
+        }
+
+    return {
+        "avg_complexity": 0.0,
+        "max_complexity": 0,
+        "over_threshold_count": 0,
+        "complex_functions": [],
+        "language": language,
+        "analyzer": "regex_fallback",
+    }
+
+
 def _calc_complexity_fallback(content: str, language: str) -> dict[str, Any]:
-    """回退的复杂度计算（仅支持 Python）。"""
+    """回退的复杂度计算（当 tree-sitter 和 Lizard 都不可用时）。"""
     COMPLEXITY_NODES: dict[str, set[str]] = {
         "python": {"if_statement", "elif_clause", "for_statement", "for_in_statement",
                     "while_statement", "with_statement", "except_clause", "try_statement",
@@ -627,6 +815,9 @@ def _calc_complexity_fallback(content: str, language: str) -> dict[str, Any]:
 
     parser = _load_parser(language)
     if parser is None:
+        # 当 tree-sitter 不可用时，使用正则表达式进行简单的复杂度估算（仅 JavaScript/TypeScript）
+        if language in ("javascript", "typescript", "tsx", "jsx"):
+            return _calc_complexity_regex_fallback(content, language)
         return {"avg_complexity": 0.0, "max_complexity": 0, "over_threshold_count": 0, "complex_functions": [], "language": language, "analyzer": "tree-sitter"}
 
     try:

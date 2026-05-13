@@ -19,8 +19,8 @@ _logger = logging.getLogger("gitintel")
 class DashScopeEmbedder:
     """使用 LangChain DashScopeEmbeddings 生成文本向量。"""
 
-    MODEL_NAME = "text-embedding-v1"
-    DIMENSION = 1536  # text-embedding-v1 输出维度
+    MODEL_NAME = "tongyi-embedding-vision-plus-2026-03-06"
+    DIMENSION = 1536  # tongyi-embedding-vision-plus-2026-03-06 输出维度
 
     def __init__(self, api_key: Optional[str] = None):
         """
