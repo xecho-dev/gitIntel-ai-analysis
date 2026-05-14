@@ -171,7 +171,7 @@ def _extract_facts_sync(task: ExtractionTask) -> list[ExtractedFact]:
 
     except Exception:
         try:
-            llm = get_llm(model="qwen-plus")
+            llm = get_llm(model=os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"))
         except Exception as exc:
             _logger.warning(f"[Extraction] 无法获取 LLM，跳过抽取: {exc}")
             return []
