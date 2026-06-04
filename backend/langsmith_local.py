@@ -5,14 +5,14 @@
 
 注意：这是一个简化版本，完整功能请使用 LangSmith 云端 https://smith.langchain.com/
 """
-import json
+
 import logging
 import os
 from datetime import datetime, timedelta
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 load_dotenv()
@@ -106,7 +106,7 @@ async def index():
             <td>{created_at}</td>
             <td>{total_tokens:,}</td>
             <td>
-                <a href="https://smith.langchain.com/projects/{LANGSMITH_PROJECT}/runs/{trace.get('id', '')}"
+                <a href="https://smith.langchain.com/projects/{LANGSMITH_PROJECT}/runs/{trace.get("id", "")}"
                    target="_blank" class="btn-small">查看</a>
             </td>
         </tr>
@@ -121,7 +121,8 @@ async def index():
         </tr>
         """
 
-    return HTMLResponse(content=f"""
+    return HTMLResponse(
+        content=f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -286,7 +287,8 @@ async def index():
         </div>
     </body>
     </html>
-    """)
+    """
+    )
 
 
 @app.get("/refresh", response_class=HTMLResponse)
@@ -297,7 +299,8 @@ async def refresh():
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"启动 LangSmith Studio 本地追踪查看器...")
-    print(f"访问地址: http://localhost:2024")
+
+    print("启动 LangSmith Studio 本地追踪查看器...")
+    print("访问地址: http://localhost:2024")
     print(f"云端地址: https://smith.langchain.com/projects/{LANGSMITH_PROJECT}")
     uvicorn.run(app, host="0.0.0.0", port=2024)

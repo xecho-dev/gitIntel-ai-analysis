@@ -16,6 +16,7 @@
   - hotSpots: string[]（潜在风险点）
   - summary: string（LLM 生成的架构摘要，200字以内）
 """
+
 import asyncio
 import logging
 import os
@@ -31,9 +32,11 @@ _MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "1024"))
 
 # ─── LLM 懒加载（带 Token 追踪）──────────────────────────────────────────────
 
+
 def _get_llm():
     """懒加载 LLM client（通过统一工厂，支持 Token 追踪）。"""
     from utils.llm_factory import get_llm_with_tracking
+
     return get_llm_with_tracking(agent_name="架构分析", max_tokens=_MAX_OUTPUT_TOKENS)
 
 
@@ -44,7 +47,6 @@ def _build_arch_context(
     file_contents: dict | None = None,
 ) -> str:
     """从各 Agent 结果构建架构分析上下文（含真实代码片段）。"""
-    import json
 
     parts = []
 
@@ -96,13 +98,19 @@ def _build_arch_context(
             f"  总函数: {cr.get('total_functions', 0)}\n"
             f"  总类/结构: {cr.get('total_classes', 0)}\n"
             f"  语义块: {cr.get('total_chunks', 0)}\n"
-            f"  语言分布: " + ", ".join(
+            f"  语言分布: "
+            + ", ".join(
                 f"{lang}({s['files']}文件/{s.get('functions', 0)}函数)"
-                for lang, s in sorted(lang_stats.items(), key=lambda x: x[1]["files"], reverse=True)[:5]
-            ) + "\n"
-            f"  最大文件: " + (
+                for lang, s in sorted(
+                    lang_stats.items(), key=lambda x: x[1]["files"], reverse=True
+                )[:5]
+            )
+            + "\n"
+            "  最大文件: "
+            + (
                 f"{largest[0]['path'].split('/')[-1]}({largest[0]['lines']}行)"
-                if largest else "无"
+                if largest
+                else "无"
             )
         )
 
@@ -146,7 +154,8 @@ class ArchitectureAgent(BaseAgent):
         """执行 Agent，收集并返回最终 result 数据。"""
         result = None
         async for event in self.stream(
-            repo_path, branch,
+            repo_path,
+            branch,
             file_contents=file_contents,
             code_parser_result=code_parser_result,
             tech_stack_result=tech_stack_result,
@@ -172,10 +181,7 @@ class ArchitectureAgent(BaseAgent):
 
         优先使用 LLM 生成深度架构洞察，降级到规则引擎。
         """
-        yield _make_event(
-            self.name, "status",
-            "正在分析项目架构…", 10, None
-        )
+        yield _make_event(self.name, "status", "正在分析项目架构…", 10, None)
 
         # ── 1. 规则引擎：基于 AST 和 TechStack 生成基础指标 ─────────
         # 传入 tree 总文件数，使复杂度计算能反映真实仓库规模
@@ -183,27 +189,32 @@ class ArchitectureAgent(BaseAgent):
             code_parser_result=code_parser_result,
             tech_stack_result=tech_stack_result,
             quality_result=quality_result,
-            total_tree_files=total_tree_files or (
+            total_tree_files=total_tree_files
+            or (
                 (code_parser_result or {}).get("total_files", 0)
                 or (tech_stack_result or {}).get("dependency_count", 0) * 10
             ),
         )
 
         yield _make_event(
-            self.name, "progress",
-            f"检测到 {arch_data['components']} 个组件，正在深度分析…", 40, None
+            self.name,
+            "progress",
+            f"检测到 {arch_data['components']} 个组件，正在深度分析…",
+            40,
+            None,
         )
 
         # ── 2. LLM 增强：发送真实代码内容 + 分析数据给 LLM ────────────
         llm = _get_llm()
         if llm is not None:
             yield _make_event(
-                self.name, "progress",
-                "正在调用 LLM 生成架构洞察…", 60, None
+                self.name, "progress", "正在调用 LLM 生成架构洞察…", 60, None
             )
             try:
                 llm_insights = await self._generate_llm_insights(
-                    llm, repo_path, branch,
+                    llm,
+                    repo_path,
+                    branch,
                     file_contents=file_contents,
                     code_parser_result=code_parser_result,
                     tech_stack_result=tech_stack_result,
@@ -211,15 +222,29 @@ class ArchitectureAgent(BaseAgent):
                 )
                 # 合并 LLM 洞察到 arch_data
                 if llm_insights:
-                    arch_data.update({
-                        "complexity": llm_insights.get("complexity", arch_data["complexity"]),
-                        "architectureStyle": llm_insights.get("architectureStyle", arch_data["architectureStyle"]),
-                        "keyPatterns": llm_insights.get("keyPatterns", arch_data["keyPatterns"]),
-                        "hotSpots": llm_insights.get("hotSpots", arch_data["hotSpots"]),
-                        "summary": llm_insights.get("summary", arch_data["summary"]),
-                        "llmPowered": True,
-                    })
-                    _logger.info(f"[ArchitectureAgent] LLM 架构洞察成功: style={llm_insights.get('architectureStyle')}")
+                    arch_data.update(
+                        {
+                            "complexity": llm_insights.get(
+                                "complexity", arch_data["complexity"]
+                            ),
+                            "architectureStyle": llm_insights.get(
+                                "architectureStyle", arch_data["architectureStyle"]
+                            ),
+                            "keyPatterns": llm_insights.get(
+                                "keyPatterns", arch_data["keyPatterns"]
+                            ),
+                            "hotSpots": llm_insights.get(
+                                "hotSpots", arch_data["hotSpots"]
+                            ),
+                            "summary": llm_insights.get(
+                                "summary", arch_data["summary"]
+                            ),
+                            "llmPowered": True,
+                        }
+                    )
+                    _logger.info(
+                        f"[ArchitectureAgent] LLM 架构洞察成功: style={llm_insights.get('architectureStyle')}"
+                    )
             except Exception as exc:
                 _logger.error(f"[ArchitectureAgent] LLM 架构分析失败: {exc}")
         else:
@@ -227,10 +252,12 @@ class ArchitectureAgent(BaseAgent):
 
         # ── 3. 最终输出 ──────────────────────────────────────────
         yield _make_event(
-            self.name, "result",
+            self.name,
+            "result",
             f"架构分析完成 — {arch_data['complexity']} 复杂度 / "
             f"{arch_data['components']} 组件 / 可维护性 {arch_data['maintainability']}",
-            100, arch_data
+            100,
+            arch_data,
         )
 
     # ─── 规则引擎：基于 AST/质量数据生成基础架构指标 ────────────────
@@ -243,16 +270,24 @@ class ArchitectureAgent(BaseAgent):
         total_tree_files: int = 0,
     ) -> dict:
         """基于 AST 结构和技术栈识别生成架构评估（不依赖 LLM）。"""
-        total_funcs = code_parser_result.get("total_functions", 0) if code_parser_result else 0
-        total_classes = code_parser_result.get("total_classes", 0) if code_parser_result else 0
-        parsed_files = code_parser_result.get("parsed_files", 0) if code_parser_result else 0
+        total_funcs = (
+            code_parser_result.get("total_functions", 0) if code_parser_result else 0
+        )
+        total_classes = (
+            code_parser_result.get("total_classes", 0) if code_parser_result else 0
+        )
+        parsed_files = (
+            code_parser_result.get("parsed_files", 0) if code_parser_result else 0
+        )
         lang_stats = (code_parser_result or {}).get("language_stats", {})
         largest_files = (code_parser_result or {}).get("largest_files", [])
 
         languages_raw = (tech_stack_result or {}).get("languages", [])
+
         # 兼容 languages/frameworks/infrastructure 可能是 dict 列表
         def _extract_names(items: list) -> list[str]:
             return [f.get("name", "") if isinstance(f, dict) else str(f) for f in items]
+
         languages = _extract_names(languages_raw)
         raw_frameworks = (tech_stack_result or {}).get("frameworks", [])
         if raw_frameworks and isinstance(raw_frameworks[0], dict):
@@ -262,10 +297,14 @@ class ArchitectureAgent(BaseAgent):
         infra = _extract_names((tech_stack_result or {}).get("infrastructure", []))
 
         health = quality_result.get("health_score", 70) if quality_result else 70
-        maintainability = quality_result.get("maintainability", "B") if quality_result else "B"
+        maintainability = (
+            quality_result.get("maintainability", "B") if quality_result else "B"
+        )
         duplication_level = (
-            quality_result or {}
-        ).get("duplication", {}).get("duplication_level", "Low")
+            (quality_result or {})
+            .get("duplication", {})
+            .get("duplication_level", "Low")
+        )
         if duplication_level == "High":
             maintainability = "C"
 
@@ -273,10 +312,10 @@ class ArchitectureAgent(BaseAgent):
         complexity_score = 0
         # 真实仓库规模权重（最重要）：使用 tree 总文件数或实际解析文件数
         effective_files = max(total_tree_files, parsed_files)
-        complexity_score += min(effective_files / 100, 6)   # 0-6  ← 提高上限
+        complexity_score += min(effective_files / 100, 6)  # 0-6  ← 提高上限
         # AST 分析数据权重（解析越充分越准确）
-        complexity_score += min(total_funcs / 100, 3)          # 0-3
-        complexity_score += min(total_classes / 30, 2)        # 0-2
+        complexity_score += min(total_funcs / 100, 3)  # 0-3
+        complexity_score += min(total_classes / 30, 2)  # 0-2
         # 基于最大文件大小
         if largest_files and largest_files[0]["lines"] > 500:
             complexity_score += 1
@@ -302,10 +341,10 @@ class ArchitectureAgent(BaseAgent):
         # 使用真实仓库规模估算组件数（而非仅用解析的少量文件）
         effective_files = max(total_tree_files, parsed_files)
         components = max(
-            lang_count * 5 + framework_count * 2,           # 语言+框架基础
-            parsed_files // 20 + lang_count,                 # 解析文件密度
+            lang_count * 5 + framework_count * 2,  # 语言+框架基础
+            parsed_files // 20 + lang_count,  # 解析文件密度
             effective_files // 50 + lang_count + framework_count,  # 全仓库规模
-            3
+            3,
         )
 
         # ── 技术栈汇总 ──────────────────────────────────────
@@ -338,8 +377,7 @@ class ArchitectureAgent(BaseAgent):
                 f"该仓库使用 {', '.join(languages[:3])} 开发，包含 "
                 f"{components} 个可识别组件，整体复杂度 {complexity}，"
                 f"代码质量 {maintainability}。"
-                + (f"检测到 {', '.join(patterns[:2])} 设计模式。"
-                   if patterns else "")
+                + (f"检测到 {', '.join(patterns[:2])} 设计模式。" if patterns else "")
                 + (f"需要注意: {hotspots[0]}。" if hotspots else "")
             ),
         }
@@ -362,7 +400,10 @@ class ArchitectureAgent(BaseAgent):
                 if name:
                     all_tags.add(name.lower())
 
-        if any(f in all_tags for f in ["fastapi", "django", "flask", "rails", "laravel", "spring"]):
+        if any(
+            f in all_tags
+            for f in ["fastapi", "django", "flask", "rails", "laravel", "spring"]
+        ):
             if any(f in all_tags for f in ["docker", "kubernetes"]):
                 return "Modular Monolith"
             return "Monolithic"
@@ -374,7 +415,9 @@ class ArchitectureAgent(BaseAgent):
             if any(f in all_tags for f in ["tailwindcss", "vite", "webpack"]):
                 return "Single Page Application (SPA)"
 
-        if any(f in all_tags for f in ["langchain", "langgraph", "anthropic", "openai"]):
+        if any(
+            f in all_tags for f in ["langchain", "langgraph", "anthropic", "openai"]
+        ):
             return "LLM-Powered Application"
 
         if any(f in all_tags for f in ["langgraph", "langgraph-sdk"]):
@@ -453,7 +496,9 @@ class ArchitectureAgent(BaseAgent):
             hotspots.append(f"{py_metrics['over_complexity_count']} 个高圈复杂度函数")
         ts_metrics = (quality_result or {}).get("typescript_metrics", {})
         if ts_metrics.get("over_complexity_count", 0) > 10:
-            hotspots.append(f"{ts_metrics['over_complexity_count']} 个高圈复杂度 TypeScript 函数")
+            hotspots.append(
+                f"{ts_metrics['over_complexity_count']} 个高圈复杂度 TypeScript 函数"
+            )
 
         return hotspots[:4]  # 最多 4 个
 
@@ -470,10 +515,13 @@ class ArchitectureAgent(BaseAgent):
         quality_result: dict | None = None,
     ) -> dict:
         """调用 LLM 生成深度架构洞察（含真实代码片段）。"""
-        import json, re
+        import json
+        import re
 
         context = _build_arch_context(
-            code_parser_result, tech_stack_result, quality_result,
+            code_parser_result,
+            tech_stack_result,
+            quality_result,
             file_contents=file_contents,
         )
 
@@ -492,6 +540,7 @@ class ArchitectureAgent(BaseAgent):
 
         try:
             from langchain_core.messages import HumanMessage
+
             response = await llm.ainvoke([HumanMessage(content=prompt)])
             content = response.content.strip()
 
@@ -532,19 +581,25 @@ class ArchitectureAgent(BaseAgent):
             loop = asyncio.get_running_loop()
         except RuntimeError:
             # 无运行中的循环时用标准方式（防御性）
-            return asyncio.run(agent.run(
-                repo_path, branch,
+            return asyncio.run(
+                agent.run(
+                    repo_path,
+                    branch,
+                    file_contents=file_contents,
+                    code_parser_result=code_parser_result,
+                    tech_stack_result=tech_stack_result,
+                    quality_result=quality_result,
+                    total_tree_files=total_tree_files,
+                )
+            )
+        return loop.run_until_complete(
+            agent.run(
+                repo_path,
+                branch,
                 file_contents=file_contents,
                 code_parser_result=code_parser_result,
                 tech_stack_result=tech_stack_result,
                 quality_result=quality_result,
                 total_tree_files=total_tree_files,
-            ))
-        return loop.run_until_complete(agent.run(
-            repo_path, branch,
-            file_contents=file_contents,
-            code_parser_result=code_parser_result,
-            tech_stack_result=tech_stack_result,
-            quality_result=quality_result,
-            total_tree_files=total_tree_files,
-        ))
+            )
+        )

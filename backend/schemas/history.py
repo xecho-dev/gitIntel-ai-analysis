@@ -1,9 +1,9 @@
-from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
 
 # --- 请求模型 ---
+
 
 class SaveAnalysisRequest(BaseModel):
     repo_url: str
@@ -12,6 +12,7 @@ class SaveAnalysisRequest(BaseModel):
 
 
 # --- 响应模型 ---
+
 
 class HistoryItem(BaseModel):
     id: str
@@ -85,6 +86,7 @@ class UpsertUserRequest(BaseModel):
 
 # ─── 管理端（Admin）请求/响应模型 ──────────────────────────────────────────────
 
+
 class AdminOverviewResponse(BaseModel):
     total_users: int
     total_analysis: int
@@ -149,26 +151,30 @@ class AdminHistoryListResponse(BaseModel):
 
 # ─── Admin 筛选 & 详情 ─────────────────────────────────────────────────────────
 
+
 class AdminHistoryFilter(BaseModel):
     """分析历史筛选条件"""
-    user_id: Optional[str] = None       # 限定用户
-    risk_level: Optional[str] = None     # 高危 | 中等 | 极低
+
+    user_id: Optional[str] = None  # 限定用户
+    risk_level: Optional[str] = None  # 高危 | 中等 | 极低
     quality_score_min: Optional[float] = None  # 最低质量分（0-100）
     quality_score_max: Optional[float] = None  # 最高质量分
-    date_from: Optional[str] = None     # 开始日期 YYYY-MM-DD
-    date_to: Optional[str] = None       # 结束日期 YYYY-MM-DD
-    repo_name: Optional[str] = None     # 仓库名（模糊搜索）
-    branch: Optional[str] = None        # 分支名
+    date_from: Optional[str] = None  # 开始日期 YYYY-MM-DD
+    date_to: Optional[str] = None  # 结束日期 YYYY-MM-DD
+    repo_name: Optional[str] = None  # 仓库名（模糊搜索）
+    branch: Optional[str] = None  # 分支名
 
 
 class AdminUserHistoryResponse(BaseModel):
     """指定用户的分析历史（包含用户名信息）"""
+
     user: AdminUserItem
     history: AdminHistoryListResponse
 
 
 class LangSmithTraceInfo(BaseModel):
     """LangSmith 追踪信息"""
+
     project_name: str
     run_url: Optional[str] = None
     trace_id: Optional[str] = None
@@ -183,6 +189,7 @@ class LangSmithTraceInfo(BaseModel):
 
 class AdminHistoryDetailResponse(BaseModel):
     """单条分析记录的完整详情"""
+
     history: AdminHistoryItem
     user: AdminUserItem
     langsmith: Optional[LangSmithTraceInfo] = None

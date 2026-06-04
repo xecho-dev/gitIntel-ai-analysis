@@ -26,15 +26,16 @@ ReActRepoLoaderAgent — 基于 ReAct 模式的智能仓库加载 Agent。
   - 迭代轮次达到 MAX_ITERATIONS (10)
   - Agent 认为信息足够（is_sufficient=true）
 """
+
 import asyncio
 import json
 import logging
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Literal, Optional
+from typing import Any, Optional
 
-from langchain.agents import create_agent, AgentState
+from langchain.agents import create_agent
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -45,10 +46,16 @@ from agents.react.tool_wrapper import inject_context, ToolLoopInterrupt
 from utils.tree_filter import filter_file_tree
 from utils.code_parser import FileSummary, summarize_files
 from tools.github_tools import (
-    get_repo_info, get_file_tree, read_file_content,
-    get_file_blobs, batch_search_code, get_commit_history,
-    get_pull_requests, get_default_branch,
-    _get_repo_info_impl, _get_file_tree_impl, _get_default_branch_impl,
+    get_repo_info,
+    get_file_tree,
+    read_file_content,
+    get_file_blobs,
+    batch_search_code,
+    get_commit_history,
+    get_pull_requests,
+    get_default_branch,
+    _get_repo_info_impl,
+    _get_file_tree_impl,
     _get_branch_sha_impl,
 )
 from tools.code_tools import parse_file_ast, summarize_code_file
@@ -58,21 +65,26 @@ logger = logging.getLogger("gitintel")
 
 # ─── 结构化输出模型 ────────────────────────────────────────────────────────────
 
+
 class ToolAction(BaseModel):
     """工具调用参数"""
+
     name: str = Field(description="工具名称")
     args: dict = Field(description="工具参数，包含 owner, repo, paths 等")
 
 
 class ExplorationOutput(BaseModel):
     """强制 LLM 每轮返回的结构化输出"""
+
     thought: str = Field(description="当前推理思考，说明为什么选择这个行动")
     action: Optional[ToolAction] = Field(
         default=None,
-        description="如果要调用工具，填写工具名称和参数；如已收集足够信息则填 null"
+        description="如果要调用工具，填写工具名称和参数；如已收集足够信息则填 null",
     )
     is_sufficient: bool = Field(description="是否已收集足够信息可停止探索")
-    summary: str = Field(description="探索总结，必须包含：技术栈、主要模块、关键文件、架构特点")
+    summary: str = Field(
+        description="探索总结，必须包含：技术栈、主要模块、关键文件、架构特点"
+    )
 
 
 # ─── Token 预算配置 ────────────────────────────────────────────────────────────
@@ -157,6 +169,7 @@ REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分
 
 # ─── 推理记录结构 ────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ToolCall:
     iteration: int
@@ -174,7 +187,9 @@ class ExplorationResult:
     repo: str
     branch: str
     sha: str = ""
-    loaded_files: dict[str, str] = field(default_factory=dict)  # 原始文件内容（可选保留）
+    loaded_files: dict[str, str] = field(
+        default_factory=dict
+    )  # 原始文件内容（可选保留）
     loaded_paths: list[str] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
     is_sufficient: bool = False
@@ -189,6 +204,7 @@ class ExplorationResult:
 
 
 # ─── LangChain Callback Handler ───────────────────────────────────────────────
+
 
 class RepoLoaderCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
     """通过 LangChain Agent callbacks 自动收集工具调用记录。
@@ -206,14 +222,22 @@ class RepoLoaderCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
         self.tool_calls: list[dict] = []
 
     async def on_tool_start(
-        self, serialized: dict, inputs: dict, *, run_id: str, parent_run_id: str | None = None, **kwargs
+        self,
+        serialized: dict,
+        inputs: dict,
+        *,
+        run_id: str,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         name = serialized.get("name", "unknown")
-        self.tool_calls.append({
-            "event": "start",
-            "tool": name,
-            "inputs": inputs,
-        })
+        self.tool_calls.append(
+            {
+                "event": "start",
+                "tool": name,
+                "inputs": inputs,
+            }
+        )
 
     async def on_tool_end(
         self, output: str, *, run_id: str, parent_run_id: str | None = None, **kwargs
@@ -225,7 +249,12 @@ class RepoLoaderCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
             self._check_error_pattern(output_str)
 
     async def on_tool_error(
-        self, error: Exception | str, *, run_id: str, parent_run_id: str | None = None, **kwargs
+        self,
+        error: Exception | str,
+        *,
+        run_id: str,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         if self.tool_calls and self.tool_calls[-1]["event"] == "start":
             error_str = str(error)[:200]
@@ -235,6 +264,7 @@ class RepoLoaderCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
 
 
 # ─── 核心 Agent ───────────────────────────────────────────────────────────────
+
 
 class ReActRepoLoaderAgent:
     """基于 ReAct 模式的仓库加载 Agent。
@@ -270,7 +300,10 @@ class ReActRepoLoaderAgent:
         """懒加载 LLM client（带 Token 追踪）。"""
         try:
             from utils.llm_factory import get_llm_with_tracking
-            llm = get_llm_with_tracking(agent_name="智能仓库加载", max_tokens=_MAX_OUTPUT_TOKENS)
+
+            llm = get_llm_with_tracking(
+                agent_name="智能仓库加载", max_tokens=_MAX_OUTPUT_TOKENS
+            )
             if llm is None:
                 logger.warning("[ReActRepoLoader] LLM 不可用，将使用规则模式")
             return llm
@@ -322,11 +355,15 @@ class ReActRepoLoaderAgent:
         self._file_contents = {}
 
         # 包装工具时传递 languages，用于过滤 get_file_tree 返回的文件树
-        wrapped_tools = self._get_wrapped_tools(owner, repo, result.sha or branch, languages=result.languages)
+        wrapped_tools = self._get_wrapped_tools(
+            owner, repo, result.sha or branch, languages=result.languages
+        )
         self._wrapped_tools = wrapped_tools
 
         # 构建初始上下文（使用过滤后的文件树）
-        initial_context = self._build_initial_context(owner, repo, branch, result.sha, info, tree)
+        initial_context = self._build_initial_context(
+            owner, repo, branch, result.sha, info, tree
+        )
         system_message = SystemMessage(content=REACT_SYSTEM_PROMPT)
 
         # 构建 create_agent（用于 astream_events 基础设施）
@@ -340,7 +377,9 @@ class ReActRepoLoaderAgent:
             )
             has_create_agent = True
         except Exception as e:
-            logger.warning(f"[ReActRepoLoader] create_agent 初始化失败: {e}，使用兼容模式")
+            logger.warning(
+                f"[ReActRepoLoader] create_agent 初始化失败: {e}，使用兼容模式"
+            )
             has_create_agent = False
             agent = None
 
@@ -360,22 +399,33 @@ class ReActRepoLoaderAgent:
 
             try:
                 step_result = await self._run_single_step(
-                    owner, repo, branch, result.sha, result,
-                    system_message, conversation_messages, iteration,
-                    llm_with_output, agent if has_create_agent else None,
+                    owner,
+                    repo,
+                    branch,
+                    result.sha,
+                    result,
+                    system_message,
+                    conversation_messages,
+                    iteration,
+                    llm_with_output,
+                    agent if has_create_agent else None,
                     callback_handler,
                 )
-                conversation_messages.extend(step_result.get("conversation_additions", []))
+                conversation_messages.extend(
+                    step_result.get("conversation_additions", [])
+                )
 
                 if step_result["is_sufficient"]:
                     result.is_sufficient = True
                     result.summary = step_result.get("summary", "")
-                    logger.info(f"[ReActRepoLoader] Agent 认为信息足够，停止探索")
+                    logger.info("[ReActRepoLoader] Agent 认为信息足够，停止探索")
                     break
 
                 if step_result.get("had_tool_error"):
                     if step_result.get("consecutive_errors", 0) >= 3:
-                        logger.warning("[ReActRepoLoader] 连续 3 次迭代无进展，停止探索")
+                        logger.warning(
+                            "[ReActRepoLoader] 连续 3 次迭代无进展，停止探索"
+                        )
                         break
 
                 # 检查是否因错误循环而提前停止
@@ -423,19 +473,26 @@ class ReActRepoLoaderAgent:
         return result.strip()
 
     def _build_initial_context(
-        self, owner: str, repo: str, branch: str, sha: str,
-        info: dict, tree: list[dict],
+        self,
+        owner: str,
+        repo: str,
+        branch: str,
+        sha: str,
+        info: dict,
+        tree: list[dict],
     ) -> str:
         """构建精简后的初始上下文，过滤低价值文件。"""
         languages = info.get("languages", {}) or {}
         top_languages = list(languages.keys())[:3]
         context_parts = [f"# 仓库探索任务\n目标仓库: {owner}/{repo}@{branch}\n"]
 
-        context_parts.append(f"## 仓库基本信息\n")
+        context_parts.append("## 仓库基本信息\n")
         context_parts.append(f"- 默认分支: {info.get('default_branch', branch)}")
         context_parts.append(f"- 主要语言（前3）: {', '.join(top_languages) or '未知'}")
         context_parts.append(f"- Stars: {info.get('stars', 0)}")
-        context_parts.append(f"- Topics: {', '.join(info.get('topics', [])[:10]) or '无'}")
+        context_parts.append(
+            f"- Topics: {', '.join(info.get('topics', [])[:10]) or '无'}"
+        )
         if info.get("description"):
             context_parts.append(f"- 描述: {info.get('description')}")
 
@@ -446,22 +503,24 @@ class ReActRepoLoaderAgent:
             if "/" in path:
                 dirs.add(path.split("/")[0])
 
-        context_parts.append(f"\n## 文件树概览（已过滤）\n")
-        context_parts.append(f"- 原始文件数: {len([t for t in tree if t.get('type') == 'blob'])}")
+        context_parts.append("\n## 文件树概览（已过滤）\n")
+        context_parts.append(
+            f"- 原始文件数: {len([t for t in tree if t.get('type') == 'blob'])}"
+        )
         context_parts.append(f"- 过滤后文件数: {len(filtered_blobs)}")
         context_parts.append(f"- 顶层目录: {', '.join(sorted(dirs)[:20])}")
 
-        context_parts.append(f"\n### 文件路径清单（已过滤）:\n")
+        context_parts.append("\n### 文件路径清单（已过滤）:\n")
         for t in filtered_blobs[:200]:
             context_parts.append(f"- {t['path']}")
         if len(filtered_blobs) > 200:
             context_parts.append(f"- ... 等共 {len(filtered_blobs)} 个文件")
 
         context_parts.append(
-            f"\n## 任务\n"
-            f"请从上方文件路径清单中选取关键文件进行加载，理解其技术栈和架构。\n"
-            f"**重要**：只能加载文件路径清单中列出的文件，禁止猜测不在清单中的文件路径！\n"
-            f"当已了解足够信息时，输出 is_sufficient=true 和总结。"
+            "\n## 任务\n"
+            "请从上方文件路径清单中选取关键文件进行加载，理解其技术栈和架构。\n"
+            "**重要**：只能加载文件路径清单中列出的文件，禁止猜测不在清单中的文件路径！\n"
+            "当已了解足够信息时，输出 is_sufficient=true 和总结。"
         )
 
         return "\n".join(context_parts)
@@ -503,7 +562,7 @@ class ReActRepoLoaderAgent:
                 raw_content = raw_content.strip()
                 for _leader in ("```json", "```JSON", "```"):
                     if raw_content.startswith(_leader):
-                        raw_content = raw_content[len(_leader):]
+                        raw_content = raw_content[len(_leader) :]
                 for _trailer in ("```",):
                     if raw_content.endswith(_trailer):
                         raw_content = raw_content[: -len(_trailer)]
@@ -526,7 +585,9 @@ class ReActRepoLoaderAgent:
                         # 确保 summary 是 string 类型
                         raw_summary = parsed.get("summary", "")
                         if isinstance(raw_summary, dict):
-                            summary_str = json.dumps(raw_summary, ensure_ascii=False, indent=2)
+                            summary_str = json.dumps(
+                                raw_summary, ensure_ascii=False, indent=2
+                            )
                         elif isinstance(raw_summary, str):
                             summary_str = raw_summary
                         else:
@@ -539,7 +600,8 @@ class ReActRepoLoaderAgent:
                                     name=parsed["action"]["name"],
                                     args=parsed["action"].get("args", {}),
                                 )
-                                if parsed.get("action") else None
+                                if parsed.get("action")
+                                else None
                             ),
                             is_sufficient=parsed["is_sufficient"],
                             summary=summary_str,
@@ -551,7 +613,10 @@ class ReActRepoLoaderAgent:
 
     async def _run_single_step(
         self,
-        owner: str, repo: str, branch: str, sha: str,
+        owner: str,
+        repo: str,
+        branch: str,
+        sha: str,
         result: ExplorationResult,
         system_message: SystemMessage,
         conversation_messages: list,
@@ -572,11 +637,11 @@ class ReActRepoLoaderAgent:
 
         # 兜底：LLM 解析完全失败时，强制停止迭代（避免无限循环）
         if structured_output is None:
-            logger.warning(f"[ReActRepoLoader] 迭代 {iteration + 1} LLM 解析失败，强制停止")
-            result.is_sufficient = True
-            result.summary = (
-                "LLM 输出异常，分析被迫终止。请检查 LLM 输出质量。"
+            logger.warning(
+                f"[ReActRepoLoader] 迭代 {iteration + 1} LLM 解析失败，强制停止"
             )
+            result.is_sufficient = True
+            result.summary = "LLM 输出异常，分析被迫终止。请检查 LLM 输出质量。"
             return {
                 "is_sufficient": True,
                 "summary": result.summary,
@@ -584,13 +649,15 @@ class ReActRepoLoaderAgent:
                 "had_tool_error": False,
             }
 
-        result.tool_calls.append(ToolCall(
-            iteration=iteration,
-            thought=structured_output.thought,
-            tool_name="(reasoning)",
-            tool_args={},
-            observation=structured_output.summary,
-        ))
+        result.tool_calls.append(
+            ToolCall(
+                iteration=iteration,
+                thought=structured_output.thought,
+                tool_name="(reasoning)",
+                tool_args={},
+                observation=structured_output.summary,
+            )
+        )
 
         if structured_output.is_sufficient or structured_output.action is None:
             return {
@@ -607,7 +674,9 @@ class ReActRepoLoaderAgent:
 
         t0 = time.time()
         try:
-            raw_result = await self._execute_tool(owner, repo, sha, result, tool_name, tool_args)
+            raw_result = await self._execute_tool(
+                owner, repo, sha, result, tool_name, tool_args
+            )
             elapsed = (time.time() - t0) * 1000
         except Exception as e:
             elapsed = (time.time() - t0) * 1000
@@ -618,14 +687,16 @@ class ReActRepoLoaderAgent:
             consecutive_errors = step_messages.count("error") + 1
 
         tool_observation = raw_result[:_TOOL_RESULT_TRUNCATE]
-        result.tool_calls.append(ToolCall(
-            iteration=iteration,
-            thought=structured_output.thought,
-            tool_name=tool_name,
-            tool_args=tool_args,
-            observation=tool_observation,
-            elapsed_ms=round(elapsed, 1),
-        ))
+        result.tool_calls.append(
+            ToolCall(
+                iteration=iteration,
+                thought=structured_output.thought,
+                tool_name=tool_name,
+                tool_args=tool_args,
+                observation=tool_observation,
+                elapsed_ms=round(elapsed, 1),
+            )
+        )
 
         return {
             "is_sufficient": False,
@@ -637,7 +708,9 @@ class ReActRepoLoaderAgent:
 
     async def _execute_tool(
         self,
-        owner: str, repo: str, sha: str,
+        owner: str,
+        repo: str,
+        sha: str,
         result: ExplorationResult,
         tool_name: str,
         args: dict,
@@ -695,9 +768,14 @@ class ReActRepoLoaderAgent:
         languages 参数用于过滤 get_file_tree 返回的文件树。
         """
         from tools.github_tools import (
-            get_repo_info, get_file_tree, read_file_content,
-            get_file_blobs, batch_search_code, get_commit_history,
-            get_pull_requests, get_default_branch,
+            get_repo_info,
+            get_file_tree,
+            read_file_content,
+            get_file_blobs,
+            batch_search_code,
+            get_commit_history,
+            get_pull_requests,
+            get_default_branch,
         )
         from tools.code_tools import parse_file_ast, summarize_code_file
 
@@ -713,11 +791,13 @@ class ReActRepoLoaderAgent:
             parse_file_ast,
             summarize_code_file,
         ]
-        return [inject_context(t, owner=owner, repo=repo, ref=ref, languages=languages) for t in _TOOLS]
+        return [
+            inject_context(t, owner=owner, repo=repo, ref=ref, languages=languages)
+            for t in _TOOLS
+        ]
 
     def _build_iteration_context(
-        self, owner: str, repo: str, sha: str,
-        result: ExplorationResult, iteration: int
+        self, owner: str, repo: str, sha: str, result: ExplorationResult, iteration: int
     ) -> str:
         """构建每轮迭代的上下文。"""
         parts = [f"\n## 迭代 {iteration + 1}\n"]
@@ -730,9 +810,9 @@ class ReActRepoLoaderAgent:
                 parts.append(f"- {path}")
 
         if result.errors:
-            parts.append(f"\n### 最近的错误（请注意避开这些无效路径）:\n")
+            parts.append("\n### 最近的错误（请注意避开这些无效路径）:\n")
             for e in result.errors[-3:]:
                 parts.append(f"- {e}")
 
-        parts.append(f"\n请决定下一步行动（调用工具）：")
+        parts.append("\n请决定下一步行动（调用工具）：")
         return "\n".join(parts)

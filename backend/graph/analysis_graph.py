@@ -121,57 +121,68 @@ def node_react_loader(state: SharedState) -> dict:
 
                 for call in result.tool_calls:
                     if call.thought:
-                        react_events.append({
-                            "type": "progress",
-                            "agent": "react_loader",
-                            "message": f"[推理 {call.iteration + 1}] {call.thought[:80]}",
-                            "percent": min(30 + call.iteration * 5, 80),
-                            "data": {
-                                "tool": call.tool_name,
-                                "args": call.tool_args,
-                                "observation": call.observation[:200],
-                                "elapsed_ms": call.elapsed_ms,
-                            },
-                        })
+                        react_events.append(
+                            {
+                                "type": "progress",
+                                "agent": "react_loader",
+                                "message": f"[推理 {call.iteration + 1}] {call.thought[:80]}",
+                                "percent": min(30 + call.iteration * 5, 80),
+                                "data": {
+                                    "tool": call.tool_name,
+                                    "args": call.tool_args,
+                                    "observation": call.observation[:200],
+                                    "elapsed_ms": call.elapsed_ms,
+                                },
+                            }
+                        )
 
                     if call.tool_name in ("get_file_blobs", "read_file_content"):
-                        react_events.append({
-                            "type": "progress",
-                            "agent": "react_loader",
-                            "message": f"加载: {call.observation[:60]}",
-                            "percent": min(50, 30 + len(result.loaded_paths) * 0.8),
-                            "data": {"loaded_count": len(result.loaded_paths)},
-                        })
+                        react_events.append(
+                            {
+                                "type": "progress",
+                                "agent": "react_loader",
+                                "message": f"加载: {call.observation[:60]}",
+                                "percent": min(50, 30 + len(result.loaded_paths) * 0.8),
+                                "data": {"loaded_count": len(result.loaded_paths)},
+                            }
+                        )
 
-                react_events.append({
-                    "type": "result",
-                    "agent": "react_loader",
-                    "message": f"ReAct 探索完成: {result.total_iterations} 轮, {len(result.loaded_paths)} 个文件",
-                    "percent": 100,
-                    "data": {
-                        "total_iterations": result.total_iterations,
-                        "loaded_count": len(result.loaded_paths),
-                        "loaded_paths": result.loaded_paths[:30],
-                        "is_sufficient": result.is_sufficient,
-                        "summary": result.summary[:500],
-                        "errors": result.errors,
-                    },
-                })
+                react_events.append(
+                    {
+                        "type": "result",
+                        "agent": "react_loader",
+                        "message": f"ReAct 探索完成: {result.total_iterations} 轮, {len(result.loaded_paths)} 个文件",
+                        "percent": 100,
+                        "data": {
+                            "total_iterations": result.total_iterations,
+                            "loaded_count": len(result.loaded_paths),
+                            "loaded_paths": result.loaded_paths[:30],
+                            "is_sufficient": result.is_sufficient,
+                            "summary": result.summary[:500],
+                            "errors": result.errors,
+                        },
+                    }
+                )
 
-                result_ref.append({
-                    "loaded_files": result.loaded_files,
-                    "loaded_paths": result.loaded_paths,
-                    "repo_sha": getattr(result, "sha", branch),
-                    "file_summaries": result.file_summaries,  # 提炼后的文件摘要
-                    "languages": result.languages,  # GitHub API 代码语言
-                    "all_tree_paths": result.all_tree_paths,  # 原始文件树所有文件路径
-                })
+                result_ref.append(
+                    {
+                        "loaded_files": result.loaded_files,
+                        "loaded_paths": result.loaded_paths,
+                        "repo_sha": getattr(result, "sha", branch),
+                        "file_summaries": result.file_summaries,  # 提炼后的文件摘要
+                        "languages": result.languages,  # GitHub API 代码语言
+                        "all_tree_paths": result.all_tree_paths,  # 原始文件树所有文件路径
+                    }
+                )
 
             loop.run_until_complete(consume())
             loop.close()
         except Exception as e:
             import traceback
-            logger.error(f"[node_react_loader] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+            logger.error(
+                f"[node_react_loader] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             exc_info.append(e)
         finally:
             q.put(None)
@@ -236,7 +247,7 @@ def node_react_loader(state: SharedState) -> dict:
             "repo_languages": result_ref[0].get("languages", []) if result_ref else [],
         }
     else:
-        logger.warning(f"[node_react_loader] ReAct 无结果")
+        logger.warning("[node_react_loader] ReAct 无结果")
         return {
             "errors": exc_info + ["ReAct 无结果"],
             "react_events": all_events,
@@ -276,7 +287,9 @@ def node_explorer(state: SharedState) -> dict:
     file_summaries = state.get("file_summaries") or {}
     repo_languages: list = state.get("repo_languages") or []
 
-    logger.info(f"[node_explorer] 入参: file_contents={len(file_contents) if file_contents else 0} 个文件, file_summaries={len(file_summaries)} 个, languages={repo_languages}")
+    logger.info(
+        f"[node_explorer] 入参: file_contents={len(file_contents) if file_contents else 0} 个文件, file_summaries={len(file_summaries)} 个, languages={repo_languages}"
+    )
 
     q: Any = _q_module.Queue()
     exc_info: list = []
@@ -288,7 +301,11 @@ def node_explorer(state: SharedState) -> dict:
     if file_contents:
         try:
             from agents.legacy import CodeParserAgent
-            files = [{"path": path, "content": content} for path, content in file_contents.items()]
+
+            files = [
+                {"path": path, "content": content}
+                for path, content in file_contents.items()
+            ]
             if files:
                 code_parser_result = asyncio.run(
                     CodeParserAgent()._analyze_inmemory_files(files)
@@ -305,6 +322,7 @@ def node_explorer(state: SharedState) -> dict:
 
         async def run_dep():
             from agents.legacy import DependencyAgent
+
             agent = DependencyAgent()
             result_data = {}
             async for ev in agent.stream(
@@ -330,34 +348,43 @@ def node_explorer(state: SharedState) -> dict:
             asyncio.set_event_loop(loop)
 
             async def consume():
-                explorer_events.append({
-                    "type": "status",
-                    "agent": "explorer",
-                    "message": "并行探索启动：TechStack / Quality / Architecture",
-                    "percent": 50,
-                    "data": None,
-                })
+                explorer_events.append(
+                    {
+                        "type": "status",
+                        "agent": "explorer",
+                        "message": "并行探索启动：TechStack / Quality / Architecture",
+                        "percent": 50,
+                        "data": None,
+                    }
+                )
 
                 results = await ExplorerOrchestrator().explore_all(
-                    owner, repo, branch,
+                    owner,
+                    repo,
+                    branch,
                     file_contents=file_contents or None,
                     file_summaries=file_summaries or None,
                     languages=repo_languages,
                 )
 
-                explorer_events.append({
-                    "type": "result",
-                    "agent": "explorer",
-                    "message": f"并行探索完成: {len(results)} 个维度",
-                    "percent": 100,
-                    "data": results,
-                })
+                explorer_events.append(
+                    {
+                        "type": "result",
+                        "agent": "explorer",
+                        "message": f"并行探索完成: {len(results)} 个维度",
+                        "percent": 100,
+                        "data": results,
+                    }
+                )
 
             loop.run_until_complete(consume())
             loop.close()
         except Exception as e:
             import traceback
-            logger.error(f"[node_explorer] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+            logger.error(
+                f"[node_explorer] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             exc_info.append(e)
         finally:
             q.put(None)
@@ -393,20 +420,32 @@ def node_explorer(state: SharedState) -> dict:
         return_val["code_parser_result"] = code_parser_result
 
     if dependency_result is not None:
-        logger.info(f"[node_explorer] 写入 dependency_result 到状态: {dependency_result}")
+        logger.info(
+            f"[node_explorer] 写入 dependency_result 到状态: {dependency_result}"
+        )
         return_val["dependency_result"] = dependency_result
 
     # Explorer 结果映射到对应字段（供后续节点使用）
     if result:
         if "TechStackExplorer" in result:
             ts_data = result["TechStackExplorer"]
-            return_val["tech_stack_result"] = ts_data.get("findings", ts_data) if isinstance(ts_data, dict) else ts_data
+            return_val["tech_stack_result"] = (
+                ts_data.get("findings", ts_data)
+                if isinstance(ts_data, dict)
+                else ts_data
+            )
         if "QualityExplorer" in result:
             q_data = result["QualityExplorer"]
-            return_val["quality_result"] = q_data.get("findings", q_data) if isinstance(q_data, dict) else q_data
+            return_val["quality_result"] = (
+                q_data.get("findings", q_data) if isinstance(q_data, dict) else q_data
+            )
         if "ArchitectureExplorer" in result:
             arch_data = result["ArchitectureExplorer"]
-            return_val["architecture_result"] = arch_data.get("findings", arch_data) if isinstance(arch_data, dict) else arch_data
+            return_val["architecture_result"] = (
+                arch_data.get("findings", arch_data)
+                if isinstance(arch_data, dict)
+                else arch_data
+            )
 
     return return_val
 
@@ -444,6 +483,7 @@ def node_architecture(state: SharedState) -> dict:
 
             async def consume():
                 from agents.legacy import ArchitectureAgent
+
                 agent = ArchitectureAgent()
                 async for event in agent.stream(
                     f"{owner}/{repo}",
@@ -459,7 +499,10 @@ def node_architecture(state: SharedState) -> dict:
             loop.close()
         except Exception as e:
             import traceback
-            logger.error(f"[node_architecture] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+            logger.error(
+                f"[node_architecture] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             exc_info.append(e)
         finally:
             q.put(None)
@@ -540,7 +583,10 @@ def node_react_suggestion(state: SharedState) -> dict:
             loop.close()
         except Exception as e:
             import traceback
-            logger.error(f"[node_react_suggestion] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+            logger.error(
+                f"[node_react_suggestion] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             exc_info.append(e)
         finally:
             q.put(None)
@@ -563,17 +609,21 @@ def node_react_suggestion(state: SharedState) -> dict:
 
     # 如果 ReActSuggestionAgent 返回空结果，生成兜底建议
     if not result or not result.get("suggestions"):
-        logger.warning("[node_react_suggestion] ReActSuggestionAgent 返回空结果，使用兜底建议")
+        logger.warning(
+            "[node_react_suggestion] ReActSuggestionAgent 返回空结果，使用兜底建议"
+        )
         fallback = _generate_fallback_suggestions(state)
         if fallback:
             result = fallback
-            all_events.append({
-                "type": "result",
-                "agent": "optimization",
-                "message": "兜底建议生成完成",
-                "percent": 100,
-                "data": result,
-            })
+            all_events.append(
+                {
+                    "type": "result",
+                    "agent": "optimization",
+                    "message": "兜底建议生成完成",
+                    "percent": 100,
+                    "data": result,
+                }
+            )
 
     # repo_sha 从 react_loader 节点已写入 state
     repo_sha = state.get("repo_sha", branch)
@@ -583,7 +633,9 @@ def node_react_suggestion(state: SharedState) -> dict:
             "repo": repo,
             "branch": branch,
             "repo_sha": repo_sha,
-            "total_files": state.get("total_tree_files", len(state.get("loaded_files", {}))),
+            "total_files": state.get(
+                "total_tree_files", len(state.get("loaded_files", {}))
+            ),
             "loaded_count": len(state.get("loaded_paths", [])),
             "languages": state.get("repo_languages", []),  # GitHub API 代码语言
         },
@@ -605,7 +657,10 @@ def node_react_suggestion(state: SharedState) -> dict:
 
 def _generate_fallback_suggestions(state: SharedState) -> dict:
     """基于已有分析数据生成兜底建议。"""
-    from agents.react.suggestion_agent import _quality_suggestions_impl, _dependency_suggestions_impl
+    from agents.react.suggestion_agent import (
+        _quality_suggestions_impl,
+        _dependency_suggestions_impl,
+    )
 
     suggestions = []
     _id = [1]
@@ -620,39 +675,47 @@ def _generate_fallback_suggestions(state: SharedState) -> dict:
         try:
             suggestions.extend(_quality_suggestions_impl(quality_result, next_id))
         except Exception as e:
-            logger.warning(f"[_generate_fallback_suggestions] _quality_suggestions_impl 失败: {e}")
+            logger.warning(
+                f"[_generate_fallback_suggestions] _quality_suggestions_impl 失败: {e}"
+            )
 
     dependency_result = state.get("dependency_result")
     if dependency_result and isinstance(dependency_result, dict):
         try:
             suggestions.extend(_dependency_suggestions_impl(dependency_result, next_id))
         except Exception as e:
-            logger.warning(f"[_generate_fallback_suggestions] _dependency_suggestions_impl 失败: {e}")
+            logger.warning(
+                f"[_generate_fallback_suggestions] _dependency_suggestions_impl 失败: {e}"
+            )
 
     architecture_result = state.get("architecture_result")
     if architecture_result and isinstance(architecture_result, dict):
         concerns = architecture_result.get("concerns", [])
         for concern in concerns[:3]:
-            suggestions.append({
-                "id": next_id(),
-                "type": "architecture",
-                "title": "架构优化建议",
-                "description": str(concern),
-                "priority": "medium",
-                "category": "architecture",
-                "source": "fallback",
-            })
+            suggestions.append(
+                {
+                    "id": next_id(),
+                    "type": "architecture",
+                    "title": "架构优化建议",
+                    "description": str(concern),
+                    "priority": "medium",
+                    "category": "architecture",
+                    "source": "fallback",
+                }
+            )
 
     if not suggestions:
-        suggestions.append({
-            "id": next_id(),
-            "type": "general",
-            "title": "项目分析完成",
-            "description": "分析已完成，未检测到需要紧急处理的问题。",
-            "priority": "low",
-            "category": "general",
-            "source": "fallback",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "general",
+                "title": "项目分析完成",
+                "description": "分析已完成，未检测到需要紧急处理的问题。",
+                "priority": "low",
+                "category": "general",
+                "source": "fallback",
+            }
+        )
 
     priority_order = {"high": 0, "medium": 1, "low": 2}
     suggestions.sort(key=lambda s: priority_order.get(s.get("priority", "low"), 2))
@@ -727,24 +790,30 @@ def node_reflector(state: SharedState) -> dict:
                 from agents.react.reflection_agent import quick_confidence_check
 
                 # ── Step 1: 快速评估 ───────────────────────────────────
-                reflection_events.append({
-                    "type": "status",
-                    "agent": "reflection",
-                    "message": "正在进行快速置信度评估...",
-                    "percent": 10,
-                    "data": None,
-                })
+                reflection_events.append(
+                    {
+                        "type": "status",
+                        "agent": "reflection",
+                        "message": "正在进行快速置信度评估...",
+                        "percent": 10,
+                        "data": None,
+                    }
+                )
 
                 # 评估各节点
                 explorer_check = quick_confidence_check("explorer", explorer_result)
-                suggestion_check = quick_confidence_check("suggestion", suggestion_result)
-                architecture_check = quick_confidence_check("architecture", architecture_result)
+                suggestion_check = quick_confidence_check(
+                    "suggestion", suggestion_result
+                )
+                architecture_check = quick_confidence_check(
+                    "architecture", architecture_result
+                )
 
                 # 判断是否需要深度反思
                 needs_deep_reflection = (
-                    explorer_check.get("needs_deep_reflection", False) or
-                    suggestion_check.get("needs_deep_reflection", False) or
-                    architecture_check.get("needs_deep_reflection", False)
+                    explorer_check.get("needs_deep_reflection", False)
+                    or suggestion_check.get("needs_deep_reflection", False)
+                    or architecture_check.get("needs_deep_reflection", False)
                 )
 
                 # ── Step 2: 执行深度反思（如需要）─────────────────────
@@ -753,16 +822,22 @@ def node_reflector(state: SharedState) -> dict:
                 reflection_round = state.get("reflection_round", 0) + 1
 
                 if needs_deep_reflection and reflection_round <= 2:
-                    reflection_events.append({
-                        "type": "status",
-                        "agent": "reflection",
-                        "message": "执行深度反思审查...",
-                        "percent": 30,
-                        "data": {
-                            "explorer_needs_reflection": explorer_check.get("needs_deep_reflection", False),
-                            "suggestion_needs_reflection": suggestion_check.get("needs_deep_reflection", False),
-                        },
-                    })
+                    reflection_events.append(
+                        {
+                            "type": "status",
+                            "agent": "reflection",
+                            "message": "执行深度反思审查...",
+                            "percent": 30,
+                            "data": {
+                                "explorer_needs_reflection": explorer_check.get(
+                                    "needs_deep_reflection", False
+                                ),
+                                "suggestion_needs_reflection": suggestion_check.get(
+                                    "needs_deep_reflection", False
+                                ),
+                            },
+                        }
+                    )
 
                     # 构建反思上下文（仓库信息和文件树直接注入，无需工具调用）
                     repo_info = state.get("repo_info") or {}
@@ -770,7 +845,9 @@ def node_reflector(state: SharedState) -> dict:
                     context = {
                         "loaded_paths": loaded_paths,
                         "file_contents": loaded_files,
-                        "file_tree": [{"path": p, "type": "blob"} for p in loaded_paths],
+                        "file_tree": [
+                            {"path": p, "type": "blob"} for p in loaded_paths
+                        ],
                         "repo_info": repo_info,
                         "tech_stack_result": state.get("tech_stack_result"),
                         "quality_result": state.get("quality_result"),
@@ -831,7 +908,9 @@ def node_reflector(state: SharedState) -> dict:
                             "analysis_type": "explorer",
                             "overall_confidence": quick_score,
                             "confidence_level": _score_to_level(quick_score),
-                            "needs_retry": explorer_check.get("needs_deep_reflection", False),
+                            "needs_retry": explorer_check.get(
+                                "needs_deep_reflection", False
+                            ),
                             "quick_check": True,
                         }
                         all_confidences.append(quick_score)
@@ -842,7 +921,9 @@ def node_reflector(state: SharedState) -> dict:
                             "analysis_type": "suggestion",
                             "overall_confidence": quick_score,
                             "confidence_level": _score_to_level(quick_score),
-                            "needs_retry": suggestion_check.get("needs_deep_reflection", False),
+                            "needs_retry": suggestion_check.get(
+                                "needs_deep_reflection", False
+                            ),
                             "quick_check": True,
                         }
                         all_confidences.append(quick_score)
@@ -853,25 +934,34 @@ def node_reflector(state: SharedState) -> dict:
                             "analysis_type": "architecture",
                             "overall_confidence": quick_score,
                             "confidence_level": _score_to_level(quick_score),
-                            "needs_retry": architecture_check.get("needs_deep_reflection", False),
+                            "needs_retry": architecture_check.get(
+                                "needs_deep_reflection", False
+                            ),
                             "quick_check": True,
                         }
                         all_confidences.append(quick_score)
 
                 # 计算整体置信度（确保不为空列表）
-                overall_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.7
+                overall_confidence = (
+                    sum(all_confidences) / len(all_confidences)
+                    if all_confidences
+                    else 0.7
+                )
 
                 # 记录反思历史
                 reflection_history = state.get("reflection_history", [])
-                reflection_history.append({
-                    "round": reflection_round,
-                    "timestamp": time.time(),
-                    "confidence": overall_confidence,
-                    "needs_deep_reflection": needs_deep_reflection,
-                    "results_summary": {
-                        k: v.get("overall_confidence", 0) for k, v in reflection_results.items()
-                    },
-                })
+                reflection_history.append(
+                    {
+                        "round": reflection_round,
+                        "timestamp": time.time(),
+                        "confidence": overall_confidence,
+                        "needs_deep_reflection": needs_deep_reflection,
+                        "results_summary": {
+                            k: v.get("overall_confidence", 0)
+                            for k, v in reflection_results.items()
+                        },
+                    }
+                )
 
                 # 判断是否需要重试（只有置信度低于 0.5 时才重试）
                 needs_retry = overall_confidence < 0.5 or any(
@@ -882,35 +972,42 @@ def node_reflector(state: SharedState) -> dict:
                 if reflection_round >= 2:
                     needs_retry = False
 
-                reflection_events.append({
-                    "type": "result",
-                    "agent": "reflection",
-                    "message": f"反思完成: 置信度 {overall_confidence * 100:.0f}%, 需要重试: {needs_retry}",
-                    "percent": 100,
-                    "data": {
-                        "reflection_round": reflection_round,
-                        "overall_confidence": overall_confidence,
-                        "needs_retry": needs_retry,
-                        "reflection_results": reflection_results,
-                    },
-                })
+                reflection_events.append(
+                    {
+                        "type": "result",
+                        "agent": "reflection",
+                        "message": f"反思完成: 置信度 {overall_confidence * 100:.0f}%, 需要重试: {needs_retry}",
+                        "percent": 100,
+                        "data": {
+                            "reflection_round": reflection_round,
+                            "overall_confidence": overall_confidence,
+                            "needs_retry": needs_retry,
+                            "reflection_results": reflection_results,
+                        },
+                    }
+                )
 
                 # 保存结果供后续条件边使用
-                q.put({
-                    "reflection_results": reflection_results,
-                    "reflection_round": reflection_round,
-                    "reflection_history": reflection_history,
-                    "overall_confidence": overall_confidence,
-                    "needs_retry": needs_retry,
-                    "needs_reflection": needs_retry,  # 与 _should_retry 保持一致
-                    "last_reflection_confidence": overall_confidence,
-                })
+                q.put(
+                    {
+                        "reflection_results": reflection_results,
+                        "reflection_round": reflection_round,
+                        "reflection_history": reflection_history,
+                        "overall_confidence": overall_confidence,
+                        "needs_retry": needs_retry,
+                        "needs_reflection": needs_retry,  # 与 _should_retry 保持一致
+                        "last_reflection_confidence": overall_confidence,
+                    }
+                )
 
             loop.run_until_complete(consume())
             loop.close()
         except Exception as e:
             import traceback
-            logger.error(f"[node_reflector] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+            logger.error(
+                f"[node_reflector] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             exc_info.append(e)
         finally:
             q.put(None)
@@ -1024,10 +1121,14 @@ def _build_graph() -> StateGraph:
     graph = StateGraph(state_schema=SharedState)
 
     # 节点注册（metadata 设置 LangSmith trace 中的 run_name，方便在 Dashboard 中追踪）
-    graph.add_node("react_loader", node_react_loader, metadata={"run_name": "智能仓库加载"})
+    graph.add_node(
+        "react_loader", node_react_loader, metadata={"run_name": "智能仓库加载"}
+    )
     graph.add_node("explorer", node_explorer, metadata={"run_name": "多维探索编排"})
     graph.add_node("architecture", node_architecture, metadata={"run_name": "架构评估"})
-    graph.add_node("react_suggestion", node_react_suggestion, metadata={"run_name": "优化建议生成"})
+    graph.add_node(
+        "react_suggestion", node_react_suggestion, metadata={"run_name": "优化建议生成"}
+    )
     graph.add_node("reflector", node_reflector, metadata={"run_name": "反思审查"})
 
     # 线性流程 + 反思节点
@@ -1045,15 +1146,17 @@ def _build_graph() -> StateGraph:
             "retry_explorer": "explorer",
             "retry_suggestion": "react_suggestion",
             "continue": END,
-        }
+        },
     )
 
     return graph
 
 
 # 编译后的工作流（全局单例），全局默认 run_name 可被运行时 config 覆盖
-_workflow = _build_graph().compile(checkpointer=_checkpointer).with_config(
-    run_name="GitIntel 分析 Pipeline"
+_workflow = (
+    _build_graph()
+    .compile(checkpointer=_checkpointer)
+    .with_config(run_name="GitIntel 分析 Pipeline")
 )
 
 
@@ -1082,10 +1185,16 @@ def _yield_sse_for_node(
             raise ValueError("get_state 返回空状态")
         current_state = fresh_state
     except Exception as state_err:
-        logger.warning(f"[stream_analysis_sse] get_state 失败: {state_err}，使用 node_output 作为 fallback")
+        logger.warning(
+            f"[stream_analysis_sse] get_state 失败: {state_err}，使用 node_output 作为 fallback"
+        )
         if isinstance(node_output, dict):
             current_state = node_output
-        elif isinstance(node_output, list) and len(node_output) == 1 and isinstance(node_output[0], dict):
+        elif (
+            isinstance(node_output, list)
+            and len(node_output) == 1
+            and isinstance(node_output[0], dict)
+        ):
             current_state = node_output[0]
         else:
             current_state = {}
@@ -1120,10 +1229,13 @@ def stream_analysis_sse(
         thread_id: 可选的 thread ID（用于 LangGraph checkpoint 断点续传）
         run_name: LangSmith trace 名称，默认使用 "{owner}/{repo}@{branch}" 格式
     """
-    logger.info(f"[stream_analysis_sse] 开始: repo={repo_url}, branch={branch}, thread={thread_id}")
+    logger.info(
+        f"[stream_analysis_sse] 开始: repo={repo_url}, branch={branch}, thread={thread_id}"
+    )
 
     try:
         from utils.llm_factory import reset_token_stats
+
         reset_token_stats()
     except ImportError:
         pass
@@ -1146,52 +1258,65 @@ def stream_analysis_sse(
 
     initial_state = build_initial_state(repo_url, branch)
 
-    yield format_sse_event({
-        "type": "status",
-        "agent": "pipeline",
-        "message": f"正在连接分析引擎，repo={owner}/{repo}...",
-        "percent": 1,
-        "data": {"repo_url": repo_url, "branch": branch},
-    })
+    yield format_sse_event(
+        {
+            "type": "status",
+            "agent": "pipeline",
+            "message": f"正在连接分析引擎，repo={owner}/{repo}...",
+            "percent": 1,
+            "data": {"repo_url": repo_url, "branch": branch},
+        }
+    )
 
     status_sent: set[str] = set()
     result_sent: set[str] = set()
 
     try:
         import queue as _queue_module
+
         q: Any = _queue_module.Queue()
         exc_info: list = []
 
         def run():
             try:
-                logger.debug(f"[stream_analysis_sse] 线程启动")
+                logger.debug("[stream_analysis_sse] 线程启动")
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
                 async def consume():
-                    logger.debug(f"[stream_analysis_sse] consume 开始")
+                    logger.debug("[stream_analysis_sse] consume 开始")
                     count = 0
                     run_name_val = run_name or f"{owner}/{repo}@{branch}"
-                    async for chunk in _workflow.with_config(run_name=run_name_val).astream(initial_state, config=config):
+                    async for chunk in _workflow.with_config(
+                        run_name=run_name_val
+                    ).astream(initial_state, config=config):
                         q.put(chunk)
                         count += 1
-                        logger.debug(f"[stream_analysis_sse] 线程 yield chunk {count}: {type(chunk).__name__}")
-                    logger.info(f"[stream_analysis_sse] 线程 astream 完成，共 {count} 个 chunks")
+                        logger.debug(
+                            f"[stream_analysis_sse] 线程 yield chunk {count}: {type(chunk).__name__}"
+                        )
+                    logger.info(
+                        f"[stream_analysis_sse] 线程 astream 完成，共 {count} 个 chunks"
+                    )
                     q.put(None)
 
                 loop.run_until_complete(consume())
                 loop.close()
             except Exception as e:
                 import traceback
-                logger.error(f"[stream_analysis_sse] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+
+                logger.error(
+                    f"[stream_analysis_sse] 线程异常: {type(e).__name__}: {e}\n{traceback.format_exc()}"
+                )
                 exc_info.append(e)
                 q.put(None)
 
         import threading
-        logger.debug(f"[stream_analysis_sse] 创建线程...")
+
+        logger.debug("[stream_analysis_sse] 创建线程...")
         t = threading.Thread(target=run, daemon=True)
         t.start()
-        logger.debug(f"[stream_analysis_sse] 线程已启动，wait q.get()")
+        logger.debug("[stream_analysis_sse] 线程已启动，wait q.get()")
 
         # 心跳配置：每 45 秒发送一次 keep-alive，防止 SSE 连接超时断开
         heartbeat_interval = 45  # 秒
@@ -1212,11 +1337,15 @@ def stream_analysis_sse(
                 continue
 
             if chunk is None:
-                logger.info(f"[stream_analysis_sse] 收到哨兵，退出循环")
+                logger.info("[stream_analysis_sse] 收到哨兵，退出循环")
                 break
 
-            logger.debug(f"[stream_analysis_sse] 主线程收到 chunk: {type(chunk).__name__}")
-            for sse in _dispatch_chunk(chunk, config, owner, repo, status_sent, result_sent):
+            logger.debug(
+                f"[stream_analysis_sse] 主线程收到 chunk: {type(chunk).__name__}"
+            )
+            for sse in _dispatch_chunk(
+                chunk, config, owner, repo, status_sent, result_sent
+            ):
                 yield sse
                 last_heartbeat_time[0] = time.time()  # 有数据发送时重置心跳计时器
 
@@ -1226,6 +1355,7 @@ def stream_analysis_sse(
         # 分析完成，保存到缓存
         try:
             from utils.llm_factory import get_token_stats
+
             stats = get_token_stats()
             logger.info(
                 f"[stream_analysis_sse] 分析完成: "
@@ -1242,20 +1372,25 @@ def stream_analysis_sse(
 
         # 确保 final_result 被发送到前端（修复反思节点后 final_result 事件丢失的问题）
         if final_result:
-            logger.info(f"[stream_analysis_sse] 发送 final_result: {list(final_result.keys())}")
-            yield format_sse_event({
-                "type": "result",
-                "agent": "final_result",
-                "message": "全部分析完成",
-                "percent": 100,
-                "data": final_result,
-            })
+            logger.info(
+                f"[stream_analysis_sse] 发送 final_result: {list(final_result.keys())}"
+            )
+            yield format_sse_event(
+                {
+                    "type": "result",
+                    "agent": "final_result",
+                    "message": "全部分析完成",
+                    "percent": 100,
+                    "data": final_result,
+                }
+            )
 
         yield "data: [DONE]\n\n"
 
     except Exception as e:
         logger.error(f"[stream_analysis_sse] 异常: {type(e).__name__}: {e}")
         import traceback
+
         logger.error(f"[stream_analysis_sse] 堆栈: {traceback.format_exc()}")
         yield format_sse_error("pipeline", f"分析异常: {type(e).__name__}: {str(e)}")
         yield "data: [DONE]\n\n"
@@ -1276,7 +1411,15 @@ def _dispatch_chunk(
             node_data_map = chunk.get("data", {})
             if isinstance(node_data_map, dict):
                 for node_name, node_output in node_data_map.items():
-                    for sse in _yield_sse_for_node(node_name, node_output, config, owner, repo, status_sent, result_sent):
+                    for sse in _yield_sse_for_node(
+                        node_name,
+                        node_output,
+                        config,
+                        owner,
+                        repo,
+                        status_sent,
+                        result_sent,
+                    ):
                         yield sse
         elif chunk_type == "values":
             current_state = chunk.get("data", {})
@@ -1292,13 +1435,29 @@ def _dispatch_chunk(
                     yield sse
         else:
             for node_name, node_output in chunk.items():
-                for sse in _yield_sse_for_node(node_name, node_output, config, owner, repo, status_sent, result_sent):
+                for sse in _yield_sse_for_node(
+                    node_name,
+                    node_output,
+                    config,
+                    owner,
+                    repo,
+                    status_sent,
+                    result_sent,
+                ):
                     yield sse
     else:
         try:
             if len(chunk) == 2:
                 node_name, node_output = chunk
-                for sse in _yield_sse_for_node(node_name, node_output, config, owner, repo, status_sent, result_sent):
+                for sse in _yield_sse_for_node(
+                    node_name,
+                    node_output,
+                    config,
+                    owner,
+                    repo,
+                    status_sent,
+                    result_sent,
+                ):
                     yield sse
         except (TypeError, ValueError):
             logger.warning(f"[stream_analysis_sse] 无法解析 chunk: {type(chunk)}")
@@ -1370,42 +1529,54 @@ def _state_to_sse_events(
 
         if "react_loader" not in status_sent:
             status_sent.add("react_loader")
-            events.append(format_sse_event({
-                "type": "status",
-                "agent": "react_loader",
-                "message": "正在使用 ReAct 智能探索仓库...",
-                "percent": 25,
-                "data": None,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "status",
+                        "agent": "react_loader",
+                        "message": "正在使用 ReAct 智能探索仓库...",
+                        "percent": 25,
+                        "data": None,
+                    }
+                )
+            )
 
         for ev in react_events:
             if ev.get("type") == "progress":
-                events.append(format_sse_event({
-                    "type": "progress",
-                    "agent": ev.get("agent", "react_loader"),
-                    "message": ev.get("message", ""),
-                    "percent": ev.get("percent", 50),
-                    "data": ev.get("data"),
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "progress",
+                            "agent": ev.get("agent", "react_loader"),
+                            "message": ev.get("message", ""),
+                            "percent": ev.get("percent", 50),
+                            "data": ev.get("data"),
+                        }
+                    )
+                )
 
         for ev in react_events:
             if ev.get("type") == "result":
                 data = ev.get("data", {})
-                events.append(format_sse_event({
-                    "type": "result",
-                    "agent": "react_loader",
-                    "message": ev.get("message", "ReAct 探索完成"),
-                    "percent": data.get("percent", 100),
-                    "data": {
-                        "total_iterations": data.get("total_iterations"),
-                        "total_tree_files": total_tree_files,
-                        "loaded_count": len(loaded_paths),
-                        "loaded_paths": data.get("loaded_paths", []),
-                        "is_sufficient": data.get("is_sufficient"),
-                        "summary": data.get("summary", ""),
-                        "repo_sha": state.get("repo_sha"),
-                    },
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "result",
+                            "agent": "react_loader",
+                            "message": ev.get("message", "ReAct 探索完成"),
+                            "percent": data.get("percent", 100),
+                            "data": {
+                                "total_iterations": data.get("total_iterations"),
+                                "total_tree_files": total_tree_files,
+                                "loaded_count": len(loaded_paths),
+                                "loaded_paths": data.get("loaded_paths", []),
+                                "is_sufficient": data.get("is_sufficient"),
+                                "summary": data.get("summary", ""),
+                                "repo_sha": state.get("repo_sha"),
+                            },
+                        }
+                    )
+                )
 
     # ── explorer ──────────────────────────────────────────────────────
     elif node_name == "explorer":
@@ -1413,47 +1584,63 @@ def _state_to_sse_events(
 
         if "explorer" not in status_sent:
             status_sent.add("explorer")
-            events.append(format_sse_event({
-                "type": "status",
-                "agent": "explorer",
-                "message": "并行探索启动：TechStack / Quality / Architecture...",
-                "percent": 50,
-                "data": None,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "status",
+                        "agent": "explorer",
+                        "message": "并行探索启动：TechStack / Quality / Architecture...",
+                        "percent": 50,
+                        "data": None,
+                    }
+                )
+            )
 
         if explorer_result:
             msg_explorer_done = "并行探索完成"
             if msg_explorer_done not in status_sent:
                 status_sent.add(msg_explorer_done)
-                events.append(format_sse_event({
-                    "type": "progress",
-                    "agent": "explorer",
-                    "message": msg_explorer_done,
-                    "percent": 76,
-                    "data": explorer_result,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "progress",
+                            "agent": "explorer",
+                            "message": msg_explorer_done,
+                            "percent": 76,
+                            "data": explorer_result,
+                        }
+                    )
+                )
 
         ts_result = state.get("tech_stack_result")
         if ts_result:
             msg_ts_done = "技术栈识别完成"
             if msg_ts_done not in status_sent:
                 status_sent.add(msg_ts_done)
-                events.append(format_sse_event({
-                    "type": "progress",
-                    "agent": "tech_stack",
-                    "message": msg_ts_done,
-                    "percent": 82,
-                    "data": ts_result,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "progress",
+                            "agent": "tech_stack",
+                            "message": msg_ts_done,
+                            "percent": 82,
+                            "data": ts_result,
+                        }
+                    )
+                )
             if "tech_stack" not in result_sent:
                 result_sent.add("tech_stack")
-                events.append(format_sse_event({
-                    "type": "result",
-                    "agent": "tech_stack",
-                    "message": "技术栈分析完成",
-                    "percent": 82,
-                    "data": ts_result,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "result",
+                            "agent": "tech_stack",
+                            "message": "技术栈分析完成",
+                            "percent": 82,
+                            "data": ts_result,
+                        }
+                    )
+                )
 
         q_result = state.get("quality_result")
         if q_result:
@@ -1461,42 +1648,58 @@ def _state_to_sse_events(
             msg_q_done = "代码质量分析完成"
             if msg_q_done not in status_sent:
                 status_sent.add(msg_q_done)
-                events.append(format_sse_event({
-                    "type": "progress",
-                    "agent": "quality",
-                    "message": msg_q_done,
-                    "percent": 85,
-                    "data": q_normalized,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "progress",
+                            "agent": "quality",
+                            "message": msg_q_done,
+                            "percent": 85,
+                            "data": q_normalized,
+                        }
+                    )
+                )
             if "quality" not in result_sent:
                 result_sent.add("quality")
-                events.append(format_sse_event({
-                    "type": "result",
-                    "agent": "quality",
-                    "message": "代码质量分析完成",
-                    "percent": 85,
-                    "data": q_normalized,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "result",
+                            "agent": "quality",
+                            "message": "代码质量分析完成",
+                            "percent": 85,
+                            "data": q_normalized,
+                        }
+                    )
+                )
 
         dep_result = state.get("dependency_result")
         if dep_result is not None and "dependency" not in status_sent:
             status_sent.add("dependency")
-            events.append(format_sse_event({
-                "type": "status",
-                "agent": "dependency",
-                "message": "依赖风险分析完成",
-                "percent": 87,
-                "data": None,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "status",
+                        "agent": "dependency",
+                        "message": "依赖风险分析完成",
+                        "percent": 87,
+                        "data": None,
+                    }
+                )
+            )
             if "dependency" not in result_sent:
                 result_sent.add("dependency")
-                events.append(format_sse_event({
-                    "type": "result",
-                    "agent": "dependency",
-                    "message": "依赖风险分析完成",
-                    "percent": 87,
-                    "data": dep_result or {},
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "result",
+                            "agent": "dependency",
+                            "message": "依赖风险分析完成",
+                            "percent": 87,
+                            "data": dep_result or {},
+                        }
+                    )
+                )
 
     # ── architecture ────────────────────────────────────────────────
     elif node_name == "architecture":
@@ -1509,45 +1712,61 @@ def _state_to_sse_events(
             msg = ev.get("message") or "架构分析中..."
             if msg not in status_sent:
                 status_sent.add(msg)
-                events.append(format_sse_event({
-                    "type": ev.get("type", "progress"),
-                    "agent": ev.get("agent", "architecture"),
-                    "message": msg,
-                    "percent": ev.get("percent", 88),
-                    "data": ev.get("data"),
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": ev.get("type", "progress"),
+                            "agent": ev.get("agent", "architecture"),
+                            "message": msg,
+                            "percent": ev.get("percent", 88),
+                            "data": ev.get("data"),
+                        }
+                    )
+                )
 
         if "architecture" not in status_sent:
             status_sent.add("architecture")
-            events.append(format_sse_event({
-                "type": "status",
-                "agent": "architecture",
-                "message": "正在评估项目架构...",
-                "percent": 88,
-                "data": None,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "status",
+                        "agent": "architecture",
+                        "message": "正在评估项目架构...",
+                        "percent": 88,
+                        "data": None,
+                    }
+                )
+            )
         if result:
             total_tree_files = state.get("total_tree_files") or 0
             arch_data_with_tree = {**result, "total_tree_files": total_tree_files}
             msg_done = "架构评估完成"
             if msg_done not in status_sent:
                 status_sent.add(msg_done)
-                events.append(format_sse_event({
-                    "type": "progress",
-                    "agent": "architecture",
-                    "message": msg_done,
-                    "percent": 91,
-                    "data": arch_data_with_tree,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "progress",
+                            "agent": "architecture",
+                            "message": msg_done,
+                            "percent": 91,
+                            "data": arch_data_with_tree,
+                        }
+                    )
+                )
             if "architecture" not in result_sent:
                 result_sent.add("architecture")
-                events.append(format_sse_event({
-                    "type": "result",
-                    "agent": "architecture",
-                    "message": "架构评估完成",
-                    "percent": 91,
-                    "data": arch_data_with_tree,
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "result",
+                            "agent": "architecture",
+                            "message": "架构评估完成",
+                            "percent": 91,
+                            "data": arch_data_with_tree,
+                        }
+                    )
+                )
 
     # ── react_suggestion ──────────────────────────────────────────────
     elif node_name == "react_suggestion":
@@ -1557,13 +1776,17 @@ def _state_to_sse_events(
 
         if "react_suggestion" not in status_sent:
             status_sent.add("react_suggestion")
-            events.append(format_sse_event({
-                "type": "status",
-                "agent": "optimization",
-                "message": "正在使用 ReAct 生成优化建议（主动验证中）...",
-                "percent": 93,
-                "data": None,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "status",
+                        "agent": "optimization",
+                        "message": "正在使用 ReAct 生成优化建议（主动验证中）...",
+                        "percent": 93,
+                        "data": None,
+                    }
+                )
+            )
 
         for ev in opt_events:
             if ev.get("type") == "status":
@@ -1572,35 +1795,47 @@ def _state_to_sse_events(
             ev_percent = ev.get("percent", 93)
             ev_message = ev.get("message") or "生成优化建议中..."
             ev_data = ev.get("data")
-            events.append(format_sse_event({
-                "type": ev_type,
-                "agent": ev.get("agent", "react_suggestion"),
-                "message": ev_message,
-                "percent": ev_percent,
-                "data": ev_data,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": ev_type,
+                        "agent": ev.get("agent", "react_suggestion"),
+                        "message": ev_message,
+                        "percent": ev_percent,
+                        "data": ev_data,
+                    }
+                )
+            )
             if ev_type == "result":
                 result_sent.add("react_suggestion_result")
 
         if opt_result and "react_suggestion" not in result_sent:
             result_sent.add("react_suggestion")
-            events.append(format_sse_event({
-                "type": "result",
-                "agent": "optimization",
-                "message": f"ReAct 生成了优化建议",
-                "percent": 98,
-                "data": opt_result,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "result",
+                        "agent": "optimization",
+                        "message": "ReAct 生成了优化建议",
+                        "percent": 98,
+                        "data": opt_result,
+                    }
+                )
+            )
 
         if final_result and "final_result" not in result_sent:
             result_sent.add("final_result")
-            events.append(format_sse_event({
-                "type": "result",
-                "agent": "final_result",
-                "message": "全部分析完成",
-                "percent": 100,
-                "data": final_result,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "result",
+                        "agent": "final_result",
+                        "message": "全部分析完成",
+                        "percent": 100,
+                        "data": final_result,
+                    }
+                )
+            )
 
     # ── reflector (反思节点) ───────────────────────────────────────────
     elif node_name == "reflector":
@@ -1625,13 +1860,17 @@ def _state_to_sse_events(
 
         if "reflector" not in status_sent:
             status_sent.add("reflector")
-            events.append(format_sse_event({
-                "type": "status",
-                "agent": "reflection",
-                "message": f"正在执行反思审查（第 {reflection_round} 轮）...",
-                "percent": 93,
-                "data": None,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "status",
+                        "agent": "reflection",
+                        "message": f"正在执行反思审查（第 {reflection_round} 轮）...",
+                        "percent": 93,
+                        "data": None,
+                    }
+                )
+            )
 
         for ev in reflection_events:
             if ev.get("type") == "status":
@@ -1640,39 +1879,55 @@ def _state_to_sse_events(
             ev_percent = ev.get("percent", 94)
             ev_message = ev.get("message") or "反思审查中..."
             ev_data = ev.get("data")
-            events.append(format_sse_event({
-                "type": ev_type,
-                "agent": ev.get("agent", "reflection"),
-                "message": ev_message,
-                "percent": ev_percent,
-                "data": ev_data,
-            }))
+            events.append(
+                format_sse_event(
+                    {
+                        "type": ev_type,
+                        "agent": ev.get("agent", "reflection"),
+                        "message": ev_message,
+                        "percent": ev_percent,
+                        "data": ev_data,
+                    }
+                )
+            )
 
         if reflection_results and "reflection_result" not in result_sent:
             result_sent.add("reflection_result")
-            confidence_level = "high" if overall_confidence >= 0.8 else ("medium" if overall_confidence >= 0.5 else "low")
-            events.append(format_sse_event({
-                "type": "result",
-                "agent": "reflection",
-                "message": f"反思完成: 置信度 {overall_confidence * 100:.0f}% ({confidence_level})",
-                "percent": 96,
-                "data": {
-                    "reflection_round": reflection_round,
-                    "overall_confidence": overall_confidence,
-                    "confidence_level": confidence_level,
-                    "needs_retry": needs_retry,
-                    "reflection_results": reflection_results,
-                },
-            }))
+            confidence_level = (
+                "high"
+                if overall_confidence >= 0.8
+                else ("medium" if overall_confidence >= 0.5 else "low")
+            )
+            events.append(
+                format_sse_event(
+                    {
+                        "type": "result",
+                        "agent": "reflection",
+                        "message": f"反思完成: 置信度 {overall_confidence * 100:.0f}% ({confidence_level})",
+                        "percent": 96,
+                        "data": {
+                            "reflection_round": reflection_round,
+                            "overall_confidence": overall_confidence,
+                            "confidence_level": confidence_level,
+                            "needs_retry": needs_retry,
+                            "reflection_results": reflection_results,
+                        },
+                    }
+                )
+            )
 
             if needs_retry:
-                events.append(format_sse_event({
-                    "type": "status",
-                    "agent": "reflection",
-                    "message": "反思建议重试，质量需改进",
-                    "percent": 97,
-                    "data": {"needs_retry": True},
-                }))
+                events.append(
+                    format_sse_event(
+                        {
+                            "type": "status",
+                            "agent": "reflection",
+                            "message": "反思建议重试，质量需改进",
+                            "percent": 97,
+                            "data": {"needs_retry": True},
+                        }
+                    )
+                )
 
     return events
 
@@ -1696,7 +1951,9 @@ def run_analysis_sync(
     }
     run_name_val = run_name or f"{owner}/{repo}@{branch}"
     initial_state = build_initial_state(repo_url, branch)
-    final_state = _workflow.with_config(run_name=run_name_val).invoke(initial_state, config=config)
+    final_state = _workflow.with_config(run_name=run_name_val).invoke(
+        initial_state, config=config
+    )
     return final_state.get("final_result") or {}
 
 
@@ -1722,6 +1979,7 @@ def build_initial_state(
         owner, repo = parsed
         try:
             from tools.github_tools import get_repo_info
+
             info_raw = get_repo_info.invoke({"owner": owner, "repo": repo})
             info = json.loads(info_raw)
             resolved_repo_info = info
@@ -1731,7 +1989,9 @@ def build_initial_state(
             if not branch or branch.lower() in ("main", "master"):
                 resolved_branch = api_default
                 if branch and branch.lower() != api_default.lower():
-                    logger.info(f"[build_initial_state] 分支修正: {branch} -> {api_default}（仓库默认分支）")
+                    logger.info(
+                        f"[build_initial_state] 分支修正: {branch} -> {api_default}（仓库默认分支）"
+                    )
             # 预填充代码语言（前3），供 Explorer 的 get_file_tree 过滤使用
             langs = info.get("languages") or {}
             resolved_languages = list(langs.keys())[:3]

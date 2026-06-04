@@ -2,6 +2,7 @@
 Admin 管理端相关路由 (/api/admin/*)
 用户管理、分析历史管理等
 """
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 
 from dependencies import get_current_admin, get_sb_client

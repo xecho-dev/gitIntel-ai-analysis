@@ -16,8 +16,8 @@
     )
     agent = create_agent(model=llm, tools=wrapped, ...)
 """
+
 import logging
-from typing import Any
 
 from langchain_core.tools import StructuredTool
 
@@ -30,6 +30,7 @@ _LOOP_THRESHOLD = 3
 
 
 # ─── 异常定义 ────────────────────────────────────────────────────────────────
+
 
 class ToolLoopInterrupt(BaseException):
     """工具层错误循环打断异常（继承 BaseException，LangGraph ToolNode 不会 catch）。
@@ -49,8 +50,7 @@ class ToolLoopInterrupt(BaseException):
         self.pattern = pattern
         self.count = count
         super().__init__(
-            f"Agent 因工具 {tool_name} 连续 {count} 次相同错误打断: "
-            f"'{pattern[:80]}...'"
+            f"Agent 因工具 {tool_name} 连续 {count} 次相同错误打断: '{pattern[:80]}...'"
         )
 
 
@@ -131,6 +131,7 @@ def _normalize_invocation_args(args: dict, tool_name: str) -> dict:
                     return {**args, **inner_kw}
         elif isinstance(inner, str):
             import json
+
             try:
                 parsed = json.loads(inner)
                 if isinstance(parsed, dict) and "args" in parsed and "config" in parsed:
@@ -138,6 +139,7 @@ def _normalize_invocation_args(args: dict, tool_name: str) -> dict:
             except json.JSONDecodeError:
                 # JSON 解析失败时，尝试用 ast.literal_eval 解析 Python 字典格式
                 import ast
+
                 try:
                     parsed = ast.literal_eval(inner)
                     if isinstance(parsed, dict):
@@ -164,6 +166,7 @@ def _normalize_invocation_args(args: dict, tool_name: str) -> dict:
 
 
 # ─── 辅助函数 ───────────────────────────────────────────────────────────────
+
 
 def _parse_python_style_args(args_str: str) -> dict | None:
     """解析 Python 风格的参数字符串。
@@ -195,7 +198,7 @@ def _parse_python_style_args(args_str: str) -> dict | None:
 
     # 如果上面没匹配到，尝试匹配 key=value（无引号）
     # 但这种情况下值不能包含特殊字符
-    pattern2 = r'(\w+)=([\w.-]+)'
+    pattern2 = r"(\w+)=([\w.-]+)"
     matches2 = re.findall(pattern2, args_str)
 
     if matches2:
@@ -210,6 +213,7 @@ def _parse_python_style_args(args_str: str) -> dict | None:
 def _filter_tree(languages: list[str], tree: list[dict]) -> list[dict]:
     """根据语言扩展名过滤文件树（供 inject_context 使用）。"""
     from utils.tree_filter import filter_file_tree
+
     return filter_file_tree(tree, languages)
 
 
@@ -306,10 +310,13 @@ def inject_context(
             if languages and languages is not None:
                 try:
                     import json
+
                     tree = json.loads(raw_result)
                     filtered = _filter_tree(languages, tree)
                     raw_result = json.dumps(filtered, ensure_ascii=False)
-                    logger.info(f"[inject_context] get_file_tree 过滤: {len(tree)} → {len(filtered)} 条")
+                    logger.info(
+                        f"[inject_context] get_file_tree 过滤: {len(tree)} → {len(filtered)} 条"
+                    )
                 except Exception:
                     pass  # 解析失败时返回原始结果
             result = raw_result
@@ -339,17 +346,24 @@ def inject_context(
             elif not path:
                 result = _EMPTY_ERRORS.get(name, "path 参数为空")
             else:
-                result = _call_tool({
-                    "owner": owner, "repo": repo,
-                    "path": path, "ref": ref,
-                })
+                result = _call_tool(
+                    {
+                        "owner": owner,
+                        "repo": repo,
+                        "path": path,
+                        "ref": ref,
+                    }
+                )
 
         elif name == "get_file_blobs":
-            result = _call_tool({
-                "owner": owner, "repo": repo,
-                "paths": tool_args.get("paths", []),
-                "ref": ref,
-            })
+            result = _call_tool(
+                {
+                    "owner": owner,
+                    "repo": repo,
+                    "paths": tool_args.get("paths", []),
+                    "ref": ref,
+                }
+            )
 
         elif name == "search_code":
             query = tool_args.get("query", "").strip()
@@ -366,11 +380,14 @@ def inject_context(
             elif not query:
                 result = _EMPTY_ERRORS.get(name, "query 参数为空")
             else:
-                result = _call_tool({
-                    "owner": owner, "repo": repo,
-                    "query": query,
-                    "language": language,
-                })
+                result = _call_tool(
+                    {
+                        "owner": owner,
+                        "repo": repo,
+                        "query": query,
+                        "language": language,
+                    }
+                )
 
         elif name == "batch_search_code":
             queries = tool_args.get("queries", [])
@@ -378,10 +395,12 @@ def inject_context(
             # 处理 LLM 返回 JSON 字符串的情况
             if isinstance(queries, str):
                 import json
+
                 try:
                     queries = json.loads(queries)
                 except json.JSONDecodeError:
                     import ast
+
                     try:
                         queries = ast.literal_eval(queries)
                     except (ValueError, SyntaxError):
@@ -404,10 +423,13 @@ def inject_context(
             elif not queries:
                 result = _EMPTY_ERRORS.get(name, "queries 参数为空")
             else:
-                result = _call_tool({
-                    "owner": owner, "repo": repo,
-                    "queries": queries,
-                })
+                result = _call_tool(
+                    {
+                        "owner": owner,
+                        "repo": repo,
+                        "queries": queries,
+                    }
+                )
 
         elif name == "get_default_branch":
             result = _call_tool({"owner": owner, "repo": repo})
@@ -429,7 +451,9 @@ def inject_context(
 
             if _error_count >= _LOOP_THRESHOLD:
                 # 抛 BaseException：LangGraph ToolNode 不会 catch，直接传播打断 agent
-                raise ToolLoopInterrupt(tool_name=name, pattern=pattern, count=_error_count)
+                raise ToolLoopInterrupt(
+                    tool_name=name, pattern=pattern, count=_error_count
+                )
         else:
             # 成功调用，重置计数
             _error_count = 0
@@ -454,4 +478,7 @@ def wrap_tools(
     languages: list[str] | None = None,
 ) -> list[StructuredTool]:
     """包装一组工具，自动注入 owner/repo/ref。"""
-    return [inject_context(t, owner=owner, repo=repo, ref=ref, languages=languages) for t in tools]
+    return [
+        inject_context(t, owner=owner, repo=repo, ref=ref, languages=languages)
+        for t in tools
+    ]

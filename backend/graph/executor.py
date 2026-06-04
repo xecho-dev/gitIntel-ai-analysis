@@ -14,9 +14,10 @@ Pipeline Executor — Agent 执行引擎，封装 SSE 和同步执行的公共�
   # 从 state 提取参数
   repo_id, branch, file_contents = get_inputs_from_state(state)
 """
+
 import asyncio
 import json
-from typing import Any, ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar
 
 from .state import SharedState
 
@@ -27,6 +28,7 @@ T = TypeVar("T")
 
 # ─── SSE 事件格式化 ────────────────────────────────────────────────
 
+
 def format_sse_event(event: dict) -> str:
     """将 AgentEvent 格式化为 SSE 格式字符串。"""
     return f"data: {json.dumps(event)}\n\n"
@@ -34,16 +36,21 @@ def format_sse_event(event: dict) -> str:
 
 def format_sse_error(agent: str, message: str, data: dict | None = None) -> str:
     """格式化 SSE 错误事件（返回原始字符串，不带 data: 前缀）。"""
-    return f"data: {json.dumps({
-        "type": "error",
-        "agent": agent,
-        "message": message,
-        "percent": 0,
-        "data": data,
-    })}\n\n"
+    return f"data: {
+        json.dumps(
+            {
+                'type': 'error',
+                'agent': agent,
+                'message': message,
+                'percent': 0,
+                'data': data,
+            }
+        )
+    }\n\n"
 
 
 # ─── 通用 Agent 执行 ────────────────────────────────────────────────
+
 
 def run_agent_sync(
     agent,
@@ -72,6 +79,7 @@ def run_agent_sync(
 
 
 # ─── State 参数提取 ────────────────────────────────────────────────
+
 
 def parse_repo_url(url: str) -> tuple[str, str] | None:
     """解析 GitHub URL，返回 (owner, repo)。

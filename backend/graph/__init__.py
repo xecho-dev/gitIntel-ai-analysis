@@ -4,6 +4,7 @@ Graph — LangGraph 工作流包。
 注意：analysis_graph 的导入是 lazy 的（在 __getattr__ 中），因为它依赖 agents 层，
 直接导入会触发 agents → routers → analysis_graph → agents 的循环依赖。
 """
+
 from __future__ import annotations
 
 import sys
@@ -31,6 +32,7 @@ _LAZY_SUBMODULES = {
 def __getattr__(name: str) -> Any:
     if name in _LAZY_SUBMODULES:
         from . import analysis_graph as _ag
+
         return getattr(_ag, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

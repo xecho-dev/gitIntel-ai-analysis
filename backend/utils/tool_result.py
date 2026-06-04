@@ -17,6 +17,7 @@
         except Exception as e:
             return ToolError(str(e)).to_str()
 """
+
 import json
 from typing import Any
 
@@ -39,7 +40,9 @@ class ToolResult:
     _WARN_PREFIX = "[WARNING]"
     _SUCCESS_PREFIX = "[OK]"
 
-    def __init__(self, success: bool, data: Any = None, error: str = None, warn: str = None):
+    def __init__(
+        self, success: bool, data: Any = None, error: str = None, warn: str = None
+    ):
         self.success = success
         self.data = data
         self.error = error
@@ -89,7 +92,11 @@ class ToolResult:
         """判断字符串是否为成功响应。"""
         if not isinstance(s, str):
             return False
-        return s and not s.startswith(cls._ERROR_PREFIX) and not s.startswith(cls._WARN_PREFIX)
+        return (
+            s
+            and not s.startswith(cls._ERROR_PREFIX)
+            and not s.startswith(cls._WARN_PREFIX)
+        )
 
     def __str__(self):
         return self.to_str()

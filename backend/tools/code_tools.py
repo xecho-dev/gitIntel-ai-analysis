@@ -11,6 +11,7 @@
 
 这些工具让 Agent 能够动态选择分析哪些文件，而非一次性分析全部。
 """
+
 import json
 import logging
 import re
@@ -25,6 +26,7 @@ logger = logging.getLogger("gitintel")
 # ─── Lizard 导入（多语言复杂度分析库）────────────────────────────────────────
 try:
     import lizard
+
     _LIZARD_AVAILABLE = True
 except ImportError:
     _LIZARD_AVAILABLE = False
@@ -74,6 +76,7 @@ def _load_parser(language: str) -> Any | None:
 
     try:
         from tree_sitter_languages import get_parser
+
         parser = get_parser(language)
         _PARSER_CACHE[language] = parser
         return parser
@@ -100,17 +103,25 @@ def _parse_ast_regex_fallback(content: str, language: str) -> dict[str, Any]:
         # function declarations
         re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\("),
         # const/let/var arrow functions with name
-        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>"),
+        re.compile(
+            r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>"
+        ),
         # const/let/var methods
-        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?function\b"),
+        re.compile(
+            r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?function\b"
+        ),
         # class methods (including private)
-        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{"),
+        re.compile(
+            r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{"
+        ),
     ]
 
     # TypeScript 函数匹配（带类型注解）
     ts_func_patterns = [
         re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[<(]"),
-        re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*:\s*\w+\s*=\s*(?:async\s+)?\("),
+        re.compile(
+            r"^\s*(?:export\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:const|let|var)\s+(\w+)\s*:\s*\w+\s*=\s*(?:async\s+)?\("
+        ),
         # class methods with type annotations
         re.compile(r"^\s*(?:export\s+)?(?:static\s+)?(\w+)\s*\([^)]*\)\s*:\s*\w+\s*\{"),
     ]
@@ -129,7 +140,11 @@ def _parse_ast_regex_fallback(content: str, language: str) -> dict[str, Any]:
         stripped = line.strip()
 
         # 跳过注释行
-        if stripped.startswith("//") or stripped.startswith("/*") or stripped.startswith("*"):
+        if (
+            stripped.startswith("//")
+            or stripped.startswith("/*")
+            or stripped.startswith("*")
+        ):
             if len(stripped) > 5:
                 comments.append({"line": i, "text": stripped[:100]})
             continue
@@ -137,30 +152,40 @@ def _parse_ast_regex_fallback(content: str, language: str) -> dict[str, Any]:
         # 匹配类定义
         class_match = class_pattern.match(line)
         if class_match:
-            classes.append({
-                "name": class_match.group(1),
-                "start_line": i,
-                "end_line": i,
-                "bases": [],
-            })
+            classes.append(
+                {
+                    "name": class_match.group(1),
+                    "start_line": i,
+                    "end_line": i,
+                    "bases": [],
+                }
+            )
             continue
 
         # 匹配函数定义（根据语言选择模式）
         matched = False
-        patterns = ts_func_patterns if language in ("typescript", "tsx") else func_patterns
+        patterns = (
+            ts_func_patterns if language in ("typescript", "tsx") else func_patterns
+        )
         for pattern in patterns:
             match = pattern.match(line)
             if match:
                 func_name = match.group(1)
                 # 跳过私有方法、构造函数、getter/setter
-                if not func_name.startswith("_") and func_name not in ("constructor", "get", "set"):
-                    functions.append({
-                        "name": func_name,
-                        "start_line": i,
-                        "end_line": i,
-                        "parameters": "",
-                        "decorators": [],
-                    })
+                if not func_name.startswith("_") and func_name not in (
+                    "constructor",
+                    "get",
+                    "set",
+                ):
+                    functions.append(
+                        {
+                            "name": func_name,
+                            "start_line": i,
+                            "end_line": i,
+                            "parameters": "",
+                            "decorators": [],
+                        }
+                    )
                     matched = True
                     break
         if matched:
@@ -186,12 +211,27 @@ def _parse_ast_regex_fallback(content: str, language: str) -> dict[str, Any]:
 # ─── 语言扩展名映射 ──────────────────────────────────────────────────────────
 
 _EXT_TO_LANGUAGE: dict[str, str] = {
-    "py": "python", "js": "javascript", "ts": "typescript",
-    "tsx": "tsx", "jsx": "javascript", "go": "go",
-    "rs": "rust", "java": "java", "c": "c", "cpp": "cpp",
-    "cc": "cpp", "cxx": "cpp", "rb": "ruby", "swift": "swift",
-    "kt": "kotlin", "kts": "kotlin", "scala": "scala",
-    "php": "php", "dart": "dart", "zig": "zig", "cs": "csharp",
+    "py": "python",
+    "js": "javascript",
+    "ts": "typescript",
+    "tsx": "tsx",
+    "jsx": "javascript",
+    "go": "go",
+    "rs": "rust",
+    "java": "java",
+    "c": "c",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "rb": "ruby",
+    "swift": "swift",
+    "kt": "kotlin",
+    "kts": "kotlin",
+    "scala": "scala",
+    "php": "php",
+    "dart": "dart",
+    "zig": "zig",
+    "cs": "csharp",
 }
 
 # 函数/类定义的 AST 节点关键字（多语言）
@@ -202,7 +242,16 @@ _FUNC_KEYWORDS: dict[str, list[str]] = {
     "vue": ["function ", "const ", "let ", "async "],
     "go": ["func "],
     "rust": ["fn "],
-    "java": ["public ", "private ", "protected ", "void ", "int ", "String ", "boolean ", "@"],
+    "java": [
+        "public ",
+        "private ",
+        "protected ",
+        "void ",
+        "int ",
+        "String ",
+        "boolean ",
+        "@",
+    ],
     "cpp": ["void ", "int ", "auto ", "std::", "class ", "struct "],
     "csharp": ["public ", "private ", "void ", "async ", "Task<", "string "],
     "ruby": ["def ", "class ", "module "],
@@ -237,66 +286,279 @@ _IMPORT_KEYWORDS: dict[str, list[str]] = {
 # 标准库定义（多语言）
 _STDLIB: dict[str, set[str]] = {
     "python": {
-        "os", "sys", "json", "re", "math", "time", "datetime", "collections",
-        "itertools", "functools", "typing", "pathlib", "requests", "urllib",
-        "http", "io", "argparse", "logging", "dataclasses", "enum", "abc",
-        "copy", "pickle", "sqlite3", "csv", "gzip", "zipfile", "uuid",
-        "hashlib", "base64", "threading", "multiprocessing", "asyncio",
-        "random", "string", "struct", "array", "weakref", "gc", "warnings",
+        "os",
+        "sys",
+        "json",
+        "re",
+        "math",
+        "time",
+        "datetime",
+        "collections",
+        "itertools",
+        "functools",
+        "typing",
+        "pathlib",
+        "requests",
+        "urllib",
+        "http",
+        "io",
+        "argparse",
+        "logging",
+        "dataclasses",
+        "enum",
+        "abc",
+        "copy",
+        "pickle",
+        "sqlite3",
+        "csv",
+        "gzip",
+        "zipfile",
+        "uuid",
+        "hashlib",
+        "base64",
+        "threading",
+        "multiprocessing",
+        "asyncio",
+        "random",
+        "string",
+        "struct",
+        "array",
+        "weakref",
+        "gc",
+        "warnings",
     },
     "javascript": {
-        "fs", "path", "os", "http", "https", "url", "querystring", "crypto",
-        "buffer", "stream", "events", "util", "assert", "constants", "events",
-        "child_process", "cluster", "dgram", "dns", "domain", "net", "readline",
-        "repl", "string_decoder", "tls", "tty", "vm", "zlib", "console", "process",
+        "fs",
+        "path",
+        "os",
+        "http",
+        "https",
+        "url",
+        "querystring",
+        "crypto",
+        "buffer",
+        "stream",
+        "events",
+        "util",
+        "assert",
+        "constants",
+        "events",
+        "child_process",
+        "cluster",
+        "dgram",
+        "dns",
+        "domain",
+        "net",
+        "readline",
+        "repl",
+        "string_decoder",
+        "tls",
+        "tty",
+        "vm",
+        "zlib",
+        "console",
+        "process",
     },
     "typescript": {
-        "fs", "path", "os", "http", "https", "url", "querystring", "crypto",
-        "buffer", "stream", "events", "util", "assert", "constants", "child_process",
-        "cluster", "dgram", "dns", "domain", "net", "readline", "console", "process",
+        "fs",
+        "path",
+        "os",
+        "http",
+        "https",
+        "url",
+        "querystring",
+        "crypto",
+        "buffer",
+        "stream",
+        "events",
+        "util",
+        "assert",
+        "constants",
+        "child_process",
+        "cluster",
+        "dgram",
+        "dns",
+        "domain",
+        "net",
+        "readline",
+        "console",
+        "process",
     },
     "vue": {
         # Vue 生态
-        "vue", "vue-router", "pinia", "vuex", "vue-i18n", "vue-meta",
+        "vue",
+        "vue-router",
+        "pinia",
+        "vuex",
+        "vue-i18n",
+        "vue-meta",
         # 状态管理
-        "zustand", "redux", "mobx", "recoil",
+        "zustand",
+        "redux",
+        "mobx",
+        "recoil",
         # UI 框架
-        "element-plus", "ant-design-vue", "vuetify", "quasar", "naive-ui",
+        "element-plus",
+        "ant-design-vue",
+        "vuetify",
+        "quasar",
+        "naive-ui",
         # 工具库
-        "axios", "fetch", "lodash", "dayjs", "moment",
+        "axios",
+        "fetch",
+        "lodash",
+        "dayjs",
+        "moment",
         # 打包/开发
-        "vite", "webpack", "@vitejs", "vite-plugin",
+        "vite",
+        "webpack",
+        "@vitejs",
+        "vite-plugin",
     },
     "go": {
-        "fmt", "os", "io", "bufio", "strings", "strconv", "bytes", "net/http",
-        "encoding/json", "errors", "sync", "time", "log", "os/exec", "flag",
-        "math", "sort", "container/list", "context", "database/sql", "crypto",
-        "hash", "regexp", "unicode", "unicode/utf8", "path", "path/filepath",
+        "fmt",
+        "os",
+        "io",
+        "bufio",
+        "strings",
+        "strconv",
+        "bytes",
+        "net/http",
+        "encoding/json",
+        "errors",
+        "sync",
+        "time",
+        "log",
+        "os/exec",
+        "flag",
+        "math",
+        "sort",
+        "container/list",
+        "context",
+        "database/sql",
+        "crypto",
+        "hash",
+        "regexp",
+        "unicode",
+        "unicode/utf8",
+        "path",
+        "path/filepath",
     },
     "rust": {
-        "std", "core", "alloc", "collections", "fmt", "io", "iter", "mem",
-        "option", "result", "string", "vec", "boxed", "rc", "cell", "refcell",
-        "sync", "thread", "time", "path", "fs", "net", "os", "env", "process",
-        "num", "convert", "marker", "task", "future", "pin", "async_await",
+        "std",
+        "core",
+        "alloc",
+        "collections",
+        "fmt",
+        "io",
+        "iter",
+        "mem",
+        "option",
+        "result",
+        "string",
+        "vec",
+        "boxed",
+        "rc",
+        "cell",
+        "refcell",
+        "sync",
+        "thread",
+        "time",
+        "path",
+        "fs",
+        "net",
+        "os",
+        "env",
+        "process",
+        "num",
+        "convert",
+        "marker",
+        "task",
+        "future",
+        "pin",
+        "async_await",
     },
     "java": {
-        "java.lang", "java.util", "java.io", "java.nio", "java.math",
-        "java.text", "java.time", "java.net", "java.sql", "java.security",
-        "java.util.concurrent", "java.util.stream", "java.util.function",
-        "javax.servlet", "org.springframework", "org.apache",
+        "java.lang",
+        "java.util",
+        "java.io",
+        "java.nio",
+        "java.math",
+        "java.text",
+        "java.time",
+        "java.net",
+        "java.sql",
+        "java.security",
+        "java.util.concurrent",
+        "java.util.stream",
+        "java.util.function",
+        "javax.servlet",
+        "org.springframework",
+        "org.apache",
     },
     "cpp": {
-        "iostream", "vector", "string", "map", "set", "unordered_map", "unordered_set",
-        "memory", "algorithm", "functional", "numeric", "cassert", "cctype",
-        "cerrno", "cfloat", "cmath", "cstdlib", "cstring", "ctime", "deque",
-        "list", "stack", "queue", "fstream", "sstream", "thread", "mutex",
-        "atomic", "future", "regex", "random",
+        "iostream",
+        "vector",
+        "string",
+        "map",
+        "set",
+        "unordered_map",
+        "unordered_set",
+        "memory",
+        "algorithm",
+        "functional",
+        "numeric",
+        "cassert",
+        "cctype",
+        "cerrno",
+        "cfloat",
+        "cmath",
+        "cstdlib",
+        "cstring",
+        "ctime",
+        "deque",
+        "list",
+        "stack",
+        "queue",
+        "fstream",
+        "sstream",
+        "thread",
+        "mutex",
+        "atomic",
+        "future",
+        "regex",
+        "random",
     },
     "typescript_tsx": {
-        "fs", "path", "os", "http", "https", "url", "querystring", "crypto",
-        "buffer", "stream", "events", "util", "assert", "constants", "child_process",
-        "cluster", "dgram", "dns", "domain", "net", "readline", "console", "process",
-        "react", "next", "@", "styled-components", "axios", "lodash",
+        "fs",
+        "path",
+        "os",
+        "http",
+        "https",
+        "url",
+        "querystring",
+        "crypto",
+        "buffer",
+        "stream",
+        "events",
+        "util",
+        "assert",
+        "constants",
+        "child_process",
+        "cluster",
+        "dgram",
+        "dns",
+        "domain",
+        "net",
+        "readline",
+        "console",
+        "process",
+        "react",
+        "next",
+        "@",
+        "styled-components",
+        "axios",
+        "lodash",
     },
 }
 
@@ -512,19 +774,31 @@ def _parse_ast_impl(file_path: str, content: str, language: str) -> dict[str, An
     if parser is None:
         # 当 tree-sitter 不可用时，对 JavaScript/TypeScript 使用正则表达式兜底
         if language in ("javascript", "typescript", "tsx", "jsx"):
-            logger.debug(f"[code_tools] tree-sitter 不可用，使用正则表达式解析 {language}")
+            logger.debug(
+                f"[code_tools] tree-sitter 不可用，使用正则表达式解析 {language}"
+            )
             return _parse_ast_regex_fallback(content, language)
 
         return {
             "error": f"不支持的语言: {language}，或 tree-sitter 解析器未安装",
-            "functions": [], "classes": [], "imports": [],
-            "comments": [], "lines": len(content.splitlines()),
+            "functions": [],
+            "classes": [],
+            "imports": [],
+            "comments": [],
+            "lines": len(content.splitlines()),
         }
 
     try:
         tree = parser.parse(bytes(content, "utf-8"))
     except Exception as e:
-        return {"error": str(e), "functions": [], "classes": [], "imports": [], "comments": [], "lines": 0}
+        return {
+            "error": str(e),
+            "functions": [],
+            "classes": [],
+            "imports": [],
+            "comments": [],
+            "lines": 0,
+        }
 
     functions: list[dict] = []
     classes: list[dict] = []
@@ -543,54 +817,74 @@ def _parse_ast_impl(file_path: str, content: str, language: str) -> dict[str, An
                 if child.type == "decorator":
                     decos.append(child.text.decode("utf-8", errors="replace").strip())
             params_node = node.child_by_field_name("parameters")
-            params = params_node.text.decode("utf-8", errors="replace") if params_node else ""
-            functions.append({
-                "name": name,
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-                "parameters": params.strip(),
-                "decorators": decos,
-            })
-        elif language in ("javascript", "typescript", "tsx") and node_type in ("function_declaration", "method_definition"):
+            params = (
+                params_node.text.decode("utf-8", errors="replace")
+                if params_node
+                else ""
+            )
+            functions.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "parameters": params.strip(),
+                    "decorators": decos,
+                }
+            )
+        elif language in ("javascript", "typescript", "tsx") and node_type in (
+            "function_declaration",
+            "method_definition",
+        ):
             name_node = node.child_by_field_name("name")
             name = name_node.text.decode() if name_node else "(anonymous)"
-            functions.append({
-                "name": name,
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-                "parameters": "",
-                "decorators": [],
-            })
+            functions.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "parameters": "",
+                    "decorators": [],
+                }
+            )
         elif language == "go" and node_type == "function_declaration":
             name_node = node.child_by_field_name("name")
             name = name_node.text.decode() if name_node else ""
-            functions.append({
-                "name": name,
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-                "parameters": "",
-                "decorators": [],
-            })
+            functions.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "parameters": "",
+                    "decorators": [],
+                }
+            )
         elif language == "rust" and node_type == "function_item":
             name_node = node.child_by_field_name("name")
             name = name_node.text.decode() if name_node else ""
-            functions.append({
-                "name": name,
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-                "parameters": "",
-                "decorators": [],
-            })
-        elif language == "java" and node_type in ("method_declaration", "constructor_declaration"):
+            functions.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "parameters": "",
+                    "decorators": [],
+                }
+            )
+        elif language == "java" and node_type in (
+            "method_declaration",
+            "constructor_declaration",
+        ):
             name_node = node.child_by_field_name("name")
             name = name_node.text.decode() if name_node else ""
-            functions.append({
-                "name": name,
-                "start_line": node.start_point[0] + 1,
-                "end_line": node.end_point[0] + 1,
-                "parameters": "",
-                "decorators": [],
-            })
+            functions.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "parameters": "",
+                    "decorators": [],
+                }
+            )
 
         # 类（多语言支持）
         if language == "python" and node_type == "class_definition":
@@ -599,34 +893,82 @@ def _parse_ast_impl(file_path: str, content: str, language: str) -> dict[str, An
             bases = []
             for child in node.children:
                 if child.type == "argument_list":
-                    bases = [c.text.decode("utf-8", errors="replace") for c in child.children if c.type == "identifier"]
-            classes.append({"name": name, "start_line": node.start_point[0] + 1, "end_line": node.end_point[0] + 1, "bases": bases})
-        elif language in ("javascript", "typescript", "tsx") and node_type == "class_declaration":
+                    bases = [
+                        c.text.decode("utf-8", errors="replace")
+                        for c in child.children
+                        if c.type == "identifier"
+                    ]
+            classes.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "bases": bases,
+                }
+            )
+        elif (
+            language in ("javascript", "typescript", "tsx")
+            and node_type == "class_declaration"
+        ):
             name_node = node.child_by_field_name("name")
             name = name_node.text.decode() if name_node else ""
-            classes.append({"name": name, "start_line": node.start_point[0] + 1, "end_line": node.end_point[0] + 1, "bases": []})
+            classes.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "bases": [],
+                }
+            )
         elif language == "go" and node_type == "type_declaration":
             for child in node.children:
                 if child.type == "type_spec":
                     name_node = child.child_by_field_name("name")
                     name = name_node.text.decode() if name_node else ""
-                    classes.append({"name": name, "start_line": child.start_point[0] + 1, "end_line": child.end_point[0] + 1, "bases": []})
+                    classes.append(
+                        {
+                            "name": name,
+                            "start_line": child.start_point[0] + 1,
+                            "end_line": child.end_point[0] + 1,
+                            "bases": [],
+                        }
+                    )
         elif language == "rust" and node_type == "impl_item":
             types = []
             for child in node.children:
                 if child.type == "type_identifier":
                     types.append(child.text.decode("utf-8", errors="replace"))
             if types:
-                classes.append({"name": f"impl {types[0]}", "start_line": node.start_point[0] + 1, "end_line": node.end_point[0] + 1, "bases": []})
+                classes.append(
+                    {
+                        "name": f"impl {types[0]}",
+                        "start_line": node.start_point[0] + 1,
+                        "end_line": node.end_point[0] + 1,
+                        "bases": [],
+                    }
+                )
         elif language == "java" and node_type == "class_declaration":
             name_node = node.child_by_field_name("name")
             name = name_node.text.decode() if name_node else ""
-            classes.append({"name": name, "start_line": node.start_point[0] + 1, "end_line": node.end_point[0] + 1, "bases": []})
+            classes.append(
+                {
+                    "name": name,
+                    "start_line": node.start_point[0] + 1,
+                    "end_line": node.end_point[0] + 1,
+                    "bases": [],
+                }
+            )
 
         # 导入（多语言支持）
-        if language == "python" and node_type in ("import_statement", "import_from_statement"):
+        if language == "python" and node_type in (
+            "import_statement",
+            "import_from_statement",
+        ):
             imports.append(node.text.decode("utf-8", errors="replace").strip())
-        elif language in ("javascript", "typescript") and node_type in ("import_statement", "import_declaration"):
+        elif language in ("javascript", "typescript") and node_type in (
+            "import_statement",
+            "import_declaration",
+        ):
             imports.append(node.text.decode("utf-8", errors="replace").strip())
         elif language == "go" and node_type == "import_declaration":
             imports.append(node.text.decode("utf-8", errors="replace").strip())
@@ -680,13 +1022,15 @@ def _calc_complexity_with_lizard(content: str, language: str) -> dict[str, Any]:
 
         funcs: list[dict] = []
         for fn in result.function_list:
-            funcs.append({
-                "name": fn.name,
-                "line": fn.start_line,
-                "complexity": fn.cyclomatic_complexity,
-                "nloc": fn.nloc,
-                "parameters": fn.parameter_count,
-            })
+            funcs.append(
+                {
+                    "name": fn.name,
+                    "line": fn.start_line,
+                    "complexity": fn.cyclomatic_complexity,
+                    "nloc": fn.nloc,
+                    "parameters": fn.parameter_count,
+                }
+            )
 
         if funcs:
             total = sum(f["complexity"] for f in funcs)
@@ -697,7 +1041,9 @@ def _calc_complexity_with_lizard(content: str, language: str) -> dict[str, Any]:
                 "avg_complexity": round(avg, 2),
                 "max_complexity": max_comp,
                 "over_threshold_count": over,
-                "complex_functions": sorted(funcs, key=lambda x: x["complexity"], reverse=True)[:10],
+                "complex_functions": sorted(
+                    funcs, key=lambda x: x["complexity"], reverse=True
+                )[:10],
                 "language": language,
                 "analyzer": "lizard",
             }
@@ -711,7 +1057,7 @@ def _calc_complexity_with_lizard(content: str, language: str) -> dict[str, Any]:
             "analyzer": "lizard",
         }
 
-    except Exception as e:
+    except Exception:
         # 如果 Lizard 失败，回退到简单实现
         return _calc_complexity_fallback(content, language)
 
@@ -728,7 +1074,18 @@ def _calc_complexity_regex_fallback(content: str, language: str) -> dict[str, An
     )
 
     # 复杂度关键词（用于估算）
-    complexity_keywords = ["if", "else if", "for", "forEach", "while", "do", "switch", "case", "catch", "try"]
+    complexity_keywords = [
+        "if",
+        "else if",
+        "for",
+        "forEach",
+        "while",
+        "do",
+        "switch",
+        "case",
+        "catch",
+        "try",
+    ]
 
     current_func: dict = {"name": "", "start": 0, "complexity": 1, "lines": []}
 
@@ -739,15 +1096,22 @@ def _calc_complexity_regex_fallback(content: str, language: str) -> dict[str, An
         func_match = func_pattern.search(line)
         if func_match:
             if current_func["name"] and current_func["lines"]:
-                funcs.append({
-                    "name": current_func["name"],
-                    "line": current_func["start"],
-                    "complexity": max(1, current_func["complexity"]),
-                    "nloc": len(current_func["lines"]),
-                    "parameters": 0,
-                })
+                funcs.append(
+                    {
+                        "name": current_func["name"],
+                        "line": current_func["start"],
+                        "complexity": max(1, current_func["complexity"]),
+                        "nloc": len(current_func["lines"]),
+                        "parameters": 0,
+                    }
+                )
             func_name = func_match.group(1) or func_match.group(2)
-            current_func = {"name": func_name or "(anonymous)", "start": i, "complexity": 1, "lines": []}
+            current_func = {
+                "name": func_name or "(anonymous)",
+                "start": i,
+                "complexity": 1,
+                "lines": [],
+            }
 
         if current_func["name"]:
             current_func["lines"].append(i)
@@ -759,13 +1123,15 @@ def _calc_complexity_regex_fallback(content: str, language: str) -> dict[str, An
 
     # 记录最后一个函数
     if current_func["name"] and current_func["lines"]:
-        funcs.append({
-            "name": current_func["name"],
-            "line": current_func["start"],
-            "complexity": max(1, current_func["complexity"]),
-            "nloc": len(current_func["lines"]),
-            "parameters": 0,
-        })
+        funcs.append(
+            {
+                "name": current_func["name"],
+                "line": current_func["start"],
+                "complexity": max(1, current_func["complexity"]),
+                "nloc": len(current_func["lines"]),
+                "parameters": 0,
+            }
+        )
 
     if funcs:
         total = sum(f["complexity"] for f in funcs)
@@ -776,7 +1142,9 @@ def _calc_complexity_regex_fallback(content: str, language: str) -> dict[str, An
             "avg_complexity": round(avg, 2),
             "max_complexity": max_comp,
             "over_threshold_count": over,
-            "complex_functions": sorted(funcs, key=lambda x: x["complexity"], reverse=True)[:10],
+            "complex_functions": sorted(
+                funcs, key=lambda x: x["complexity"], reverse=True
+            )[:10],
             "language": language,
             "analyzer": "regex_fallback",
         }
@@ -794,21 +1162,65 @@ def _calc_complexity_regex_fallback(content: str, language: str) -> dict[str, An
 def _calc_complexity_fallback(content: str, language: str) -> dict[str, Any]:
     """回退的复杂度计算（当 tree-sitter 和 Lizard 都不可用时）。"""
     COMPLEXITY_NODES: dict[str, set[str]] = {
-        "python": {"if_statement", "elif_clause", "for_statement", "for_in_statement",
-                    "while_statement", "with_statement", "except_clause", "try_statement",
-                    "conditional_expression", "and_operator", "or_operator"},
-        "javascript": {"if_statement", "else_clause", "for_statement", "for_in_statement",
-                       "for_of_statement", "while_statement", "do_statement", "switch_statement",
-                       "case_statement", "catch_clause", "try_statement", "conditional_expression",
-                       "binary_expression"},
-        "typescript": {"if_statement", "else_clause", "for_statement", "for_in_statement",
-                       "for_of_statement", "while_statement", "do_statement", "switch_statement",
-                       "case_statement", "catch_clause", "try_statement", "conditional_expression",
-                       "binary_expression"},
-        "go": {"if_statement", "for_statement", "range_statement", "switch_statement",
-               "case_clause", "select_statement", "defer_statement"},
-        "rust": {"if_expression", "match_expression", "for_expression", "while_expression",
-                 "loop_expression"},
+        "python": {
+            "if_statement",
+            "elif_clause",
+            "for_statement",
+            "for_in_statement",
+            "while_statement",
+            "with_statement",
+            "except_clause",
+            "try_statement",
+            "conditional_expression",
+            "and_operator",
+            "or_operator",
+        },
+        "javascript": {
+            "if_statement",
+            "else_clause",
+            "for_statement",
+            "for_in_statement",
+            "for_of_statement",
+            "while_statement",
+            "do_statement",
+            "switch_statement",
+            "case_statement",
+            "catch_clause",
+            "try_statement",
+            "conditional_expression",
+            "binary_expression",
+        },
+        "typescript": {
+            "if_statement",
+            "else_clause",
+            "for_statement",
+            "for_in_statement",
+            "for_of_statement",
+            "while_statement",
+            "do_statement",
+            "switch_statement",
+            "case_statement",
+            "catch_clause",
+            "try_statement",
+            "conditional_expression",
+            "binary_expression",
+        },
+        "go": {
+            "if_statement",
+            "for_statement",
+            "range_statement",
+            "switch_statement",
+            "case_clause",
+            "select_statement",
+            "defer_statement",
+        },
+        "rust": {
+            "if_expression",
+            "match_expression",
+            "for_expression",
+            "while_expression",
+            "loop_expression",
+        },
     }
 
     nodes = COMPLEXITY_NODES.get(language, COMPLEXITY_NODES.get("python", set()))
@@ -818,12 +1230,26 @@ def _calc_complexity_fallback(content: str, language: str) -> dict[str, Any]:
         # 当 tree-sitter 不可用时，使用正则表达式进行简单的复杂度估算（仅 JavaScript/TypeScript）
         if language in ("javascript", "typescript", "tsx", "jsx"):
             return _calc_complexity_regex_fallback(content, language)
-        return {"avg_complexity": 0.0, "max_complexity": 0, "over_threshold_count": 0, "complex_functions": [], "language": language, "analyzer": "tree-sitter"}
+        return {
+            "avg_complexity": 0.0,
+            "max_complexity": 0,
+            "over_threshold_count": 0,
+            "complex_functions": [],
+            "language": language,
+            "analyzer": "tree-sitter",
+        }
 
     try:
         tree = parser.parse(bytes(content, "utf-8"))
     except Exception:
-        return {"avg_complexity": 0.0, "max_complexity": 0, "over_threshold_count": 0, "complex_functions": [], "language": language, "analyzer": "tree-sitter"}
+        return {
+            "avg_complexity": 0.0,
+            "max_complexity": 0,
+            "over_threshold_count": 0,
+            "complex_functions": [],
+            "language": language,
+            "analyzer": "tree-sitter",
+        }
 
     funcs: list[dict] = []
 
@@ -840,17 +1266,21 @@ def _calc_complexity_fallback(content: str, language: str) -> dict[str, Any]:
             local_comp = 1
 
         for child in node.children:
-            child_comp, child_name, child_start = walk(child, in_func, func_complexity, func_name, func_start)
+            child_comp, child_name, child_start = walk(
+                child, in_func, func_complexity, func_name, func_start
+            )
             if in_func and not child_name:
                 func_complexity += child_comp
             elif child_name:
-                funcs.append({
-                    "name": child_name,
-                    "line": child_start,
-                    "complexity": child_comp,
-                    "nloc": 0,
-                    "parameters": 0,
-                })
+                funcs.append(
+                    {
+                        "name": child_name,
+                        "line": child_start,
+                        "complexity": child_comp,
+                        "nloc": 0,
+                        "parameters": 0,
+                    }
+                )
 
         return local_comp, "", 0
 
@@ -865,11 +1295,20 @@ def _calc_complexity_fallback(content: str, language: str) -> dict[str, Any]:
             "avg_complexity": round(avg, 2),
             "max_complexity": max_comp,
             "over_threshold_count": over,
-            "complex_functions": sorted(funcs, key=lambda x: x["complexity"], reverse=True)[:10],
+            "complex_functions": sorted(
+                funcs, key=lambda x: x["complexity"], reverse=True
+            )[:10],
             "language": language,
             "analyzer": "tree-sitter",
         }
-    return {"avg_complexity": 0.0, "max_complexity": 0, "over_threshold_count": 0, "complex_functions": [], "language": language, "analyzer": "tree-sitter"}
+    return {
+        "avg_complexity": 0.0,
+        "max_complexity": 0,
+        "over_threshold_count": 0,
+        "complex_functions": [],
+        "language": language,
+        "analyzer": "tree-sitter",
+    }
 
 
 def _detect_smells_impl(content: str, language: str, file_path: str = "") -> list[dict]:
@@ -903,16 +1342,20 @@ def _detect_smells_impl(content: str, language: str, file_path: str = "") -> lis
                 current_indent = len(line) - len(line.lstrip())
                 if func_lines and current_indent <= 4:
                     # 检查是否是函数开始关键字
-                    if any(stripped.startswith(kw) for kw in func_keywords if kw.strip()):
+                    if any(
+                        stripped.startswith(kw) for kw in func_keywords if kw.strip()
+                    ):
                         # 新函数开始，记录上一个函数
                         if len(func_lines) > 50:
-                            smells.append({
-                                "type": "long_function",
-                                "severity": "medium",
-                                "location": f"{func_lines[0][0]}-{func_lines[-1][0]}",
-                                "description": f"函数 {func_lines[0][1][:40]} 长度 {len(func_lines)} 行",
-                                "suggestion": "考虑拆分为更小的函数，每个函数控制在 30 行以内",
-                            })
+                            smells.append(
+                                {
+                                    "type": "long_function",
+                                    "severity": "medium",
+                                    "location": f"{func_lines[0][0]}-{func_lines[-1][0]}",
+                                    "description": f"函数 {func_lines[0][1][:40]} 长度 {len(func_lines)} 行",
+                                    "suggestion": "考虑拆分为更小的函数，每个函数控制在 30 行以内",
+                                }
+                            )
                         in_func = True
                         func_start_line = i + 1
                         func_lines = [(i + 1, stripped)]
@@ -920,25 +1363,29 @@ def _detect_smells_impl(content: str, language: str, file_path: str = "") -> lis
 
                     in_func = False
                     if len(func_lines) > 50:
-                        smells.append({
-                            "type": "long_function",
-                            "severity": "medium",
-                            "location": f"{func_lines[0][0]}-{func_lines[-1][0]}",
-                            "description": f"函数 {func_lines[0][1][:40]} 长度 {len(func_lines)} 行",
-                            "suggestion": "考虑拆分为更小的函数，每个函数控制在 30 行以内",
-                        })
+                        smells.append(
+                            {
+                                "type": "long_function",
+                                "severity": "medium",
+                                "location": f"{func_lines[0][0]}-{func_lines[-1][0]}",
+                                "description": f"函数 {func_lines[0][1][:40]} 长度 {len(func_lines)} 行",
+                                "suggestion": "考虑拆分为更小的函数，每个函数控制在 30 行以内",
+                            }
+                        )
                 else:
                     func_lines.append((i + 1, line))
 
     # 检查最后一个函数
     if in_func and len(func_lines) > 50:
-        smells.append({
-            "type": "long_function",
-            "severity": "medium",
-            "location": f"{func_lines[0][0]}-{func_lines[-1][0]}",
-            "description": f"函数 {func_lines[0][1][:40]} 长度 {len(func_lines)} 行",
-            "suggestion": "考虑拆分为更小的函数，每个函数控制在 30 行以内",
-        })
+        smells.append(
+            {
+                "type": "long_function",
+                "severity": "medium",
+                "location": f"{func_lines[0][0]}-{func_lines[-1][0]}",
+                "description": f"函数 {func_lines[0][1][:40]} 长度 {len(func_lines)} 行",
+                "suggestion": "考虑拆分为更小的函数，每个函数控制在 30 行以内",
+            }
+        )
 
     # 2. 深度嵌套（语言无关）
     max_depth = 0
@@ -957,46 +1404,66 @@ def _detect_smells_impl(content: str, language: str, file_path: str = "") -> lis
                     depth_lines[current_depth] = i + 1
 
     if max_depth > 4:
-        smells.append({
-            "type": "deep_nesting",
-            "severity": "high",
-            "location": f"第 {depth_lines.get(max_depth * 4, '?')} 行",
-            "description": f"嵌套深度达到 {max_depth} 层",
-            "suggestion": f"嵌套深度 {max_depth} 层，建议重构，使用提前返回或提取方法",
-        })
+        smells.append(
+            {
+                "type": "deep_nesting",
+                "severity": "high",
+                "location": f"第 {depth_lines.get(max_depth * 4, '?')} 行",
+                "description": f"嵌套深度达到 {max_depth} 层",
+                "suggestion": f"嵌套深度 {max_depth} 层，建议重构，使用提前返回或提取方法",
+            }
+        )
 
     # 3. 魔数
     magic_pattern = re.compile(r"(?<![a-zA-Z_])([0-9]{3,})(?![a-zA-Z_])")
     for i, line in enumerate(lines):
         matches = magic_pattern.findall(line)
         for _ in matches[:2]:
-            if not any(k in line for k in ["url", "http", "version", "port", "timeout", "202", "404", "500"]):
-                smells.append({
-                    "type": "magic_number",
-                    "severity": "low",
-                    "location": f"第 {i + 1} 行",
-                    "description": f"发现硬编码数字: {matches[0]}",
-                    "suggestion": "考虑定义常量命名，提高可读性",
-                })
+            if not any(
+                k in line
+                for k in [
+                    "url",
+                    "http",
+                    "version",
+                    "port",
+                    "timeout",
+                    "202",
+                    "404",
+                    "500",
+                ]
+            ):
+                smells.append(
+                    {
+                        "type": "magic_number",
+                        "severity": "low",
+                        "location": f"第 {i + 1} 行",
+                        "description": f"发现硬编码数字: {matches[0]}",
+                        "suggestion": "考虑定义常量命名，提高可读性",
+                    }
+                )
                 break
 
     # 4. 过大的文件
     if total_lines > 800:
-        smells.append({
-            "type": "god_object",
-            "severity": "high",
-            "location": f"共 {total_lines} 行",
-            "description": f"文件过大（{total_lines} 行），可能包含过多职责",
-            "suggestion": "建议按职责拆分为多个文件",
-        })
+        smells.append(
+            {
+                "type": "god_object",
+                "severity": "high",
+                "location": f"共 {total_lines} 行",
+                "description": f"文件过大（{total_lines} 行），可能包含过多职责",
+                "suggestion": "建议按职责拆分为多个文件",
+            }
+        )
     elif total_lines > 500:
-        smells.append({
-            "type": "large_file",
-            "severity": "medium",
-            "location": f"共 {total_lines} 行",
-            "description": f"文件较大（{total_lines} 行）",
-            "suggestion": "考虑拆分以提高可维护性",
-        })
+        smells.append(
+            {
+                "type": "large_file",
+                "severity": "medium",
+                "location": f"共 {total_lines} 行",
+                "description": f"文件较大（{total_lines} 行）",
+                "suggestion": "考虑拆分以提高可维护性",
+            }
+        )
 
     # 5. 缺少类型注解（Python/TypeScript）
     if language in ("python", "typescript", "tsx"):
@@ -1006,18 +1473,25 @@ def _detect_smells_impl(content: str, language: str, file_path: str = "") -> lis
             if any(stripped.startswith(kw) for kw in func_keywords):
                 if language == "python" and "->" not in stripped:
                     untyped_funcs += 1
-                elif language in ("typescript", "tsx") and ":" not in stripped.split("(")[0] if "(" in stripped else ":" not in stripped:
+                elif (
+                    language in ("typescript", "tsx")
+                    and ":" not in stripped.split("(")[0]
+                    if "(" in stripped
+                    else ":" not in stripped
+                ):
                     # TypeScript 函数通常是 typed 的
                     pass
 
         if untyped_funcs > 3:
-            smells.append({
-                "type": "missing_type_hints",
-                "severity": "low",
-                "location": f"{untyped_funcs} 个函数",
-                "description": f"发现 {untyped_funcs} 个函数缺少类型注解",
-                "suggestion": "添加类型注解以提高代码可读性和安全性",
-            })
+            smells.append(
+                {
+                    "type": "missing_type_hints",
+                    "severity": "low",
+                    "location": f"{untyped_funcs} 个函数",
+                    "description": f"发现 {untyped_funcs} 个函数缺少类型注解",
+                    "suggestion": "添加类型注解以提高代码可读性和安全性",
+                }
+            )
 
     return smells[:10]
 
@@ -1066,19 +1540,26 @@ def _summarize_impl(content: str, language: str) -> str:
                 # 提取函数名和参数
                 match = re.search(r"(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)", stripped)
                 if not match:
-                    match = re.search(r"(?:function|const|let|func|fn)\s+(\w+)", stripped)
+                    match = re.search(
+                        r"(?:function|const|let|func|fn)\s+(\w+)", stripped
+                    )
                 if match:
                     func_name = match.group(1)
                     params = ""
                     if match.lastindex and match.lastindex >= 2:
                         params = match.group(2)
                     # 跳过私有/测试函数
-                    if not func_name.startswith("_") and "test" not in func_name.lower():
+                    if (
+                        not func_name.startswith("_")
+                        and "test" not in func_name.lower()
+                    ):
                         sig = f"{func_name}({params[:40]})" if params else func_name
                         functions.append(sig)
 
         # 导入语句（只保留外部依赖，过滤标准库）
-        elif any(stripped.startswith(kw) for kw in import_keywords) and len(imports) < 20:
+        elif (
+            any(stripped.startswith(kw) for kw in import_keywords) and len(imports) < 20
+        ):
             if language == "python":
                 if stripped.startswith("from "):
                     match = re.match(r"from\s+([\w.]+)\s+import", stripped)
@@ -1138,26 +1619,51 @@ def _detect_imports_impl(content: str, language: str) -> list[dict]:
                 parts = stripped[7:].strip().split(" as ", 1)
                 module = parts[0].split()[0]
                 alias = parts[1].strip() if len(parts) > 1 else None
-                imports.append({"module": module, "names": [], "alias": alias, "line": i + 1})
+                imports.append(
+                    {"module": module, "names": [], "alias": alias, "line": i + 1}
+                )
             elif stripped.startswith("from "):
                 m = re.match(r"from\s+([\w.]+)\s+import\s+(.+)", stripped)
                 if m:
                     module = m.group(1)
                     names_str = m.group(2)
-                    names = [n.strip() for n in re.split(r",\s*|as\s+\w+\s*,", names_str) if n.strip()]
-                    imports.append({"module": module, "names": names, "alias": None, "line": i + 1})
+                    names = [
+                        n.strip()
+                        for n in re.split(r",\s*|as\s+\w+\s*,", names_str)
+                        if n.strip()
+                    ]
+                    imports.append(
+                        {"module": module, "names": names, "alias": None, "line": i + 1}
+                    )
 
         elif language in ("javascript", "typescript", "tsx"):
             # ES6 import: import xxx from 'module'
             if stripped.startswith("import "):
-                m = re.match(r"import\s+(?:(?:\{[^}]+\}|[\w*]+)\s+from\s+)?['\"]([^'\"]+)['\"]", stripped)
+                m = re.match(
+                    r"import\s+(?:(?:\{[^}]+\}|[\w*]+)\s+from\s+)?['\"]([^'\"]+)['\"]",
+                    stripped,
+                )
                 if m:
-                    imports.append({"module": m.group(1), "names": [], "alias": None, "line": i + 1})
+                    imports.append(
+                        {
+                            "module": m.group(1),
+                            "names": [],
+                            "alias": None,
+                            "line": i + 1,
+                        }
+                    )
             # CommonJS require: const xxx = require('module')
             elif "require(" in stripped:
                 m = re.search(r"require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)", stripped)
                 if m:
-                    imports.append({"module": m.group(1), "names": [], "alias": None, "line": i + 1})
+                    imports.append(
+                        {
+                            "module": m.group(1),
+                            "names": [],
+                            "alias": None,
+                            "line": i + 1,
+                        }
+                    )
 
         elif language == "go":
             # import ( ... ) 或 import "module"
@@ -1165,55 +1671,95 @@ def _detect_imports_impl(content: str, language: str) -> list[dict]:
                 if '"' in stripped:
                     m = re.search(r'"([^"]+)"', stripped)
                     if m:
-                        imports.append({"module": m.group(1), "names": [], "alias": None, "line": i + 1})
+                        imports.append(
+                            {
+                                "module": m.group(1),
+                                "names": [],
+                                "alias": None,
+                                "line": i + 1,
+                            }
+                        )
 
         elif language == "rust":
             # use xxx::yyy;
             if stripped.startswith("use "):
                 module = stripped[4:].rstrip(";").strip()
-                imports.append({"module": module, "names": [], "alias": None, "line": i + 1})
+                imports.append(
+                    {"module": module, "names": [], "alias": None, "line": i + 1}
+                )
 
         elif language == "java":
             # import package.Class;
             if stripped.startswith("import "):
                 module = stripped[7:].rstrip(";").strip()
-                imports.append({"module": module, "names": [], "alias": None, "line": i + 1})
+                imports.append(
+                    {"module": module, "names": [], "alias": None, "line": i + 1}
+                )
 
         elif language == "cpp":
             # #include <xxx> 或 #include "xxx"
             if stripped.startswith("#include "):
-                module = stripped[9:].strip("<>\"")
-                imports.append({"module": module, "names": [], "alias": None, "line": i + 1})
+                module = stripped[9:].strip('<>"')
+                imports.append(
+                    {"module": module, "names": [], "alias": None, "line": i + 1}
+                )
 
         elif language == "ruby":
             # require 'xxx' 或 require_relative 'xxx'
-            if stripped.startswith("require ") or stripped.startswith("require_relative "):
+            if stripped.startswith("require ") or stripped.startswith(
+                "require_relative "
+            ):
                 m = re.search(r"['\"]([^'\"]+)['\"]", stripped)
                 if m:
-                    imports.append({"module": m.group(1), "names": [], "alias": None, "line": i + 1})
+                    imports.append(
+                        {
+                            "module": m.group(1),
+                            "names": [],
+                            "alias": None,
+                            "line": i + 1,
+                        }
+                    )
 
         elif language == "swift" or language == "kotlin":
             # import xxx
             if stripped.startswith("import "):
                 module = stripped[7:].strip()
-                imports.append({"module": module, "names": [], "alias": None, "line": i + 1})
+                imports.append(
+                    {"module": module, "names": [], "alias": None, "line": i + 1}
+                )
 
         elif language == "php":
             # use Namespace\Class; require 'file.php'; include 'file.php';
             if stripped.startswith("use "):
                 module = stripped[4:].rstrip(";").strip()
-                imports.append({"module": module, "names": [], "alias": None, "line": i + 1})
+                imports.append(
+                    {"module": module, "names": [], "alias": None, "line": i + 1}
+                )
             elif stripped.startswith("require ") or stripped.startswith("include "):
                 m = re.search(r"['\"]([^'\"]+)['\"]", stripped)
                 if m:
-                    imports.append({"module": m.group(1), "names": [], "alias": None, "line": i + 1})
+                    imports.append(
+                        {
+                            "module": m.group(1),
+                            "names": [],
+                            "alias": None,
+                            "line": i + 1,
+                        }
+                    )
 
         elif language == "dart":
             # import 'xxx'; export 'xxx'; part 'xxx';
             if any(stripped.startswith(kw) for kw in ["import ", "export ", "part "]):
                 m = re.search(r"['\"]([^'\"]+)['\"]", stripped)
                 if m:
-                    imports.append({"module": m.group(1), "names": [], "alias": None, "line": i + 1})
+                    imports.append(
+                        {
+                            "module": m.group(1),
+                            "names": [],
+                            "alias": None,
+                            "line": i + 1,
+                        }
+                    )
 
     return imports
 
@@ -1230,7 +1776,9 @@ def _detect_deps_impl(content: str, language: str) -> dict[str, Any]:
             main_mod = imp["module"].split(".")[0]
             # 移除常见的前缀
             if main_mod.startswith("@"):
-                main_mod = imp["module"].split("/")[0] if "/" in imp["module"] else main_mod
+                main_mod = (
+                    imp["module"].split("/")[0] if "/" in imp["module"] else main_mod
+                )
             modules.append(main_mod)
 
     module_counts: dict[str, int] = {}
@@ -1240,18 +1788,41 @@ def _detect_deps_impl(content: str, language: str) -> dict[str, Any]:
     # 危险操作检测（多语言）
     suspicious: list[dict] = []
     dangerous_patterns: dict[str, list[str]] = {
-        "python": ["eval", "exec", "__import__", "subprocess.run", "os.system", "pickle.loads"],
-        "javascript": ["eval(", "Function(", "new Function(", "innerHTML", "document.write"],
-        "typescript": ["eval(", "Function(", "new Function(", "innerHTML", "document.write"],
+        "python": [
+            "eval",
+            "exec",
+            "__import__",
+            "subprocess.run",
+            "os.system",
+            "pickle.loads",
+        ],
+        "javascript": [
+            "eval(",
+            "Function(",
+            "new Function(",
+            "innerHTML",
+            "document.write",
+        ],
+        "typescript": [
+            "eval(",
+            "Function(",
+            "new Function(",
+            "innerHTML",
+            "document.write",
+        ],
         "go": ["os/exec", "syscall.Exec", "os.StartProcess"],
         "rust": ["unsafe", "std::process::Command", "eval"],
     }
 
     for imp in imports:
         mod = imp["module"]
-        patterns = dangerous_patterns.get(language, dangerous_patterns.get("python", []))
+        patterns = dangerous_patterns.get(
+            language, dangerous_patterns.get("python", [])
+        )
         if any(s in mod.lower() for s in patterns):
-            suspicious.append({"module": mod, "reason": "可能执行任意代码或存在安全风险"})
+            suspicious.append(
+                {"module": mod, "reason": "可能执行任意代码或存在安全风险"}
+            )
 
     # 获取该语言的标准库
     stdlib = _get_stdlib(language)

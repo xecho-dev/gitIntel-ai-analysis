@@ -2,6 +2,7 @@
 PR 相关路由 (/api/pr)
 代码修改方案生成和 PR 创建
 """
+
 import logging
 
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ logger = logging.getLogger("gitintel")
 
 class PRGenerateRequest(BaseModel):
     """生成代码修改方案的请求。"""
+
     repo_url: str
     branch: str = "main"
     suggestions: list[dict]  # SuggestionAgent 返回的建议列表
@@ -25,6 +27,7 @@ class PRGenerateRequest(BaseModel):
 
 class PRCreateRequest(BaseModel):
     """创建 PR 的请求。"""
+
     repo_url: str
     branch: str = "main"
     fixes: list[dict]  # FixGeneratorAgent 返回的修改方案
@@ -81,7 +84,7 @@ async def api_pr_create(req: PRCreateRequest, request: Request):
         raise HTTPException(
             status_code=403,
             detail="GitHub 授权不足：创建 PR 需要用户的 GitHub OAuth Token（包含 repo 权限）。"
-                   "请重新登录 GitHub 并授权 repo 权限后重试。",
+            "请重新登录 GitHub 并授权 repo 权限后重试。",
         )
 
     logger.info("[PR Create] 使用用户 GitHub OAuth Token")

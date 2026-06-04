@@ -85,9 +85,11 @@ _CACHE_MAX_SIZE = 200
 
 # ─── ProcessedQuery ──────────────────────────────────────────────────────
 
+
 @dataclass
 class ProcessedQuery:
     """处理后的查询对象"""
+
     original: str
     rewritten_query: str  # Query Rewrite 后的查询
     keywords: list[str]
@@ -101,6 +103,7 @@ class ProcessedQuery:
 
 
 # ─── 查询分析（LLM-Based，替代规则穷举）────────────────────────────────
+
 
 async def _analyze_query_llm(query: str) -> dict:
     """
@@ -127,7 +130,9 @@ async def _analyze_query_llm(query: str) -> dict:
 
         messages = [
             SystemMessage(content=QUERY_ANALYSIS_SYSTEM_PROMPT),
-            HumanMessage(content=QUERY_ANALYSIS_USER_PROMPT_TEMPLATE.format(query=query)),
+            HumanMessage(
+                content=QUERY_ANALYSIS_USER_PROMPT_TEMPLATE.format(query=query)
+            ),
         ]
 
         response = await llm.ainvoke(messages)
@@ -159,17 +164,58 @@ def _default_analysis() -> dict:
 
 # ─── 关键词提取 ─────────────────────────────────────────────────────────
 
+
 def _extract_keywords(query: str) -> list[str]:
     """提取查询关键词（轻量规则，作为 HyDE 的补充）"""
     stop_words = {
-        "的", "是", "在", "有", "和", "了", "我", "你", "他", "她", "它",
-        "a", "an", "the", "is", "are", "was", "were", "be", "been",
-        "have", "has", "had", "do", "does", "did", "will", "would",
-        "could", "should", "may", "might", "can", "to", "of", "in",
-        "for", "on", "with", "at", "by", "from", "as", "into", "through",
+        "的",
+        "是",
+        "在",
+        "有",
+        "和",
+        "了",
+        "我",
+        "你",
+        "他",
+        "她",
+        "它",
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
     }
 
-    words = re.split(r'[\s,，.。!！?？;；:：()（）\[\]【】""''""''《》<>\/]+', query)
+    words = re.split(r'[\s,，.。!！?？;；:：()（）\[\]【】""' '""' "《》<>\/]+", query)
     words = [w.strip().lower() for w in words if w.strip()]
 
     keywords = [w for w in words if w not in stop_words and len(w) >= 2]
@@ -177,6 +223,7 @@ def _extract_keywords(query: str) -> list[str]:
 
 
 # ─── HyDE: 假设文档生成 ─────────────────────────────────────────────────
+
 
 async def _generate_hyde_document(query: str, is_code_related: bool) -> Optional[str]:
     """
@@ -243,8 +290,8 @@ async def _generate_hyde_document(query: str, is_code_related: bool) -> Optional
         return None
 
 
-
 # ─── 主流程 ─────────────────────────────────────────────────────────────
+
 
 async def process_query(
     query: str,

@@ -2,9 +2,8 @@
 
 import asyncio
 import sys
-import tempfile
 from pathlib import Path
-from typing import AsyncGenerator, Generator
+from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # ─── Async Event Loop Fixture ───────────────────────────────────────────────
 
+
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create an event loop for the entire test session."""
@@ -24,6 +24,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 
 # ─── Mock LLM Fixtures ──────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_llm_response() -> MagicMock:
@@ -50,6 +51,7 @@ def mock_llm_no_more(mock_llm_response: MagicMock) -> MagicMock:
 
 
 # ─── Mock GitHub API Fixtures ──────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_github_tree_response() -> dict:
@@ -80,6 +82,7 @@ def mock_github_file_content() -> dict[str, str]:
 
 
 # ─── Mock HTTP Client Fixtures ─────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_httpx_async_client(
@@ -117,6 +120,7 @@ def mock_httpx_async_client(
 
 # ─── Temp Repository Fixtures ──────────────────────────────────────────────
 
+
 @pytest.fixture
 def temp_repo(tmp_path: Path) -> Generator[Path, None, None]:
     """Creates a temporary repository with Python and TypeScript source files."""
@@ -145,7 +149,9 @@ export const CONFIG = { debug: true };
 """)
 
     # Package.json
-    (tmp_path / "package.json").write_text('{"name": "test", "dependencies": {"react": "^18.0.0"}}')
+    (tmp_path / "package.json").write_text(
+        '{"name": "test", "dependencies": {"react": "^18.0.0"}}'
+    )
 
     # Requirements.txt
     (tmp_path / "requirements.txt").write_text("fastapi>=0.100.0\npydantic>=2.0.0\n")
@@ -225,37 +231,67 @@ def test_handler():
 
 # ─── Mock AgentEvent Fixtures ───────────────────────────────────────────────
 
+
 @pytest.fixture
 def sample_agent_events() -> list[dict]:
     """Sample AgentEvent dicts for testing."""
     return [
-        {"type": "status", "agent": "quality", "message": "Scanning...", "percent": 10, "data": None},
-        {"type": "progress", "agent": "quality", "message": "Analyzing...", "percent": 50, "data": None},
-        {"type": "result", "agent": "quality", "message": "Done", "percent": 100, "data": {
-            "health_score": 85.0,
-            "test_coverage": 60,
-            "complexity": "Low",
-            "maintainability": "A",
-            "python_metrics": {
-                "total_functions": 5,
-                "total_classes": 1,
-                "avg_complexity": 3.2,
-                "max_complexity": 5,
-                "over_complexity_count": 0,
-                "long_functions": [],
-                "large_files": [],
+        {
+            "type": "status",
+            "agent": "quality",
+            "message": "Scanning...",
+            "percent": 10,
+            "data": None,
+        },
+        {
+            "type": "progress",
+            "agent": "quality",
+            "message": "Analyzing...",
+            "percent": 50,
+            "data": None,
+        },
+        {
+            "type": "result",
+            "agent": "quality",
+            "message": "Done",
+            "percent": 100,
+            "data": {
+                "health_score": 85.0,
+                "test_coverage": 60,
+                "complexity": "Low",
+                "maintainability": "A",
+                "python_metrics": {
+                    "total_functions": 5,
+                    "total_classes": 1,
+                    "avg_complexity": 3.2,
+                    "max_complexity": 5,
+                    "over_complexity_count": 0,
+                    "long_functions": [],
+                    "large_files": [],
+                },
+                "typescript_metrics": {},
+                "duplication": {
+                    "score": 2.1,
+                    "duplicated_blocks": 0,
+                    "total_blocks_checked": 50,
+                    "duplication_level": "Low",
+                },
+                "test_info": {
+                    "estimated_coverage": 60,
+                    "test_files": 1,
+                    "source_files": 2,
+                    "test_frameworks": ["pytest"],
+                },
+                "total_files": 3,
+                "python_files": 2,
+                "typescript_files": 1,
             },
-            "typescript_metrics": {},
-            "duplication": {"score": 2.1, "duplicated_blocks": 0, "total_blocks_checked": 50, "duplication_level": "Low"},
-            "test_info": {"estimated_coverage": 60, "test_files": 1, "source_files": 2, "test_frameworks": ["pytest"]},
-            "total_files": 3,
-            "python_files": 2,
-            "typescript_files": 1,
-        }},
+        },
     ]
 
 
 # ─── Mock SharedState Fixtures ─────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_shared_state() -> dict:
@@ -289,10 +325,13 @@ def mock_shared_state() -> dict:
 
 # ─── Patch Decorators ───────────────────────────────────────────────────────
 
+
 def patch_llm(return_response: MagicMock | None = None):
     """Decorator to patch the LLM getter so it returns a mock response."""
+
     def decorator(func):
         return patch("agents.repo_loader._get_llm", return_value=return_response)(func)
+
     return decorator
 
 

@@ -11,11 +11,12 @@
   8. 提交文件修改（一个或多个文件）
   9. 创建 Pull Request
 """
+
 import base64
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -26,18 +27,20 @@ logger = logging.getLogger("gitintel")
 @dataclass
 class PRResult:
     """PR 创建结果。"""
+
     success: bool
     pr_url: str = ""
     pr_number: int = 0
     pr_title: str = ""
     error: str = ""
     is_fork: bool = False  # 是否为 Fork 场景
-    fork_url: str = ""      # fork 后的仓库 URL
+    fork_url: str = ""  # fork 后的仓库 URL
 
 
 @dataclass
 class DiffResult:
     """单个文件的 Diff 结果。"""
+
     file: str
     type: str  # replace | insert | delete
     original: str
@@ -48,11 +51,12 @@ class DiffResult:
 @dataclass
 class ForkResult:
     """Fork 操作结果。"""
+
     success: bool
-    owner: str = ""      # fork 后的 owner（当前用户名）
-    repo: str = ""        # fork 后的 repo 名（与原仓库同名）
+    owner: str = ""  # fork 后的 owner（当前用户名）
+    repo: str = ""  # fork 后的 repo 名（与原仓库同名）
     full_name: str = ""  # fork 后的完整 "owner/repo"
-    url: str = ""         # fork 后的仓库 URL
+    url: str = ""  # fork 后的仓库 URL
     error: str = ""
 
 
@@ -151,25 +155,29 @@ class GitHubPRService:
                         error=fork_result.error,
                         is_fork=True,
                     )
-                logger.info(
-                    f"[GitHubPRService] Fork 已就绪: {fork_result.full_name}"
-                )
+                logger.info(f"[GitHubPRService] Fork 已就绪: {fork_result.full_name}")
 
             # 4. 获取默认分支
             if not base_branch:
-                default_branch = await self._get_default_branch(effective_owner, effective_repo)
+                default_branch = await self._get_default_branch(
+                    effective_owner, effective_repo
+                )
                 base_branch = default_branch
             else:
                 default_branch = base_branch
 
             # 5. 获取 base 分支的最新 commit SHA
-            base_sha = await self._get_branch_sha(effective_owner, effective_repo, base_branch)
+            base_sha = await self._get_branch_sha(
+                effective_owner, effective_repo, base_branch
+            )
 
             # 6. 生成新分支名
             new_branch = _generate_branch_name(fixes)
 
             # 7. 创建新分支（基于 base_branch）
-            await self._create_branch(effective_owner, effective_repo, new_branch, base_sha)
+            await self._create_branch(
+                effective_owner, effective_repo, new_branch, base_sha
+            )
 
             # 8. 提交文件修改
             for fix in fixes:
@@ -179,10 +187,14 @@ class GitHubPRService:
 
             # 9. 创建 PR
             pr = await self._create_pull_request(
-                effective_owner, effective_repo,
+                effective_owner,
+                effective_repo,
                 head=new_branch,
                 base=base_branch,
-                title=pr_title or f"GitIntel Auto: {fixes[0].get('reason', 'Code improvements')[:50]}" if fixes else "GitIntel Auto Fix",
+                title=pr_title
+                or f"GitIntel Auto: {fixes[0].get('reason', 'Code improvements')[:50]}"
+                if fixes
+                else "GitIntel Auto Fix",
                 body=pr_body or self._build_pr_body(fixes),
             )
 
@@ -192,7 +204,9 @@ class GitHubPRService:
                 pr_number=pr.get("number", 0),
                 pr_title=pr.get("title", ""),
                 is_fork=is_fork,
-                fork_url=f"https://github.com/{effective_owner}/{effective_repo}" if is_fork else "",
+                fork_url=f"https://github.com/{effective_owner}/{effective_repo}"
+                if is_fork
+                else "",
             )
 
         except PermissionError:
@@ -256,7 +270,7 @@ class GitHubPRService:
                 f"{self.base_url}/user",
                 headers=self.headers,
             )
-            if resp.status_code in (200, ):
+            if resp.status_code in (200,):
                 return resp.json().get("login")
             return None
 
@@ -294,7 +308,9 @@ class GitHubPRService:
                         owner=fork_owner,
                         repo=fork_repo,
                         full_name=f"{fork_owner}/{fork_repo}",
-                        url=fork_data.get("html_url", f"https://github.com/{fork_owner}/{fork_repo}"),
+                        url=fork_data.get(
+                            "html_url", f"https://github.com/{fork_owner}/{fork_repo}"
+                        ),
                     )
                 else:
                     # 仓库存在但不是该 upstream 的 fork（名字冲突），提示用户手动处理
@@ -334,7 +350,10 @@ class GitHubPRService:
                     if check.status_code == 200:
                         fork_data = check.json()
                         parent = fork_data.get("parent", {})
-                        if parent.get("full_name") == f"{upstream_owner}/{upstream_repo}":
+                        if (
+                            parent.get("full_name")
+                            == f"{upstream_owner}/{upstream_repo}"
+                        ):
                             logger.info(
                                 f"[_ensure_fork_exists] Fork 创建完成: {fork_owner}/{fork_repo}"
                             )
@@ -345,7 +364,7 @@ class GitHubPRService:
                                 full_name=f"{fork_owner}/{fork_repo}",
                                 url=fork_data.get(
                                     "html_url",
-                                    f"https://github.com/{fork_owner}/{fork_repo}"
+                                    f"https://github.com/{fork_owner}/{fork_repo}",
                                 ),
                             )
                     elif check.status_code == 404:
@@ -357,7 +376,7 @@ class GitHubPRService:
                 return ForkResult(
                     success=False,
                     error=(
-                        f"Fork 请求已提交（202），但等待超时（60s）未能确认 Fork 创建完成。"
+                        "Fork 请求已提交（202），但等待超时（60s）未能确认 Fork 创建完成。"
                         "请稍后在 GitHub 页面确认 Fork 状态后再试。"
                     ),
                 )
@@ -393,8 +412,7 @@ class GitHubPRService:
                         repo=fork_repo,
                         full_name=f"{fork_owner}/{fork_repo}",
                         url=retry.json().get(
-                            "html_url",
-                            f"https://github.com/{fork_owner}/{fork_repo}"
+                            "html_url", f"https://github.com/{fork_owner}/{fork_repo}"
                         ),
                     )
                 return ForkResult(
@@ -436,7 +454,9 @@ class GitHubPRService:
             resp.raise_for_status()
             return resp.json()["commit"]["sha"]
 
-    async def _create_branch(self, owner: str, repo: str, branch: str, sha: str) -> None:
+    async def _create_branch(
+        self, owner: str, repo: str, branch: str, sha: str
+    ) -> None:
         """创建新分支。"""
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
@@ -581,10 +601,12 @@ class GitHubPRService:
                 lines.append("```")
             lines.append("")
 
-        lines.extend([
-            "---",
-            "*此 PR 由 GitIntel 自动生成*",
-        ])
+        lines.extend(
+            [
+                "---",
+                "*此 PR 由 GitIntel 自动生成*",
+            ]
+        )
 
         return "\n".join(lines)
 

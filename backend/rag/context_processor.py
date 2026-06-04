@@ -9,10 +9,8 @@ Context Processor — 上下文处理层。
   5. 格式化输出
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .query_processor import ProcessedQuery
 
@@ -22,6 +20,7 @@ _logger = logging.getLogger("gitintel")
 @dataclass
 class ContextChunk:
     """上下文块"""
+
     doc_id: str
     content: str
     title: str
@@ -36,6 +35,7 @@ class ContextChunk:
 @dataclass
 class ProcessedContext:
     """处理后的上下文"""
+
     chunks: list[ContextChunk]
     total_tokens: int
     total_chars: int
@@ -44,6 +44,7 @@ class ProcessedContext:
 
 
 # ─── Token 估算 ──────────────────────────────────────────────────────
+
 
 def _estimate_tokens(text: str) -> int:
     """估算 token 数量（中文≈2字符/token，英文≈4字符/token）"""
@@ -56,15 +57,18 @@ def _estimate_tokens(text: str) -> int:
 
 def _find_chinese(text: str) -> str:
     import re
-    return re.sub(r'[^\u4e00-\u9fff]', '', text)
+
+    return re.sub(r"[^\u4e00-\u9fff]", "", text)
 
 
 def _find_english(text: str) -> str:
     import re
-    return re.sub(r'[^a-zA-Z]', '', text)
+
+    return re.sub(r"[^a-zA-Z]", "", text)
 
 
 # ─── 上下文处理 ───────────────────────────────────────────────────────
+
 
 def process_context(
     retrieval_results: list,
@@ -127,7 +131,7 @@ def process_context(
             relevance_score=result.score,
             repo_url=result.repo_url,
             priority=result.priority,
-            code_fix=result.code_fix if hasattr(result, 'code_fix') else {},
+            code_fix=result.code_fix if hasattr(result, "code_fix") else {},
         )
 
         # Token 预算检查
@@ -192,10 +196,11 @@ def _truncate_to_tokens(text: str, max_tokens: int) -> str:
 
     # 二分查找合适的截断位置
     target_chars = int(max_tokens * 3)  # 粗略的字符数估算
-    return text[:min(target_chars, len(text))] + "..."
+    return text[: min(target_chars, len(text))] + "..."
 
 
 # ─── 格式化 ───────────────────────────────────────────────────────────
+
 
 def format_context_for_prompt(context: ProcessedContext) -> str:
     """
@@ -265,7 +270,7 @@ def _format_for_code(context: ProcessedContext) -> str:
             parts.append(f"【{i}】{chunk.title}")
             parts.append(chunk.content)
             if chunk.code_fix:
-                parts.append(f"\n修复方案:")
+                parts.append("\n修复方案:")
                 for key, val in chunk.code_fix.items():
                     if val and key != "reason":
                         parts.append(f"  - {key}: {str(val)[:100]}")

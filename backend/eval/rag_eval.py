@@ -93,6 +93,7 @@ DEFAULT_TEST_DATA = [
 
 # ─── 数据模型 ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class EvalSample:
     question: str
@@ -134,6 +135,7 @@ class EvalSummary:
 
 # ─── 核心评测函数 ──────────────────────────────────────────────────────
 
+
 async def run_single_eval(
     sample: EvalSample,
     evaluator,
@@ -141,7 +143,6 @@ async def run_single_eval(
 ) -> EvalRowResult:
     """对单条测试数据进行完整的 RAG + 评测流程。"""
     from rag import RAGPipeline
-    from eval.ragas_evaluator import RAGASEvaluator
 
     question = sample.question
 
@@ -169,19 +170,25 @@ async def run_single_eval(
                     if t == "done":
                         answer = data.get("answer") or data.get("full_text") or ""
                         sources = data.get("sources", [])
-                        retrieved_contexts = [s.get("content", "") or "" for s in sources]
+                        retrieved_contexts = [
+                            s.get("content", "") or "" for s in sources
+                        ]
                     elif t == "sources":
                         sources = data.get("sources", [])
-                        retrieved_contexts = [s.get("content", "") or "" for s in sources]
+                        retrieved_contexts = [
+                            s.get("content", "") or "" for s in sources
+                        ]
                 except json.JSONDecodeError:
                     pass
-    except Exception as exc:
+    except Exception:
         pass
 
     rag_latency_ms = (time.perf_counter() - pipeline_start) * 1000
 
     if verbose:
-        print(f"    RAG done: {len(answer)} chars, {len(retrieved_contexts)} contexts, {rag_latency_ms:.0f}ms")
+        print(
+            f"    RAG done: {len(answer)} chars, {len(retrieved_contexts)} contexts, {rag_latency_ms:.0f}ms"
+        )
 
     # ── Step 2: RAGAS 评测 ─────────────────────────────────────
     eval_start = time.perf_counter()
@@ -229,7 +236,9 @@ async def run_single_eval(
         )
 
 
-def compute_summary(results: list[EvalRowResult], experiment_name: str, duration: float) -> EvalSummary:
+def compute_summary(
+    results: list[EvalRowResult], experiment_name: str, duration: float
+) -> EvalSummary:
     """计算汇总统计。"""
     valid = [r for r in results if r.success]
 
@@ -257,6 +266,7 @@ def compute_summary(results: list[EvalRowResult], experiment_name: str, duration
 
 # ─── 报告生成 ─────────────────────────────────────────────────────────
 
+
 def save_results(summary: EvalSummary, output_dir: Path):
     """保存评测结果到 CSV 和 summary 文件。"""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -264,61 +274,72 @@ def save_results(summary: EvalSummary, output_dir: Path):
     # CSV
     csv_path = output_dir / "results.csv"
     fieldnames = [
-        "question", "answer", "num_contexts",
-        "faithfulness", "answer_relevancy", "context_precision", "context_recall",
-        "overall_score", "rag_latency_ms", "eval_latency_ms", "total_latency_ms",
-        "success", "error",
+        "question",
+        "answer",
+        "num_contexts",
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+        "overall_score",
+        "rag_latency_ms",
+        "eval_latency_ms",
+        "total_latency_ms",
+        "success",
+        "error",
     ]
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for r in summary.results:
-            writer.writerow({
-                "question": r.question,
-                "answer": r.answer,
-                "num_contexts": r.num_contexts,
-                "faithfulness": r.faithfulness,
-                "answer_relevancy": r.answer_relevancy,
-                "context_precision": r.context_precision,
-                "context_recall": r.context_recall,
-                "overall_score": r.overall_score,
-                "rag_latency_ms": round(r.rag_latency_ms, 1),
-                "eval_latency_ms": round(r.eval_latency_ms, 1),
-                "total_latency_ms": round(r.total_latency_ms, 1),
-                "success": r.success,
-                "error": r.error or "",
-            })
+            writer.writerow(
+                {
+                    "question": r.question,
+                    "answer": r.answer,
+                    "num_contexts": r.num_contexts,
+                    "faithfulness": r.faithfulness,
+                    "answer_relevancy": r.answer_relevancy,
+                    "context_precision": r.context_precision,
+                    "context_recall": r.context_recall,
+                    "overall_score": r.overall_score,
+                    "rag_latency_ms": round(r.rag_latency_ms, 1),
+                    "eval_latency_ms": round(r.eval_latency_ms, 1),
+                    "total_latency_ms": round(r.total_latency_ms, 1),
+                    "success": r.success,
+                    "error": r.error or "",
+                }
+            )
 
     # Summary
     summary_path = output_dir / "summary.txt"
     lines = [
-        f"═══════════════════════════════════════════════════════",
+        "═══════════════════════════════════════════════════════",
         f"  RAGAS Evaluation — {summary.experiment_name}",
-        f"═══════════════════════════════════════════════════════",
-        f"",
+        "═══════════════════════════════════════════════════════",
+        "",
         f"时间：{summary.timestamp}",
         f"耗时：{summary.duration_seconds:.1f}s",
-        f"",
-        f"───────────────────────────────────────────────────────",
-        f"  评测统计",
-        f"───────────────────────────────────────────────────────",
+        "",
+        "───────────────────────────────────────────────────────",
+        "  评测统计",
+        "───────────────────────────────────────────────────────",
         f"  总样本数  ：{summary.total_samples}",
         f"  成功      ：{summary.success_count}",
         f"  失败      ：{summary.failure_count}",
-        f"",
-        f"───────────────────────────────────────────────────────",
-        f"  平均指标得分",
-        f"───────────────────────────────────────────────────────",
+        "",
+        "───────────────────────────────────────────────────────",
+        "  平均指标得分",
+        "───────────────────────────────────────────────────────",
     ]
 
     scores = summary.average_scores
     for name, label in [
-        ("faithfulness",     "Faithfulness（忠实度）"),
+        ("faithfulness", "Faithfulness（忠实度）"),
         ("answer_relevancy", "Answer Relevancy（相关度）"),
-        ("context_precision","Context Precision（精确度）"),
-        ("context_recall",   "Context Recall（召回率）"),
-        ("overall_score",    "Overall（综合得分）"),
+        ("context_precision", "Context Precision（精确度）"),
+        ("context_recall", "Context Recall（召回率）"),
+        ("overall_score", "Overall（综合得分）"),
     ]:
         val = scores.get(name)
         if val is not None:
@@ -329,9 +350,9 @@ def save_results(summary: EvalSummary, output_dir: Path):
 
     lines += [
         "",
-        f"───────────────────────────────────────────────────────",
+        "───────────────────────────────────────────────────────",
         f"  详细结果 → {csv_path}",
-        f"───────────────────────────────────────────────────────",
+        "───────────────────────────────────────────────────────",
     ]
 
     with open(summary_path, "w", encoding="utf-8") as f:
@@ -341,6 +362,7 @@ def save_results(summary: EvalSummary, output_dir: Path):
 
 
 # ─── CLI 入口 ──────────────────────────────────────────────────────────
+
 
 def load_test_data(path: Optional[str]) -> list[EvalSample]:
     """从 CSV/JSON 文件加载测试数据，或返回默认数据集。"""
@@ -357,20 +379,24 @@ def load_test_data(path: Optional[str]) -> list[EvalSample]:
         with open(p, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                samples.append(EvalSample(
-                    question=row.get("question", row.get("question", "")),
-                    ground_truth=row.get("ground_truth") or None,
-                    category=row.get("category", "general"),
-                ))
+                samples.append(
+                    EvalSample(
+                        question=row.get("question", row.get("question", "")),
+                        ground_truth=row.get("ground_truth") or None,
+                        category=row.get("category", "general"),
+                    )
+                )
     elif p.suffix == ".json":
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
         for item in data:
-            samples.append(EvalSample(
-                question=item["question"],
-                ground_truth=item.get("ground_truth"),
-                category=item.get("category", "general"),
-            ))
+            samples.append(
+                EvalSample(
+                    question=item["question"],
+                    ground_truth=item.get("ground_truth"),
+                    category=item.get("category", "general"),
+                )
+            )
     else:
         print(f"[ERROR] 仅支持 .csv 或 .json 格式: {path}")
         sys.exit(1)
@@ -384,6 +410,7 @@ def run(args):
     dotenv_path = PROJECT_ROOT / ".env"
     if dotenv_path.exists():
         from dotenv import load_dotenv
+
         load_dotenv(dotenv_path)
 
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
@@ -392,7 +419,9 @@ def run(args):
         sys.exit(1)
 
     model = os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02")
-    base_url = os.getenv("OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    base_url = os.getenv(
+        "OPENAI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
 
     # 设置实验名
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -400,16 +429,16 @@ def run(args):
     output_dir = Path("results") / experiment_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n{'='*56}")
+    print(f"\n{'=' * 56}")
     print(f"  RAGAS Evaluation — {experiment_name}")
-    print(f"{'='*56}")
+    print(f"{'=' * 56}")
     print(f"  输出目录：{output_dir}")
-    print(f"{'='*56}\n")
+    print(f"{'=' * 56}\n")
 
     # ── 加载数据 ───────────────────────────────────────────────
     samples = load_test_data(args.data)
     if args.limit:
-        samples = samples[:args.limit]
+        samples = samples[: args.limit]
 
     print(f"[INFO] 加载了 {len(samples)} 条测试数据\n")
 
@@ -422,6 +451,7 @@ def run(args):
     )
     # 直接注入已初始化的 LLM（避免 ragas_evaluator 内部再次读取 env）
     from langchain_openai import ChatOpenAI
+
     evaluator._eval_llm = ChatOpenAI(
         model=model,
         temperature=0.0,
@@ -439,16 +469,20 @@ def run(args):
     for i, sample in enumerate(samples, 1):
         print(f"[{i}/{len(samples)}] Q: {sample.question[:50]}...")
         if args.verbose:
-            print(f"    ground_truth: {sample.ground_truth[:80] if sample.ground_truth else 'N/A'}...")
+            print(
+                f"    ground_truth: {sample.ground_truth[:80] if sample.ground_truth else 'N/A'}..."
+            )
 
         result = asyncio.run(run_single_eval(sample, evaluator, verbose=args.verbose))
         results.append(result)
 
         status = "✓" if result.success else "✗"
         score_str = f"{result.overall_score:.3f}" if result.success else "FAIL"
-        print(f"    → {status} overall={score_str}, "
-              f"rag={result.rag_latency_ms:.0f}ms, "
-              f"eval={result.eval_latency_ms:.0f}ms")
+        print(
+            f"    → {status} overall={score_str}, "
+            f"rag={result.rag_latency_ms:.0f}ms, "
+            f"eval={result.eval_latency_ms:.0f}ms"
+        )
 
         if result.error and args.verbose:
             print(f"    [ERROR] {result.error}")
@@ -460,18 +494,18 @@ def run(args):
     csv_path, summary_path = save_results(summary, output_dir)
 
     # ── 打印汇总 ───────────────────────────────────────────────
-    print(f"\n{'='*56}")
+    print(f"\n{'=' * 56}")
     print(f"  评测完成！耗时 {total_duration:.1f}s")
-    print(f"{'='*56}")
+    print(f"{'=' * 56}")
     print()
 
     scores = summary.average_scores
     for name, label in [
-        ("faithfulness",     "Faithfulness（忠实度）"),
+        ("faithfulness", "Faithfulness（忠实度）"),
         ("answer_relevancy", "Answer Relevancy（相关度）"),
-        ("context_precision","Context Precision（精确度）"),
-        ("context_recall",   "Context Recall（召回率）"),
-        ("overall_score",    "Overall（综合得分）"),
+        ("context_precision", "Context Precision（精确度）"),
+        ("context_recall", "Context Recall（召回率）"),
+        ("overall_score", "Overall（综合得分）"),
     ]:
         val = scores.get(name)
         if val is not None:

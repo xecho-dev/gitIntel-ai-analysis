@@ -22,6 +22,7 @@ _logger = logging.getLogger("gitintel")
 @dataclass
 class ProcessedAnswer:
     """处理后的回答"""
+
     answer: str
     citations: list[int]  # 引用编号列表
     sources: list[dict]  # 来源详情
@@ -64,9 +65,9 @@ def _extract_citations(answer: str) -> list[int]:
     """提取引用编号"""
     # 匹配【1】【2】或 [1] [2] 格式
     patterns = [
-        r'【(\d+)】',  # 【1】【2】
-        r'\[(\d+)\]',  # [1] [2]
-        r'^(\d+)[\s.。:：]',  # 1. 2.
+        r"【(\d+)】",  # 【1】【2】
+        r"\[(\d+)\]",  # [1] [2]
+        r"^(\d+)[\s.。:：]",  # 1. 2.
     ]
 
     citations: set[int] = set()

@@ -11,6 +11,7 @@
   - test_score:   测试覆盖 0-100
   - coup_score:   耦合度   0-100
 """
+
 import asyncio
 import logging
 import os
@@ -79,9 +80,11 @@ def _q_load_parser(language: str):
 
 # ─── LLM 懒加载 ────────────────────────────────────────────────────────
 
+
 def _get_llm():
     """懒加载 LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
     from utils.llm_factory import get_llm
+
     return get_llm(temperature=0.0)
 
 
@@ -95,7 +98,6 @@ def _build_quality_context(
     maintainability: str,
 ) -> str:
     """从各质量指标构建 LLM 分析上下文。"""
-    import json
 
     parts = []
 
@@ -154,6 +156,7 @@ def _build_quality_context(
 
 # ─── Agent ──────────────────────────────────────────────────────
 
+
 class QualityAgent(BaseAgent):
     """分析代码质量：圈复杂度、文件大小、重复率、测试覆盖估算。"""
 
@@ -170,14 +173,19 @@ class QualityAgent(BaseAgent):
         if file_contents is not None:
             # ── GitHub API 模式 ───────────────────────────────────
             py_contents = {p: c for p, c in file_contents.items() if p.endswith(".py")}
-            ts_contents = {p: c for p, c in file_contents.items()
-                          if p.endswith((".ts", ".tsx", ".js", ".jsx"))}
+            ts_contents = {
+                p: c
+                for p, c in file_contents.items()
+                if p.endswith((".ts", ".tsx", ".js", ".jsx"))
+            }
 
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"扫描完成: {len(py_contents)} 个 Python 文件, "
                 f"{len(ts_contents)} 个 TypeScript 文件",
-                25, None
+                25,
+                None,
             )
 
             total_files = len(py_contents) + len(ts_contents)
@@ -211,18 +219,22 @@ class QualityAgent(BaseAgent):
         else:
             # ── 本地磁盘模式 ─────────────────────────────────────
             py_files = await self._walk_by_lang(repo_path, [".py"])
-            ts_files = await self._walk_by_lang(repo_path, [".ts", ".tsx", ".js", ".jsx"])
+            ts_files = await self._walk_by_lang(
+                repo_path, [".ts", ".tsx", ".js", ".jsx"]
+            )
             all_files = await self._walk_by_lang(repo_path, None)  # 总文件数
             total_files = len(all_files)
             py_files_count = len(py_files)
             ts_files_count = len(ts_files)
 
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"扫描完成: {py_files_count} 个 Python 文件, "
                 f"{ts_files_count} 个 TypeScript 文件, "
                 f"共 {total_files} 个文件",
-                25, None
+                25,
+                None,
             )
 
             try:
@@ -241,17 +253,18 @@ class QualityAgent(BaseAgent):
                 duplication = {"score": 0, "duplicated_blocks": 0}
 
             try:
-                test_info = await self._estimate_test_coverage(repo_path, py_files, ts_files)
+                test_info = await self._estimate_test_coverage(
+                    repo_path, py_files, ts_files
+                )
             except Exception:
                 test_info = {"estimated_coverage": 0, "test_files": 0}
 
-        yield _make_event(
-            self.name, "progress",
-            "正在汇总质量评分…", 80, None
-        )
+        yield _make_event(self.name, "progress", "正在汇总质量评分…", 80, None)
 
         # 综合评分
-        health_score = self._compute_health_score(py_metrics, ts_metrics, duplication, test_info)
+        health_score = self._compute_health_score(
+            py_metrics, ts_metrics, duplication, test_info
+        )
         complexity_label = self._calc_complexity(health_score)
         maintainability = self._calc_maintainability(health_score)
 
@@ -260,8 +273,7 @@ class QualityAgent(BaseAgent):
         llm_metrics: dict = {}
         if llm is not None:
             yield _make_event(
-                self.name, "progress",
-                "正在调用 LLM 生成质量评分…", 85, None
+                self.name, "progress", "正在调用 LLM 生成质量评分…", 85, None
             )
             try:
                 llm_metrics = await self._generate_llm_insights(
@@ -294,33 +306,49 @@ class QualityAgent(BaseAgent):
             # LLM 五维评分（0-100，越高越好）
             "maint_score": llm_metrics.get("maint_score", 70),
             "comp_score": llm_metrics.get("comp_score", 70),
-            "dup_score": llm_metrics.get("dup_score", round(100 - (duplication.get("score", 0) if duplication else 0), 1)),
-            "test_score": llm_metrics.get("test_score", test_info.get("estimated_coverage", 0)),
+            "dup_score": llm_metrics.get(
+                "dup_score",
+                round(100 - (duplication.get("score", 0) if duplication else 0), 1),
+            ),
+            "test_score": llm_metrics.get(
+                "test_score", test_info.get("estimated_coverage", 0)
+            ),
             "coup_score": llm_metrics.get("coup_score", 70),
             "llmPowered": bool(llm_metrics),
         }
 
-        yield _make_event(
-            self.name, "result", "代码质量分析完成",
-            100, result
-        )
+        yield _make_event(self.name, "result", "代码质量分析完成", 100, result)
 
     # ─── Python 分析 ───────────────────────────────────────────
 
     @staticmethod
     async def _walk_by_lang(root: str, extensions: list[str] | None) -> list[str]:
-        IGNORE = frozenset({
-            "node_modules", ".git", "__pycache__", ".venv", "venv",
-            "dist", "build", ".next", ".nuxt", "target",
-            ".pytest_cache", ".mypy_cache", ".ruff_cache",
-        })
+        IGNORE = frozenset(
+            {
+                "node_modules",
+                ".git",
+                "__pycache__",
+                ".venv",
+                "venv",
+                "dist",
+                "build",
+                ".next",
+                ".nuxt",
+                "target",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".ruff_cache",
+            }
+        )
 
         def _do() -> list[str]:
             files = []
             for dirpath, dirs, names in os.walk(root):
                 dirs[:] = [d for d in dirs if d not in IGNORE and not d.startswith(".")]
                 for name in names:
-                    if extensions is None or any(name.endswith(ext) for ext in extensions):
+                    if extensions is None or any(
+                        name.endswith(ext) for ext in extensions
+                    ):
                         files.append(os.path.join(dirpath, name))
             return files
 
@@ -356,7 +384,9 @@ class QualityAgent(BaseAgent):
                     continue
 
                 # 统计函数、类、复杂度
-                funcs, classes, complexity = QualityAgent._walk_python(tree.root_node, [], 0)
+                funcs, classes, complexity = QualityAgent._walk_python(
+                    tree.root_node, [], 0
+                )
                 func_count += funcs
                 class_count += classes
                 total_complexity += complexity
@@ -366,13 +396,17 @@ class QualityAgent(BaseAgent):
                     over_complexity_count += 1
                 # 统计超过 50 行的函数
                 for chunk in source.split("\n\n"):
-                    if len(chunk.split("\n")) > 50 and ("def " in chunk or "async def " in chunk):
+                    if len(chunk.split("\n")) > 50 and (
+                        "def " in chunk or "async def " in chunk
+                    ):
                         fname = re.search(r"def\s+(\w+)", chunk)
-                        long_functions.append({
-                            "file": fpath.replace("\\", "/"),
-                            "function": fname.group(1) if fname else "(unknown)",
-                            "lines": len(chunk.split("\n")),
-                        })
+                        long_functions.append(
+                            {
+                                "file": fpath.replace("\\", "/"),
+                                "function": fname.group(1) if fname else "(unknown)",
+                                "lines": len(chunk.split("\n")),
+                            }
+                        )
 
             avg_complexity = total_complexity / max(func_count, 1)
             large_files.sort(key=lambda x: x["lines"], reverse=True)
@@ -398,12 +432,17 @@ class QualityAgent(BaseAgent):
         complexity = 0
 
         COMPLEXITY_NODES = {
-            "if_statement", "elif_clause",
-            "for_statement", "for_in_statement",
-            "while_statement", "with_statement",
-            "except_clause", "try_statement",
+            "if_statement",
+            "elif_clause",
+            "for_statement",
+            "for_in_statement",
+            "while_statement",
+            "with_statement",
+            "except_clause",
+            "try_statement",
             "conditional_expression",
-            "and_operator", "or_operator",
+            "and_operator",
+            "or_operator",
         }
 
         if node.type == "function_definition":
@@ -451,7 +490,9 @@ class QualityAgent(BaseAgent):
                 except Exception:
                     continue
 
-                funcs, classes, complexity = QualityAgent._walk_python(tree.root_node, [], 0)
+                funcs, classes, complexity = QualityAgent._walk_python(
+                    tree.root_node, [], 0
+                )
                 func_count += funcs
                 class_count += classes
                 total_complexity += complexity
@@ -461,13 +502,17 @@ class QualityAgent(BaseAgent):
                     over_complexity_count += 1
 
                 for chunk in source.split("\n\n"):
-                    if len(chunk.split("\n")) > 50 and ("def " in chunk or "async def " in chunk):
+                    if len(chunk.split("\n")) > 50 and (
+                        "def " in chunk or "async def " in chunk
+                    ):
                         fname = re.search(r"def\s+(\w+)", chunk)
-                        long_functions.append({
-                            "file": fpath.replace("\\", "/"),
-                            "function": fname.group(1) if fname else "(unknown)",
-                            "lines": len(chunk.split("\n")),
-                        })
+                        long_functions.append(
+                            {
+                                "file": fpath.replace("\\", "/"),
+                                "function": fname.group(1) if fname else "(unknown)",
+                                "lines": len(chunk.split("\n")),
+                            }
+                        )
 
             avg_complexity = total_complexity / max(func_count, 1)
             large_files.sort(key=lambda x: x["lines"], reverse=True)
@@ -537,6 +582,7 @@ class QualityAgent(BaseAgent):
         contents: dict[str, str], sample_limit: int = 80
     ) -> dict:
         """用简化 N-gram (3 行块) 哈希检测重复（内存模式）。"""
+
         def _do() -> dict:
             sampled = list(contents.items())[:sample_limit]
             line_hashes: dict[int, int] = defaultdict(int)
@@ -546,10 +592,11 @@ class QualityAgent(BaseAgent):
                 lines = [
                     l.strip()
                     for l in source.splitlines()
-                    if l.strip() and not l.strip().startswith(("#", "//", "/*", "*", "*/"))
+                    if l.strip()
+                    and not l.strip().startswith(("#", "//", "/*", "*", "*/"))
                 ]
                 for i in range(len(lines) - 2):
-                    block = "\n".join(lines[i: i + 3])
+                    block = "\n".join(lines[i : i + 3])
                     h = hash(block)
                     if len(block) > 15:
                         line_hashes[h] += 1
@@ -562,7 +609,9 @@ class QualityAgent(BaseAgent):
                 "score": round(min(dup_rate, 100), 1),
                 "duplicated_blocks": duplicated,
                 "total_blocks_checked": total_blocks,
-                "duplication_level": "Low" if dup_rate < 5 else ("Medium" if dup_rate < 15 else "High"),
+                "duplication_level": "Low"
+                if dup_rate < 5
+                else ("Medium" if dup_rate < 15 else "High"),
             }
 
         return await asyncio.to_thread(_do)
@@ -672,22 +721,32 @@ class QualityAgent(BaseAgent):
         complexity = 0
 
         COMPLEXITY_NODES = {
-            "if_statement", "else_clause",
-            "for_statement", "for_in_statement", "for_of_statement",
-            "while_statement", "do_statement",
-            "switch_statement", "case_statement",
-            "catch_clause", "try_statement",
+            "if_statement",
+            "else_clause",
+            "for_statement",
+            "for_in_statement",
+            "for_of_statement",
+            "while_statement",
+            "do_statement",
+            "switch_statement",
+            "case_statement",
+            "catch_clause",
+            "try_statement",
             "conditional_expression",
             "binary_expression",  # && or ||
         }
 
         IS_FUNC = {
-            "function_declaration", "method_declaration",
-            "arrow_function", "function",
+            "function_declaration",
+            "method_declaration",
+            "arrow_function",
+            "function",
         }
         IS_CLASS = {
-            "class_declaration", "class",
-            "interface_declaration", "abstract_class_declaration",
+            "class_declaration",
+            "class",
+            "interface_declaration",
+            "abstract_class_declaration",
         }
 
         if node.type in IS_FUNC:
@@ -713,6 +772,7 @@ class QualityAgent(BaseAgent):
     @staticmethod
     async def _calc_duplication(files: list[str], sample_limit: int = 80) -> dict:
         """用简化 N-gram (3 行块) 哈希检测重复。"""
+
         def _do() -> dict:
             # 只采样前 sample_limit 个文件，避免太慢
             sampled = files[:sample_limit]
@@ -728,7 +788,8 @@ class QualityAgent(BaseAgent):
                 lines = [
                     l.strip()
                     for l in source.splitlines()
-                    if l.strip() and not l.strip().startswith(("#", "//", "/*", "*", "*/"))
+                    if l.strip()
+                    and not l.strip().startswith(("#", "//", "/*", "*", "*/"))
                 ]
                 for i in range(len(lines) - 2):
                     block = "\n".join(lines[i : i + 3])
@@ -746,7 +807,9 @@ class QualityAgent(BaseAgent):
                 "score": round(min(dup_rate, 100), 1),
                 "duplicated_blocks": duplicated,
                 "total_blocks_checked": total_blocks,
-                "duplication_level": "Low" if dup_rate < 5 else ("Medium" if dup_rate < 15 else "High"),
+                "duplication_level": "Low"
+                if dup_rate < 5
+                else ("Medium" if dup_rate < 15 else "High"),
             }
 
         return await asyncio.to_thread(_do)
@@ -764,9 +827,7 @@ class QualityAgent(BaseAgent):
                 r"\.spec\.(ts|tsx|js|jsx)|\.test\.(ts|tsx|js|jsx)|"
                 r"__tests?__/"
             )
-            src_pattern = re.compile(
-                r"(^|/)src/|^lib/|^app/|^components?/|^pages?/"
-            )
+            src_pattern = re.compile(r"(^|/)src/|^lib/|^app/|^components?/|^pages?/")
 
             py_test = sum(1 for f in py_files if test_pattern.search(f))
             ts_test = sum(1 for f in ts_files if test_pattern.search(f))
@@ -808,8 +869,7 @@ class QualityAgent(BaseAgent):
 
     @staticmethod
     def _compute_health_score(
-        py_metrics: dict, ts_metrics: dict,
-        duplication: dict, test_info: dict
+        py_metrics: dict, ts_metrics: dict, duplication: dict, test_info: dict
     ) -> float:
         score = 100.0
 
@@ -855,11 +915,17 @@ class QualityAgent(BaseAgent):
         Returns:
             dict: 包含 maint_score, comp_score, dup_score, test_score, coup_score (0-100)
         """
-        import json, re
+        import json
+        import re
 
         context = _build_quality_context(
-            py_metrics, ts_metrics, duplication, test_info,
-            health_score, complexity_label, maintainability,
+            py_metrics,
+            ts_metrics,
+            duplication,
+            test_info,
+            health_score,
+            complexity_label,
+            maintainability,
         )
 
         prompt = (
@@ -877,6 +943,7 @@ class QualityAgent(BaseAgent):
 
         try:
             from langchain_core.messages import HumanMessage
+
             response = await llm.ainvoke([HumanMessage(content=prompt)])
             content = response.content.strip()
 

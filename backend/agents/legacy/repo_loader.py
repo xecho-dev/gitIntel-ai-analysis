@@ -42,6 +42,7 @@ LangGraph 工作流（analysis_graph.py）
         └── node_load_p2_decide
                 └── RepoLoaderAgent().phase_ai_decide_p2()
 """
+
 import asyncio
 import base64
 import json as _json
@@ -58,8 +59,10 @@ logger = __import__("logging").getLogger("gitintel")
 
 # ─── Custom Exceptions ─────────────────────────────────────────────
 
+
 class GitHubPermissionError(Exception):
     """GitHub Token 缺少 public_repo 权限，无法访问他人仓库"""
+
     pass
 
 
@@ -82,13 +85,16 @@ def _build_headers() -> dict:
 
 # ─── LangChain LLM ───────────────────────────────────────────────────
 
+
 def _get_llm():
     """懒加载 LangChain LLM client（通过统一工厂，支持 LangSmith 追踪）。"""
     from utils.llm_factory import get_llm
+
     return get_llm(temperature=0.0)
 
 
 # ─── URL 解析 ────────────────────────────────────────────────────────
+
 
 def _parse_github_url(url: str) -> tuple[str, str] | None:
     """从 GitHub URL 中提取 (owner, repo)。
@@ -113,6 +119,7 @@ def _parse_github_url(url: str) -> tuple[str, str] | None:
 
 # ─── Agent ──────────────────────────────────────────────────────────
 
+
 class RepoLoaderAgent(BaseAgent):
     """通过 GitHub REST API + 多轮 LLM 决策智能加载仓库文件。"""
 
@@ -122,49 +129,100 @@ class RepoLoaderAgent(BaseAgent):
     MAX_DECISION_ROUNDS = 3
 
     # 默认优先级分类（当 LLM 不可用时的降级策略）
-    DEFAULT_P0_FILES = frozenset({
-        "package.json", "requirements.txt", "go.mod",
-        "Cargo.toml", "Gemfile", "composer.json",
-        "pyproject.toml", "Pipfile", "Makefile",
-        "Dockerfile", "docker-compose.yml", "docker-compose.yaml",
-        "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-        "poetry.lock", "bun.lockb",
-        "README.md", "README.rst", "README.txt",
-        "tsconfig.json", "jsconfig.json",
-        ".env.example", ".env.template",
-        "vite.config.ts", "vite.config.js",
-        "webpack.config.js", "next.config.js", "next.config.ts",
-        "tailwind.config.ts", "tailwind.config.js",
-        "setup.py", "setup.cfg",
-        "pytest.ini", "tox.ini",
-    })
+    DEFAULT_P0_FILES = frozenset(
+        {
+            "package.json",
+            "requirements.txt",
+            "go.mod",
+            "Cargo.toml",
+            "Gemfile",
+            "composer.json",
+            "pyproject.toml",
+            "Pipfile",
+            "Makefile",
+            "Dockerfile",
+            "docker-compose.yml",
+            "docker-compose.yaml",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "poetry.lock",
+            "bun.lockb",
+            "README.md",
+            "README.rst",
+            "README.txt",
+            "tsconfig.json",
+            "jsconfig.json",
+            ".env.example",
+            ".env.template",
+            "vite.config.ts",
+            "vite.config.js",
+            "webpack.config.js",
+            "next.config.js",
+            "next.config.ts",
+            "tailwind.config.ts",
+            "tailwind.config.js",
+            "setup.py",
+            "setup.cfg",
+            "pytest.ini",
+            "tox.ini",
+        }
+    )
 
     # ── 规则引擎：多语言文件分类 ───────────────────────────────────
 
     # 源码扩展名 → 语言名称（按优先级排序）
     SOURCE_EXTENSIONS: dict[str, str] = {
         # 前端/Node.js
-        ".js": "JavaScript", ".jsx": "JavaScript",
-        ".ts": "TypeScript", ".tsx": "TypeScript",
-        ".vue": "Vue", ".svelte": "Svelte",
+        ".js": "JavaScript",
+        ".jsx": "JavaScript",
+        ".ts": "TypeScript",
+        ".tsx": "TypeScript",
+        ".vue": "Vue",
+        ".svelte": "Svelte",
         # 后端/服务
-        ".py": "Python", ".go": "Go", ".rs": "Rust",
-        ".rb": "Ruby", ".java": "Java", ".kt": "Kotlin",
-        ".scala": "Scala", ".cs": "C#", ".php": "PHP",
+        ".py": "Python",
+        ".go": "Go",
+        ".rs": "Rust",
+        ".rb": "Ruby",
+        ".java": "Java",
+        ".kt": "Kotlin",
+        ".scala": "Scala",
+        ".cs": "C#",
+        ".php": "PHP",
         # 系统/嵌入式
-        ".c": "C", ".cpp": "C++", ".cc": "C++", ".cxx": "C++",
-        ".h": "C/C++", ".hpp": "C++",
-        ".swift": "Swift", ".m": "Objective-C",
+        ".c": "C",
+        ".cpp": "C++",
+        ".cc": "C++",
+        ".cxx": "C++",
+        ".h": "C/C++",
+        ".hpp": "C++",
+        ".swift": "Swift",
+        ".m": "Objective-C",
         # 脚本/其他
-        ".sh": "Shell", ".bash": "Shell", ".zsh": "Shell",
-        ".lua": "Lua", ".r": "R", ".R": "R", ".dart": "Dart",
+        ".sh": "Shell",
+        ".bash": "Shell",
+        ".zsh": "Shell",
+        ".lua": "Lua",
+        ".r": "R",
+        ".R": "R",
+        ".dart": "Dart",
         # 配置/数据
-        ".yaml": "YAML", ".yml": "YAML", ".toml": "TOML",
-        ".json": "JSON", ".xml": "XML", ".ini": "INI", ".cfg": "INI",
+        ".yaml": "YAML",
+        ".yml": "YAML",
+        ".toml": "TOML",
+        ".json": "JSON",
+        ".xml": "XML",
+        ".ini": "INI",
+        ".cfg": "INI",
         # 模板/样式
-        ".html": "HTML", ".css": "CSS",
-        ".scss": "SCSS", ".sass": "Sass", ".less": "Less",
-        ".md": "Markdown", ".rst": "reStructuredText",
+        ".html": "HTML",
+        ".css": "CSS",
+        ".scss": "SCSS",
+        ".sass": "Sass",
+        ".less": "Less",
+        ".md": "Markdown",
+        ".rst": "reStructuredText",
     }
 
     # 入口文件模式（匹配文件名或路径）
@@ -196,9 +254,11 @@ class RepoLoaderAgent(BaseAgent):
         owner, repo = _parse_github_url(repo_url)
         if not owner or not repo:
             yield _make_event(
-                self.name, "error",
+                self.name,
+                "error",
                 f"无法解析 GitHub 仓库 URL: {repo_url}，请确认格式为 github.com/owner/repo",
-                0, None
+                0,
+                None,
             )
             return
 
@@ -227,9 +287,11 @@ class RepoLoaderAgent(BaseAgent):
             loaded = dict(p0_contents)
 
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"P0 核心文件加载完成: {len(p0_contents)} 个，开始加载 P1…",
-                45, {"loaded": list(p0_contents.keys())}
+                45,
+                {"loaded": list(p0_contents.keys())},
             )
 
             # 阶段四：加载 P1
@@ -237,9 +299,11 @@ class RepoLoaderAgent(BaseAgent):
             loaded.update(p1_contents)
 
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"P1 文件加载完成: {len(p1_contents)} 个，开始 LLM 深度决策…",
-                65, {"loaded": list(p1_contents.keys())}
+                65,
+                {"loaded": list(p1_contents.keys())},
             )
 
             # 阶段五 & 六：LLM 迭代决策 + 按需加载（最多 3 轮）
@@ -262,9 +326,11 @@ class RepoLoaderAgent(BaseAgent):
 
                 if not need_more or not extra_paths:
                     yield _make_event(
-                        self.name, "progress",
+                        self.name,
+                        "progress",
                         f"LLM 决策（轮次 {decision_rounds}）：信息已足够，停止加载",
-                        80, None
+                        80,
+                        None,
                     )
                     break
 
@@ -273,40 +339,47 @@ class RepoLoaderAgent(BaseAgent):
                 all_p2 = [f for f in all_p2 if f["path"] not in extra_paths]
 
                 extra_contents, _ = await self._load_files(
-                    owner, repo, sha, extra_items,
-                    max_concurrent=10, max_total=30
+                    owner, repo, sha, extra_items, max_concurrent=10, max_total=30
                 )
                 loaded.update(extra_contents)
 
-                decision_history.append({
-                    "round": decision_rounds,
-                    "need_more": need_more,
-                    "paths_requested": extra_paths[:30],
-                    "paths_loaded": list(extra_contents.keys()),
-                })
+                decision_history.append(
+                    {
+                        "round": decision_rounds,
+                        "need_more": need_more,
+                        "paths_requested": extra_paths[:30],
+                        "paths_loaded": list(extra_contents.keys()),
+                    }
+                )
 
                 yield _make_event(
-                    self.name, "progress",
+                    self.name,
+                    "progress",
                     f"LLM 决策（轮次 {decision_rounds}）：额外加载 {len(extra_contents)} 个文件，"
                     f"剩余 {len(all_p2)} 个待选",
-                    80, {"decision": decision_history[-1]}
+                    80,
+                    {"decision": decision_history[-1]},
                 )
 
             # 阶段七：语言检测
             languages = self._infer_languages(tree_items)
 
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"加载完成: {len(loaded)} 个文件，"
                 f"检测到语言: {', '.join(languages) if languages else '未知'}",
-                95, None
+                95,
+                None,
             )
 
             # 阶段八：返回结果
             # 注意：代码语义分块已移至 CodeParserAgent，利用 tree-sitter AST
             # 在函数/类边界拆分，保持语义完整性
             yield _make_event(
-                self.name, "result", "仓库加载完成",
+                self.name,
+                "result",
+                "仓库加载完成",
                 100,
                 {
                     "owner": owner,
@@ -326,27 +399,31 @@ class RepoLoaderAgent(BaseAgent):
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 403:
                 yield _make_event(
-                    self.name, "error",
+                    self.name,
+                    "error",
                     "GitHub API 速率限制已达上限（403），建议设置 GITHUB_TOKEN 环境变量",
-                    0, {"exception": "rate_limit_exceeded"}
+                    0,
+                    {"exception": "rate_limit_exceeded"},
                 )
             elif exc.response.status_code == 404:
                 yield _make_event(
-                    self.name, "error",
+                    self.name,
+                    "error",
                     f"仓库 {repo_url} 不存在或无权访问（404）",
-                    0, {"exception": "not_found"}
+                    0,
+                    {"exception": "not_found"},
                 )
             else:
                 yield _make_event(
-                    self.name, "error",
+                    self.name,
+                    "error",
                     f"GitHub API 请求失败 ({exc.response.status_code}): {exc}",
-                    0, {"exception": str(exc)}
+                    0,
+                    {"exception": str(exc)},
                 )
         except Exception as exc:
             yield _make_event(
-                self.name, "error",
-                f"仓库加载失败: {exc}",
-                0, {"exception": str(exc)}
+                self.name, "error", f"仓库加载失败: {exc}", 0, {"exception": str(exc)}
             )
 
     # ── 断点续传专用阶段方法（供 LangGraph 节点调用）────────────
@@ -381,8 +458,7 @@ class RepoLoaderAgent(BaseAgent):
     ) -> dict[str, str]:
         """加载指定优先级的文件，返回 path→content 字典。"""
         contents, _ = await self._load_files(
-            owner, repo, sha, files,
-            max_concurrent=max_concurrent, max_total=max_total
+            owner, repo, sha, files, max_concurrent=max_concurrent, max_total=max_total
         )
         return contents
 
@@ -460,7 +536,7 @@ class RepoLoaderAgent(BaseAgent):
         try:
             result = _json.loads(raw)
         except (_json.JSONDecodeError, Exception):
-            logger.warning(f"[phase_ai_decide_p1] LLM 返回格式异常，使用默认值")
+            logger.warning("[phase_ai_decide_p1] LLM 返回格式异常，使用默认值")
             return False, [], "LLM 不可用，默认不加载更多文件"
         need_more = bool(result.get("need_more", False))
         reason = result.get("reason", "基于代码分析的决定")
@@ -516,10 +592,12 @@ class RepoLoaderAgent(BaseAgent):
 
         p2_info = []
         for f in p2_files[:50]:
-            p2_info.append({
-                "path": f["path"],
-                "size": f.get("size", 0),
-            })
+            p2_info.append(
+                {
+                    "path": f["path"],
+                    "size": f.get("size", 0),
+                }
+            )
 
         from .prompts import build_p2_decision_prompt
 
@@ -537,7 +615,7 @@ class RepoLoaderAgent(BaseAgent):
         try:
             result = _json.loads(raw)
         except (_json.JSONDecodeError, Exception):
-            logger.warning(f"[phase_ai_decide_p2] LLM 返回格式异常，使用默认值")
+            logger.warning("[phase_ai_decide_p2] LLM 返回格式异常，使用默认值")
             return False, [], "LLM 不可用，默认不加载更多文件"
         need_more = bool(result.get("need_more", False))
         extra_paths: list[str] = result.get("additional_paths", [])[:30]
@@ -552,29 +630,31 @@ class RepoLoaderAgent(BaseAgent):
     ) -> AsyncGenerator[AgentEvent, None]:
         """阶段一：获取 SHA + 文件树。"""
         yield _make_event(
-            self.name, "status",
-            f"正在获取 {owner}/{repo} 分支信息…", 5, None
+            self.name, "status", f"正在获取 {owner}/{repo} 分支信息…", 5, None
         )
         sha = await self._get_default_branch(owner, repo, branch)
         if not sha:
             yield _make_event(
-                self.name, "error",
+                self.name,
+                "error",
                 f"无法获取仓库 {owner}/{repo} 分支信息，可能仓库不存在或无权访问",
-                0, None
+                0,
+                None,
             )
             return
 
         yield _make_event(
-            self.name, "progress",
-            f"已解析到 commit SHA: {sha[:7]}，正在获取文件树…", 10, None
+            self.name,
+            "progress",
+            f"已解析到 commit SHA: {sha[:7]}，正在获取文件树…",
+            10,
+            None,
         )
 
         tree_items = await self._fetch_tree(owner, repo, sha)
         if not tree_items:
             yield _make_event(
-                self.name, "error",
-                f"仓库 {owner}/{repo} 文件树为空",
-                0, None
+                self.name, "error", f"仓库 {owner}/{repo} 文件树为空", 0, None
             )
             return
 
@@ -582,9 +662,11 @@ class RepoLoaderAgent(BaseAgent):
         self._last_sha = sha  # type: ignore[attr-defined]
 
         yield _make_event(
-            self.name, "progress",
-            f"文件树获取完成，共 {len(tree_items)} 个文件/目录，"
-            f"开始 LLM 初始分类…", 20, {"total_files": len(tree_items)}
+            self.name,
+            "progress",
+            f"文件树获取完成，共 {len(tree_items)} 个文件/目录，开始 LLM 初始分类…",
+            20,
+            {"total_files": len(tree_items)},
         )
 
     async def _phase_llm_decision(
@@ -606,15 +688,19 @@ class RepoLoaderAgent(BaseAgent):
 
         if need_more:
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"LLM（轮次 {round_num}）决定需要更多文件: {len(extra_paths)} 个",
-                70 + round_num * 5, {"need_more": True, "paths": extra_paths[:10]}
+                70 + round_num * 5,
+                {"need_more": True, "paths": extra_paths[:10]},
             )
         else:
             yield _make_event(
-                self.name, "progress",
+                self.name,
+                "progress",
                 f"LLM（轮次 {round_num}）判断：当前信息已足够",
-                70 + round_num * 5, {"need_more": False}
+                70 + round_num * 5,
+                {"need_more": False},
             )
 
     # ── LLM 决策 ──────────────────────────────────────────────────
@@ -653,8 +739,20 @@ class RepoLoaderAgent(BaseAgent):
             if ext in self.SOURCE_EXTENSIONS:
                 p1_paths.add(path)
             # 4. 配置/数据/样式文件 → P1
-            elif ext in (".yaml", ".yml", ".json", ".toml", ".xml", ".ini", ".cfg",
-                         ".html", ".css", ".scss", ".sass", ".less"):
+            elif ext in (
+                ".yaml",
+                ".yml",
+                ".json",
+                ".toml",
+                ".xml",
+                ".ini",
+                ".cfg",
+                ".html",
+                ".css",
+                ".scss",
+                ".sass",
+                ".less",
+            ):
                 p1_paths.add(path)
             # 5. Markdown 文档 → P1（有价值，排除 node_modules）
             elif ext == ".md" and "node_modules" not in path:
@@ -683,9 +781,9 @@ class RepoLoaderAgent(BaseAgent):
             return self._classify_by_rules_fallback(tree_items)
 
         from .prompts import build_repo_loader_initial_prompt
+
         tree_list = "\n".join(
-            f"- {b['path']} (~{b.get('size', 0)} bytes)"
-            for b in blobs[:150]
+            f"- {b['path']} (~{b.get('size', 0)} bytes)" for b in blobs[:150]
         )
         prompt_template = build_repo_loader_initial_prompt(
             repo_path=f"{owner}/{repo}",
@@ -721,8 +819,12 @@ class RepoLoaderAgent(BaseAgent):
             else:
                 raise ValueError(f"Unexpected JSON type: {type(parsed)}")
         except Exception as e:
-            logger.warning(f"[_llm_initial_classify] LLM 调用或解析失败 ({e})，使用规则引擎")
-            logger.debug(f"[_llm_initial_classify] LLM 原始返回: {raw[:500] if raw else '(empty)'}")
+            logger.warning(
+                f"[_llm_initial_classify] LLM 调用或解析失败 ({e})，使用规则引擎"
+            )
+            logger.debug(
+                f"[_llm_initial_classify] LLM 原始返回: {raw[:500] if raw else '(empty)'}"
+            )
             return self._classify_by_rules_fallback(tree_items)
 
         p0_set = set(result.get("p0_paths", []))
@@ -737,7 +839,9 @@ class RepoLoaderAgent(BaseAgent):
                 priority = 1
             else:
                 priority = 2
-            classified.append({"path": path, "priority": priority, "size": b.get("size", 0)})
+            classified.append(
+                {"path": path, "priority": priority, "size": b.get("size", 0)}
+            )
 
         llm_result = {
             "round": 0,
@@ -748,7 +852,9 @@ class RepoLoaderAgent(BaseAgent):
         }
         return classified, llm_result
 
-    def _classify_by_rules_fallback(self, tree_items: list[dict]) -> tuple[list[dict], dict]:
+    def _classify_by_rules_fallback(
+        self, tree_items: list[dict]
+    ) -> tuple[list[dict], dict]:
         """规则引擎兜底：基于文件类型和路径的多语言分类。"""
         blobs = [
             {"path": item["path"], "type": item["type"], "size": item.get("size", 0)}
@@ -766,7 +872,9 @@ class RepoLoaderAgent(BaseAgent):
                 priority = 1
             else:
                 priority = 2
-            classified.append({"path": path, "priority": priority, "size": b.get("size", 0)})
+            classified.append(
+                {"path": path, "priority": priority, "size": b.get("size", 0)}
+            )
 
         llm_result = {
             "round": 0,
@@ -820,7 +928,7 @@ class RepoLoaderAgent(BaseAgent):
         try:
             result = _json.loads(raw)
         except (_json.JSONDecodeError, Exception):
-            logger.warning(f"[_llm_decide] LLM 返回格式异常，使用默认值")
+            logger.warning("[_llm_decide] LLM 返回格式异常，使用默认值")
             return False, []
         need_more = bool(result.get("need_more", False))
         paths: list[str] = result.get("additional_paths", [])[:30]
@@ -848,7 +956,9 @@ class RepoLoaderAgent(BaseAgent):
         async def fetch_one(item: dict) -> tuple[str, str]:
             async with semaphore:
                 try:
-                    content = await self._fetch_file_content(owner, repo, item["path"], sha)
+                    content = await self._fetch_file_content(
+                        owner, repo, item["path"], sha
+                    )
                     return item["path"], content
                 except Exception:
                     return item["path"], ""
@@ -866,7 +976,9 @@ class RepoLoaderAgent(BaseAgent):
 
     # ── GitHub API ─────────────────────────────────────────────────
 
-    async def _get_default_branch(self, owner: str, repo: str, branch: str) -> str | None:
+    async def _get_default_branch(
+        self, owner: str, repo: str, branch: str
+    ) -> str | None:
         # 第一步：获取仓库默认分支（此 API 同时验证仓库可访问性）
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -878,7 +990,9 @@ class RepoLoaderAgent(BaseAgent):
                     default_branch = resp.json().get("default_branch", "main")
                     # 用户指定了分支 → 优先使用用户指定的
                     # 用户没指定 → 使用仓库默认分支
-                    target = branch if branch not in (None, "", "main") else default_branch
+                    target = (
+                        branch if branch not in (None, "", "main") else default_branch
+                    )
                     # 验证目标分支是否存在
                     branch_resp = await client.get(
                         f"{GITHUB_API_BASE_URL}/repos/{owner}/{repo}/branches/{target}",

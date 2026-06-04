@@ -2,10 +2,12 @@
 GitIntel Agent Layer - FastAPI 入口
 AI-powered GitHub repository analysis
 """
+
 import os
 import logging
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
 load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,10 +62,12 @@ _allowed_origins = [
 ]
 if os.getenv("FRONTEND_URL"):
     _allowed_origins.append(os.getenv("FRONTEND_URL"))
-_allowed_origins.extend([
-    "https://gitintel.top",
-    "http://gitintel.top",
-])
+_allowed_origins.extend(
+    [
+        "https://gitintel.top",
+        "http://gitintel.top",
+    ]
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -93,4 +97,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

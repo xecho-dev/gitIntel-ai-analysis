@@ -14,26 +14,29 @@ ReActSuggestionAgent — 基于 ReAct 模式的优化建议生成 Agent。
   - 规则引擎兜底
   - 流式输出（SSE）
 """
+
 import asyncio
 import json
 import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Annotated, Any, AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from langchain.agents import create_agent, AgentState
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage
+from langchain_core.messages import HumanMessage
 
 from agents.react.error_loop_detector import ErrorLoopDetector
 from agents.react.tool_wrapper import inject_context, ToolLoopInterrupt
 from tools.github_tools import batch_search_code
 from tools.code_tools import parse_file_ast, detect_code_smells, detect_imports
 from tools.rag_tools import (
-    rag_search_similar, rag_search_by_category, rag_store_suggestion,
-    _rag_search_similar_impl, _rag_store_suggestion_impl,
+    rag_search_similar,
+    rag_search_by_category,
+    _rag_search_similar_impl,
+    _rag_store_suggestion_impl,
 )
 
 logger = logging.getLogger("gitintel")
@@ -113,6 +116,7 @@ code_fix.file 必须来自已有的 hotspots 或 largest_files，不要猜测文
 
 # ─── 数据结构 ────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Suggestion:
     id: int
@@ -135,6 +139,7 @@ class VerificationResult:
 
 # ─── LangChain Callback Handler ───────────────────────────────────────────────
 
+
 class SuggestionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
     """通过 LangChain Agent callbacks 自动收集工具调用记录。
 
@@ -151,7 +156,13 @@ class SuggestionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
         self._current_inputs: dict = {}
 
     async def on_tool_start(
-        self, serialized: dict, input: Any = "", *, run_id: str, parent_run_id: str | None = None, **kwargs
+        self,
+        serialized: dict,
+        input: Any = "",
+        *,
+        run_id: str,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         name = serialized.get("name", "unknown")
         self._current_tool_name = name
@@ -162,55 +173,81 @@ class SuggestionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
         self, output: Any, *, run_id: str, parent_run_id: str | None = None, **kwargs
     ):
         if self._in_tool:
-            obs = str(output.content)[:_TOOL_RESULT_TRUNCATE] if hasattr(output, "content") else str(output)[:_TOOL_RESULT_TRUNCATE]
+            obs = (
+                str(output.content)[:_TOOL_RESULT_TRUNCATE]
+                if hasattr(output, "content")
+                else str(output)[:_TOOL_RESULT_TRUNCATE]
+            )
             tool_call_count = len(self.tool_calls) + 1
-            self.tool_calls.append({
-                "iteration": tool_call_count,
-                "tool": self._current_tool_name,
-                "args": dict(self._current_inputs),
-                "result": obs[:500],
-            })
+            self.tool_calls.append(
+                {
+                    "iteration": tool_call_count,
+                    "tool": self._current_tool_name,
+                    "args": dict(self._current_inputs),
+                    "result": obs[:500],
+                }
+            )
             self._check_error_pattern(obs, self._current_tool_name)
 
             # 累积进度事件
-            self.progress_events.append({
-                "type": "progress",
-                "agent": "optimization",
-                "message": f"[验证] {self._current_tool_name}: {obs[:80]}",
-                "percent": min(20 + tool_call_count * 12, 65),
-                "data": {"tool": self._current_tool_name, "result": obs[:150], "iteration": tool_call_count},
-            })
+            self.progress_events.append(
+                {
+                    "type": "progress",
+                    "agent": "optimization",
+                    "message": f"[验证] {self._current_tool_name}: {obs[:80]}",
+                    "percent": min(20 + tool_call_count * 12, 65),
+                    "data": {
+                        "tool": self._current_tool_name,
+                        "result": obs[:150],
+                        "iteration": tool_call_count,
+                    },
+                }
+            )
 
         self._in_tool = False
 
     async def on_tool_error(
-        self, error: Exception | str, *, run_id: str, parent_run_id: str | None = None, **kwargs
+        self,
+        error: Exception | str,
+        *,
+        run_id: str,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         if self._in_tool:
             error_str = str(error)[:200]
             tool_call_count = len(self.tool_calls) + 1
-            self.tool_calls.append({
-                "iteration": tool_call_count,
-                "tool": self._current_tool_name,
-                "args": dict(self._current_inputs),
-                "error": error_str,
-                "result": "",
-            })
+            self.tool_calls.append(
+                {
+                    "iteration": tool_call_count,
+                    "tool": self._current_tool_name,
+                    "args": dict(self._current_inputs),
+                    "error": error_str,
+                    "result": "",
+                }
+            )
             self._check_error_pattern(error_str, self._current_tool_name)
 
             # 累积错误进度事件
-            self.progress_events.append({
-                "type": "progress",
-                "agent": "optimization",
-                "message": f"[错误] {self._current_tool_name}: {error_str}",
-                "percent": min(20 + tool_call_count * 12, 65),
-                "data": {"tool": self._current_tool_name, "error": error_str, "iteration": tool_call_count},
-            })
+            self.progress_events.append(
+                {
+                    "type": "progress",
+                    "agent": "optimization",
+                    "message": f"[错误] {self._current_tool_name}: {error_str}",
+                    "percent": min(20 + tool_call_count * 12, 65),
+                    "data": {
+                        "tool": self._current_tool_name,
+                        "error": error_str,
+                        "iteration": tool_call_count,
+                    },
+                }
+            )
 
         self._in_tool = False
 
 
 # ─── 核心 Agent ──────────────────────────────────────────────────────────────
+
 
 class ReActSuggestionAgent:
     """基于 ReAct 模式的优化建议生成 Agent。
@@ -246,7 +283,10 @@ class ReActSuggestionAgent:
     def _get_llm() -> BaseChatModel | None:
         try:
             from utils.llm_factory import get_llm_with_tracking
-            return get_llm_with_tracking(agent_name="优化建议生成", max_tokens=_MAX_OUTPUT_TOKENS)
+
+            return get_llm_with_tracking(
+                agent_name="优化建议生成", max_tokens=_MAX_OUTPUT_TOKENS
+            )
         except ImportError:
             logger.warning("[ReActSuggestion] 无法导入 llm_factory")
             return None
@@ -275,6 +315,7 @@ class ReActSuggestionAgent:
         if ref in ("main", ""):
             try:
                 from tools.github_tools import _get_default_branch_impl
+
                 actual_branch = await _get_default_branch_impl(owner, repo)
                 if actual_branch and actual_branch != ref:
                     logger.info(f"[ReActSuggestion] 分支修正: {ref} -> {actual_branch}")
@@ -292,7 +333,8 @@ class ReActSuggestionAgent:
         }
 
         context = self._build_context(
-            repo_path, branch,
+            repo_path,
+            branch,
             file_contents=file_contents,
             code_parser_result=code_parser_result,
             tech_stack_result=tech_stack_result,
@@ -305,13 +347,18 @@ class ReActSuggestionAgent:
         rag_available = True
 
         try:
+
             def sync_rag_search():
                 return _rag_search_similar_impl(
-                    query=self._build_rag_query(tech_stack_result, quality_result, code_parser_result),
+                    query=self._build_rag_query(
+                        tech_stack_result, quality_result, code_parser_result
+                    ),
                     top_k=5,
                 )
 
-            rag_raw = await asyncio.get_running_loop().run_in_executor(None, sync_rag_search)
+            rag_raw = await asyncio.get_running_loop().run_in_executor(
+                None, sync_rag_search
+            )
             rag_data = json.loads(rag_raw)
             rag_results = rag_data.get("results", [])
             if rag_results:
@@ -337,8 +384,7 @@ class ReActSuggestionAgent:
 
         if self._llm is None:
             async for fallback_event in self._rule_based_fallback(
-                owner, repo, ref,
-                quality_result, dependency_result, file_contents
+                owner, repo, ref, quality_result, dependency_result, file_contents
             ):
                 yield fallback_event
             return
@@ -391,8 +437,7 @@ class ReActSuggestionAgent:
             verification.tool_calls = all_tool_calls
 
             logger.info(
-                f"[ReActSuggestion] create_agent 完成: "
-                f"{len(all_tool_calls)} 次工具调用"
+                f"[ReActSuggestion] create_agent 完成: {len(all_tool_calls)} 次工具调用"
             )
 
             # ── 统一 yield 所有进度事件 ─────────────────────────────────────────
@@ -412,7 +457,10 @@ class ReActSuggestionAgent:
                     "agent": "optimization",
                     "message": f"因错误循环提前终止，已完成 {len(all_tool_calls)} 次工具调用",
                     "percent": 65,
-                    "data": {"stopped_due_to_loop": True, "tool_call_count": len(all_tool_calls)},
+                    "data": {
+                        "stopped_due_to_loop": True,
+                        "tool_call_count": len(all_tool_calls),
+                    },
                 }
 
         except ToolLoopInterrupt as e:
@@ -425,7 +473,10 @@ class ReActSuggestionAgent:
                 "agent": "optimization",
                 "message": f"Agent 循环被打断（{e.tool_name} ×{e.count}），已完成 {len(handler.tool_calls)} 次工具调用",
                 "percent": 70,
-                "data": {"stopped_due_to_loop": True, "tool_call_count": len(handler.tool_calls)},
+                "data": {
+                    "stopped_due_to_loop": True,
+                    "tool_call_count": len(handler.tool_calls),
+                },
             }
             final_messages = []
 
@@ -460,6 +511,7 @@ class ReActSuggestionAgent:
             total_loaded_files = code_parser_result.get("total_files", 0)
         if rag_available and suggestions and total_loaded_files > 0:
             try:
+
                 def sync_rag_store():
                     tech_stack = []
                     languages = []
@@ -467,17 +519,25 @@ class ReActSuggestionAgent:
                         raw_fw = tech_stack_result.get("frameworks", []) or []
                         if raw_fw:
                             if isinstance(raw_fw[0], dict):
-                                tech_stack = [f.get("name", "") for f in raw_fw if f.get("name")]
+                                tech_stack = [
+                                    f.get("name", "") for f in raw_fw if f.get("name")
+                                ]
                             else:
                                 tech_stack = [str(f) for f in raw_fw]
                         langs = tech_stack_result.get("languages", []) or []
                         if langs:
                             if isinstance(langs[0], dict):
-                                languages = [l.get("name", "") for l in langs if l.get("name")]
+                                languages = [
+                                    l.get("name", "") for l in langs if l.get("name")
+                                ]
                             else:
                                 languages = [str(l) for l in langs]
 
-                    project_scale = "small" if total_loaded_files <= 100 else ("medium" if total_loaded_files <= 500 else "large")
+                    project_scale = (
+                        "small"
+                        if total_loaded_files <= 100
+                        else ("medium" if total_loaded_files <= 500 else "large")
+                    )
 
                     stored = 0
                     for sug in suggestions:
@@ -502,7 +562,9 @@ class ReActSuggestionAgent:
                             pass
                     return stored
 
-                stored_count = await asyncio.get_running_loop().run_in_executor(None, sync_rag_store)
+                stored_count = await asyncio.get_running_loop().run_in_executor(
+                    None, sync_rag_store
+                )
                 if stored_count > 0:
                     logger.info(f"[ReActSuggestion] RAG 存储了 {stored_count} 条建议")
             except Exception as e:
@@ -520,7 +582,9 @@ class ReActSuggestionAgent:
             "data": {
                 "suggestions": suggestions,
                 "total": len(suggestions),
-                "high_priority": sum(1 for s in suggestions if s.get("priority") == "high"),
+                "high_priority": sum(
+                    1 for s in suggestions if s.get("priority") == "high"
+                ),
                 "verified_count": sum(1 for s in suggestions if s.get("verified")),
                 "tool_calls": len(verification.tool_calls),
                 "rag": {
@@ -547,39 +611,53 @@ class ReActSuggestionAgent:
 
         if tech_stack_result and isinstance(tech_stack_result, dict):
             parts.append("【技术栈】")
-            raw_langs = tech_stack_result.get('languages', []) or []
+            raw_langs = tech_stack_result.get("languages", []) or []
             if raw_langs and isinstance(raw_langs[0], dict):
-                languages = [l.get('name', '') for l in raw_langs if l.get('name')]
+                languages = [l.get("name", "") for l in raw_langs if l.get("name")]
             else:
                 languages = [str(l) for l in raw_langs]
             parts.append(f"  语言: {', '.join(languages) if languages else '未知'}")
-            raw_fw = tech_stack_result.get('frameworks', []) or []
+            raw_fw = tech_stack_result.get("frameworks", []) or []
             if raw_fw and isinstance(raw_fw[0], dict):
-                fw_names = [f.get('name', '') for f in raw_fw if f.get('name')]
+                fw_names = [f.get("name", "") for f in raw_fw if f.get("name")]
             else:
                 fw_names = list(raw_fw) if isinstance(raw_fw, list) else []
             parts.append(f"  框架: {', '.join(fw_names) or '无'}")
-            infra = tech_stack_result.get('infrastructure', []) or []
+            infra = tech_stack_result.get("infrastructure", []) or []
             if infra and isinstance(infra[0], dict):
-                infra = [i.get('name', '') for i in infra if i.get('name')]
-            parts.append(f"  基础设施: {', '.join(str(i) for i in infra) if infra else '无'}")
-            dev_tools = tech_stack_result.get('dev_tools', []) or []
-            parts.append(f"  开发工具: {', '.join(str(d) for d in dev_tools) if dev_tools else '无'}")
-            deployment = tech_stack_result.get('deployment', []) or []
-            parts.append(f"  部署方式: {', '.join(str(d) for d in deployment) if deployment else '无'}")
-            config_files = tech_stack_result.get('config_files_found', []) or []
-            parts.append(f"  配置文件: {', '.join(str(c) for c in config_files) if config_files else '无'}")
+                infra = [i.get("name", "") for i in infra if i.get("name")]
+            parts.append(
+                f"  基础设施: {', '.join(str(i) for i in infra) if infra else '无'}"
+            )
+            dev_tools = tech_stack_result.get("dev_tools", []) or []
+            parts.append(
+                f"  开发工具: {', '.join(str(d) for d in dev_tools) if dev_tools else '无'}"
+            )
+            deployment = tech_stack_result.get("deployment", []) or []
+            parts.append(
+                f"  部署方式: {', '.join(str(d) for d in deployment) if deployment else '无'}"
+            )
+            config_files = tech_stack_result.get("config_files_found", []) or []
+            parts.append(
+                f"  配置文件: {', '.join(str(c) for c in config_files) if config_files else '无'}"
+            )
             parts.append("")
 
         if quality_result and isinstance(quality_result, dict):
             parts.append("【代码质量】")
             parts.append(f"  健康度: {quality_result.get('health_score', '?')}/100")
             parts.append(f"  测试覆盖率: {quality_result.get('test_coverage', '?')}%")
-            parts.append(f"  代码质量复杂度: {quality_result.get('qualityComplexity', '?')}")
-            parts.append(f"  可维护性: {quality_result.get('qualityMaintainability', '?')}")
+            parts.append(
+                f"  代码质量复杂度: {quality_result.get('qualityComplexity', '?')}"
+            )
+            parts.append(
+                f"  可维护性: {quality_result.get('qualityMaintainability', '?')}"
+            )
             dup = quality_result.get("duplication")
             if dup and isinstance(dup, dict):
-                parts.append(f"  重复率: {dup.get('score', 0)}% ({dup.get('duplication_level', '?')})")
+                parts.append(
+                    f"  重复率: {dup.get('score', 0)}% ({dup.get('duplication_level', '?')})"
+                )
             hotspots = quality_result.get("hotspots", [])
             if hotspots and isinstance(hotspots, list):
                 parts.append("  代码热点问题:")
@@ -601,16 +679,24 @@ class ReActSuggestionAgent:
         if dependency_result and isinstance(dependency_result, dict):
             parts.append("【依赖风险】")
             parts.append(f"  总依赖: {dependency_result.get('total', 0)}")
-            parts.append(f"  高危: {dependency_result.get('high', 0)}，中危: {dependency_result.get('medium', 0)}")
-            parts.append(f"  风险等级: {dependency_result.get('risk_level', 'unknown')}")
+            parts.append(
+                f"  高危: {dependency_result.get('high', 0)}，中危: {dependency_result.get('medium', 0)}"
+            )
+            parts.append(
+                f"  风险等级: {dependency_result.get('risk_level', 'unknown')}"
+            )
             deps = dependency_result.get("deps", []) or []
-            risky = [d for d in deps if isinstance(d, dict) and d.get("risk_level") in ("high", "medium")][:5]
+            risky = [
+                d
+                for d in deps
+                if isinstance(d, dict) and d.get("risk_level") in ("high", "medium")
+            ][:5]
             if risky:
                 parts.append("  高风险依赖:")
                 for d in risky:
-                    name = d.get('name', 'unknown')
-                    version = d.get('version', '*')
-                    risk = d.get('risk_level', 'unknown')
+                    name = d.get("name", "unknown")
+                    version = d.get("version", "*")
+                    risk = d.get("risk_level", "unknown")
                     parts.append(f"    - {name}@{version} ({risk})")
             parts.append("")
 
@@ -625,30 +711,38 @@ class ReActSuggestionAgent:
                 parts.append("  最大文件（可能导致性能问题）:")
                 for f in largest[:5]:
                     if isinstance(f, dict):
-                        path = f.get('path', 'unknown')
-                        lines = f.get('lines', 0)
+                        path = f.get("path", "unknown")
+                        lines = f.get("lines", 0)
                         parts.append(f"    - {path} ({lines}行)")
             parts.append("")
 
         # 注意：不再包含 file_contents 预览，避免传递大量源码消耗 token
         # 所有问题已由 QualityAgent 定位，Suggestion Agent 基于结论生成建议即可
 
-        parts.append("请基于以上分析结论生成优化建议，code_fix.file 必须来自上述文件列表。")
+        parts.append(
+            "请基于以上分析结论生成优化建议，code_fix.file 必须来自上述文件列表。"
+        )
         return "\n".join(parts)
 
-    def _build_rag_query(self, tech_stack_result, quality_result, code_parser_result=None) -> str:
+    def _build_rag_query(
+        self, tech_stack_result, quality_result, code_parser_result=None
+    ) -> str:
         """构建 RAG 检索 query。"""
         query_parts = []
 
         if tech_stack_result and isinstance(tech_stack_result, dict):
             raw_fw = tech_stack_result.get("frameworks", []) or []
             if raw_fw and isinstance(raw_fw[0], dict):
-                query_parts.extend([f.get('name', '') for f in raw_fw[:3] if f.get('name')])
+                query_parts.extend(
+                    [f.get("name", "") for f in raw_fw[:3] if f.get("name")]
+                )
             else:
                 query_parts.extend([str(f) for f in raw_fw[:3]])
             raw_lang = tech_stack_result.get("languages", []) or []
             if raw_lang and isinstance(raw_lang[0], dict):
-                query_parts.extend([l.get('name', '') for l in raw_lang[:2] if l.get('name')])
+                query_parts.extend(
+                    [l.get("name", "") for l in raw_lang[:2] if l.get("name")]
+                )
             else:
                 query_parts.extend([str(l) for l in raw_lang[:2]])
 
@@ -665,17 +759,18 @@ class ReActSuggestionAgent:
                 query_parts.append("高重复率")
             hotspots = quality_result.get("hotspots", [])
             if hotspots:
-                issue_types = set(h.get("type", "") for h in hotspots[:5] if isinstance(h, dict))
+                issue_types = set(
+                    h.get("type", "") for h in hotspots[:5] if isinstance(h, dict)
+                )
                 query_parts.extend(list(issue_types)[:2])
 
         return " ".join(query_parts) or "代码优化建议"
 
     def _build_final_prompt(
-        self, context: str, verification: VerificationResult,
-        rag_results: list
+        self, context: str, verification: VerificationResult, rag_results: list
     ) -> str:
         """构建最终建议生成 prompt。"""
-        parts = [f"\n## 工具调用结果汇总\n"]
+        parts = ["\n## 工具调用结果汇总\n"]
 
         if verification.tool_calls:
             parts.append(f"共进行了 {len(verification.tool_calls)} 次工具调用")
@@ -687,7 +782,9 @@ class ReActSuggestionAgent:
                 parts.append(f"检测到的代码异味 ({total_smells} 个):")
                 for path, smells in list(verification.smell_results.items())[:5]:
                     for smell in smells[:2]:
-                        parts.append(f"  - [{path}] {smell.get('type', '')}: {smell.get('description', '')[:50]}")
+                        parts.append(
+                            f"  - [{path}] {smell.get('type', '')}: {smell.get('description', '')[:50]}"
+                        )
             parts.append("")
 
         if rag_results:
@@ -698,7 +795,9 @@ class ReActSuggestionAgent:
             parts.append("")
 
         parts.append("请基于以上工具调用结果和历史经验，生成最终的优化建议 JSON 数组。")
-        parts.append("每条建议的 verified=true 基于已有的分析结论，code_fix.file 必须来自 hotspots 或 largest_files。")
+        parts.append(
+            "每条建议的 verified=true 基于已有的分析结论，code_fix.file 必须来自 hotspots 或 largest_files。"
+        )
         return "\n".join(parts)
 
     # ── JSON 解析 ───────────────────────────────────────────────────────────
@@ -723,7 +822,9 @@ class ReActSuggestionAgent:
         json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
         if json_match:
             try:
-                return self._normalize_suggestions(json.loads(json_match.group(1).strip()))
+                return self._normalize_suggestions(
+                    json.loads(json_match.group(1).strip())
+                )
             except json.JSONDecodeError:
                 pass
 
@@ -756,7 +857,7 @@ class ReActSuggestionAgent:
             elif ch == "}":
                 bracket_depth -= 1
                 if bracket_depth == 0 and obj_start >= 0:
-                    obj_str = text[obj_start:i + 1]
+                    obj_str = text[obj_start : i + 1]
                     try:
                         obj = json.loads(obj_str)
                         if isinstance(obj, dict) and obj.get("title"):
@@ -787,17 +888,19 @@ class ReActSuggestionAgent:
             }
 
             priority = self._normalize_priority(s.get("priority"))
-            validated.append({
-                "id": self._next_id(),
-                "type": str(s.get("type", "general")).lower()[:20],
-                "title": title[:30],
-                "description": str(s.get("description", ""))[:300],
-                "priority": priority,
-                "category": str(s.get("category", "general"))[:30],
-                "source": "llm-react",
-                "verified": bool(s.get("verified", False)),
-                "code_fix": normalized_fix,
-            })
+            validated.append(
+                {
+                    "id": self._next_id(),
+                    "type": str(s.get("type", "general")).lower()[:20],
+                    "title": title[:30],
+                    "description": str(s.get("description", ""))[:300],
+                    "priority": priority,
+                    "category": str(s.get("category", "general"))[:30],
+                    "source": "llm-react",
+                    "verified": bool(s.get("verified", False)),
+                    "code_fix": normalized_fix,
+                }
+            )
 
         return validated
 
@@ -822,13 +925,18 @@ class ReActSuggestionAgent:
 
         priority_order = {"high": 0, "medium": 1, "low": 2}
         unique.sort(key=lambda s: priority_order.get(s["priority"], 2))
-        return unique[:self.MAX_SUGGESTIONS]
+        return unique[: self.MAX_SUGGESTIONS]
 
     def _parse_repo(self, repo_path: str | None) -> tuple[str, str]:
         """从 repo_path 解析 owner/repo。"""
         if not repo_path:
             return "", ""
-        parts = repo_path.strip().replace("https://github.com/", "").replace("http://github.com/", "").split("/")
+        parts = (
+            repo_path.strip()
+            .replace("https://github.com/", "")
+            .replace("http://github.com/", "")
+            .split("/")
+        )
         if len(parts) >= 2:
             return parts[0], parts[1]
         return "", ""
@@ -837,8 +945,12 @@ class ReActSuggestionAgent:
 
     async def _rule_based_fallback(
         self,
-        owner: str, repo: str, ref: str,
-        quality_result, dependency_result, file_contents
+        owner: str,
+        repo: str,
+        ref: str,
+        quality_result,
+        dependency_result,
+        file_contents,
     ) -> AsyncGenerator[dict, None]:
         """规则引擎兜底（LLM 不可用时）。"""
         suggestions = []
@@ -857,20 +969,26 @@ class ReActSuggestionAgent:
 
         if dependency_result and isinstance(dependency_result, dict):
             try:
-                suggestions.extend(_dependency_suggestions_impl(dependency_result, next_id))
+                suggestions.extend(
+                    _dependency_suggestions_impl(dependency_result, next_id)
+                )
             except Exception as e:
-                logger.warning(f"[ReActSuggestion] _dependency_suggestions_impl 失败: {e}")
+                logger.warning(
+                    f"[ReActSuggestion] _dependency_suggestions_impl 失败: {e}"
+                )
 
         if not suggestions:
-            suggestions.append({
-                "id": next_id(),
-                "type": "general",
-                "title": "项目整体状态良好",
-                "description": "未检测到明显问题，建议持续关注代码质量和依赖安全。",
-                "priority": "low",
-                "category": "general",
-                "source": "rule",
-            })
+            suggestions.append(
+                {
+                    "id": next_id(),
+                    "type": "general",
+                    "title": "项目整体状态良好",
+                    "description": "未检测到明显问题，建议持续关注代码质量和依赖安全。",
+                    "priority": "low",
+                    "category": "general",
+                    "source": "rule",
+                }
+            )
 
         yield {
             "type": "result",
@@ -880,7 +998,9 @@ class ReActSuggestionAgent:
             "data": {
                 "suggestions": suggestions,
                 "total": len(suggestions),
-                "high_priority": sum(1 for s in suggestions if s.get("priority") == "high"),
+                "high_priority": sum(
+                    1 for s in suggestions if s.get("priority") == "high"
+                ),
                 "verified_count": 0,
                 "tool_calls": 0,
                 "rag": {"active": False, "history_count": 0},
@@ -889,6 +1009,7 @@ class ReActSuggestionAgent:
 
 
 # ─── 规则建议实现 ──────────────────────────────────────────────────────────
+
 
 def _quality_suggestions_impl(qr: dict, next_id) -> list[dict]:
     """基于代码质量数据的规则建议（LLM 兜底）。"""
@@ -901,74 +1022,86 @@ def _quality_suggestions_impl(qr: dict, next_id) -> list[dict]:
     ts_metrics = qr.get("typescript_metrics", {})
 
     if health < 60:
-        suggestions.append({
-            "id": next_id(),
-            "type": "performance",
-            "title": "代码健康度偏低 (< 60)",
-            "description": f"当前健康度评分为 {health}，建议优先解决圈复杂度超标、代码重复率高等问题。",
-            "priority": "high",
-            "category": "quality",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "performance",
+                "title": "代码健康度偏低 (< 60)",
+                "description": f"当前健康度评分为 {health}，建议优先解决圈复杂度超标、代码重复率高等问题。",
+                "priority": "high",
+                "category": "quality",
+                "source": "rule",
+            }
+        )
 
     if coverage < 30:
-        suggestions.append({
-            "id": next_id(),
-            "type": "performance",
-            "title": "测试覆盖率严重不足 (< 30%)",
-            "description": f"当前测试覆盖率仅 {coverage}%。建议使用 Jest/Vitest (JS) 或 pytest (Python) 补充单元测试。",
-            "priority": "high",
-            "category": "testing",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "performance",
+                "title": "测试覆盖率严重不足 (< 30%)",
+                "description": f"当前测试覆盖率仅 {coverage}%。建议使用 Jest/Vitest (JS) 或 pytest (Python) 补充单元测试。",
+                "priority": "high",
+                "category": "testing",
+                "source": "rule",
+            }
+        )
     elif coverage < 60:
-        suggestions.append({
-            "id": next_id(),
-            "type": "performance",
-            "title": "测试覆盖率偏低 (< 60%)",
-            "description": f"当前测试覆盖率为 {coverage}%，建议逐步补充关键模块的测试用例。",
-            "priority": "medium",
-            "category": "testing",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "performance",
+                "title": "测试覆盖率偏低 (< 60%)",
+                "description": f"当前测试覆盖率为 {coverage}%，建议逐步补充关键模块的测试用例。",
+                "priority": "medium",
+                "category": "testing",
+                "source": "rule",
+            }
+        )
 
     dup_level = dup_info.get("duplication_level", "Low")
     dup_score = dup_info.get("score", 0)
     if dup_level == "High" or dup_score > 15:
-        suggestions.append({
-            "id": next_id(),
-            "type": "refactor",
-            "title": "代码重复率较高",
-            "description": f"重复率 {dup_score}%，建议将重复代码块抽取为公共函数。",
-            "priority": "medium",
-            "category": "readability",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "refactor",
+                "title": "代码重复率较高",
+                "description": f"重复率 {dup_score}%，建议将重复代码块抽取为公共函数。",
+                "priority": "medium",
+                "category": "readability",
+                "source": "rule",
+            }
+        )
 
     for metrics, lang_label in [(py_metrics, "Python"), (ts_metrics, "TypeScript")]:
         over_complex = metrics.get("over_complexity_count", 0)
         if over_complex > 5:
-            suggestions.append({
-                "id": next_id(),
-                "type": "performance",
-                "title": f"{lang_label}: 存在 {over_complex} 个高圈复杂度函数 (> 10)",
-                "description": "建议拆分大型函数，每个函数控制在 50 行以内。",
-                "priority": "medium",
-                "category": "complexity",
-                "source": "rule",
-            })
+            suggestions.append(
+                {
+                    "id": next_id(),
+                    "type": "performance",
+                    "title": f"{lang_label}: 存在 {over_complex} 个高圈复杂度函数 (> 10)",
+                    "description": "建议拆分大型函数，每个函数控制在 50 行以内。",
+                    "priority": "medium",
+                    "category": "complexity",
+                    "source": "rule",
+                }
+            )
 
     long_funcs = py_metrics.get("long_functions", [])
     if len(long_funcs) > 3:
-        suggestions.append({
-            "id": next_id(),
-            "type": "refactor",
-            "title": f"存在 {len(long_funcs)} 个超长 Python 函数 (> 50 行)",
-            "description": "建议按职责拆分为更小的函数，提高可读性和可维护性。",
-            "priority": "low",
-            "category": "readability",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "refactor",
+                "title": f"存在 {len(long_funcs)} 个超长 Python 函数 (> 50 行)",
+                "description": "建议按职责拆分为更小的函数，提高可读性和可维护性。",
+                "priority": "low",
+                "category": "readability",
+                "source": "rule",
+            }
+        )
 
     return suggestions
 
@@ -983,38 +1116,44 @@ def _dependency_suggestions_impl(dr: dict, next_id) -> list[dict]:
     deps = dr.get("deps", [])
 
     if risk_level == "高危" or high > 0:
-        suggestions.append({
-            "id": next_id(),
-            "type": "security",
-            "title": "存在高风险依赖",
-            "description": f"检测到 {high} 个高危依赖，可能包含已知安全漏洞，建议立即更新或替换。",
-            "priority": "high",
-            "category": "security",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "security",
+                "title": "存在高风险依赖",
+                "description": f"检测到 {high} 个高危依赖，可能包含已知安全漏洞，建议立即更新或替换。",
+                "priority": "high",
+                "category": "security",
+                "source": "rule",
+            }
+        )
 
     if medium > 5:
-        suggestions.append({
-            "id": next_id(),
-            "type": "security",
-            "title": f"存在 {medium} 个中等风险依赖",
-            "description": "建议使用 `npm audit` / `pip-audit` / `cargo audit` 定期扫描已知漏洞。",
-            "priority": "medium",
-            "category": "dependency",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "security",
+                "title": f"存在 {medium} 个中等风险依赖",
+                "description": "建议使用 `npm audit` / `pip-audit` / `cargo audit` 定期扫描已知漏洞。",
+                "priority": "medium",
+                "category": "dependency",
+                "source": "rule",
+            }
+        )
 
     no_version = [d for d in deps if not d.get("version") or d["version"] == "*"]
     if no_version:
-        suggestions.append({
-            "id": next_id(),
-            "type": "performance",
-            "title": f"存在 {len(no_version)} 个依赖未锁定版本",
-            "description": "建议使用精确版本号或语义化版本范围，避免不一致性。",
-            "priority": "medium",
-            "category": "dependency",
-            "source": "rule",
-        })
+        suggestions.append(
+            {
+                "id": next_id(),
+                "type": "performance",
+                "title": f"存在 {len(no_version)} 个依赖未锁定版本",
+                "description": "建议使用精确版本号或语义化版本范围，避免不一致性。",
+                "priority": "medium",
+                "category": "dependency",
+                "source": "rule",
+            }
+        )
 
     outdated_flags = {
         "request": "request 库已废弃，建议迁移到 axios 或原生 fetch",
@@ -1025,14 +1164,16 @@ def _dependency_suggestions_impl(dr: dict, next_id) -> list[dict]:
     names = {d["name"].lower() for d in deps}
     for pkg, desc in outdated_flags.items():
         if pkg in names:
-            suggestions.append({
-                "id": next_id(),
-                "type": "refactor",
-                "title": f"检测到过时依赖: {pkg}",
-                "description": desc,
-                "priority": "medium",
-                "category": "dependency",
-                "source": "rule",
-            })
+            suggestions.append(
+                {
+                    "id": next_id(),
+                    "type": "refactor",
+                    "title": f"检测到过时依赖: {pkg}",
+                    "description": desc,
+                    "priority": "medium",
+                    "category": "dependency",
+                    "source": "rule",
+                }
+            )
 
     return suggestions

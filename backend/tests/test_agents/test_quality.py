@@ -1,9 +1,14 @@
 """Tests for QualityAgent — code quality analysis."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
-from agents.quality import QualityAgent, _read_text, _cyclomatic_complexity, _q_load_parser
+from agents.quality import (
+    QualityAgent,
+    _read_text,
+    _cyclomatic_complexity,
+    _q_load_parser,
+)
 
 
 class TestReadText:
@@ -140,9 +145,17 @@ class TestQualityAgentStream:
 
         assert result_data is not None
         expected_keys = [
-            "health_score", "test_coverage", "complexity", "maintainability",
-            "python_metrics", "typescript_metrics", "duplication",
-            "test_info", "total_files", "python_files", "typescript_files",
+            "health_score",
+            "test_coverage",
+            "complexity",
+            "maintainability",
+            "python_metrics",
+            "typescript_metrics",
+            "duplication",
+            "test_info",
+            "total_files",
+            "python_files",
+            "typescript_files",
         ]
         for key in expected_keys:
             assert key in result_data, f"Missing key: {key}"
@@ -243,7 +256,9 @@ class TestQualityAgentMetrics:
         duplication = {"score": 0}
         test_info = {"estimated_coverage": 100}
 
-        score = QualityAgent._compute_health_score(py_metrics, ts_metrics, duplication, test_info)
+        score = QualityAgent._compute_health_score(
+            py_metrics, ts_metrics, duplication, test_info
+        )
         assert score == 100.0  # max with coverage bonus
 
     def test_compute_health_score_high_complexity_penalized(self):
@@ -252,7 +267,9 @@ class TestQualityAgentMetrics:
         duplication = {"score": 0}
         test_info = {"estimated_coverage": 100}
 
-        score = QualityAgent._compute_health_score(py_metrics, ts_metrics, duplication, test_info)
+        score = QualityAgent._compute_health_score(
+            py_metrics, ts_metrics, duplication, test_info
+        )
         assert score < 100.0
 
     def test_compute_health_score_high_duplication_penalized(self):
@@ -261,7 +278,9 @@ class TestQualityAgentMetrics:
         duplication = {"score": 30}  # >15, penalized
         test_info = {"estimated_coverage": 50}
 
-        score = QualityAgent._compute_health_score(py_metrics, ts_metrics, duplication, test_info)
+        score = QualityAgent._compute_health_score(
+            py_metrics, ts_metrics, duplication, test_info
+        )
         assert score < 100.0
 
     def test_compute_health_score_low_coverage_penalized(self):
@@ -270,7 +289,9 @@ class TestQualityAgentMetrics:
         duplication = {"score": 2}
         test_info = {"estimated_coverage": 10}  # <30, penalized
 
-        score = QualityAgent._compute_health_score(py_metrics, ts_metrics, duplication, test_info)
+        score = QualityAgent._compute_health_score(
+            py_metrics, ts_metrics, duplication, test_info
+        )
         assert score < 100.0
 
     def test_compute_health_score_bounded(self):
@@ -279,7 +300,9 @@ class TestQualityAgentMetrics:
         duplication = {"score": 50}
         test_info = {"estimated_coverage": 0}
 
-        score = QualityAgent._compute_health_score(py_metrics, ts_metrics, duplication, test_info)
+        score = QualityAgent._compute_health_score(
+            py_metrics, ts_metrics, duplication, test_info
+        )
         assert 0 <= score <= 100
 
     def test_calc_duplication_inmemory_no_duplication(self):

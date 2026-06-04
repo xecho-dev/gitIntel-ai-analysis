@@ -20,6 +20,7 @@
 """
 
 import warnings
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore")
 
@@ -27,38 +28,38 @@ import os
 import re
 import json
 import logging
-import hashlib
 import time
 import threading
 from typing import Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .embeddings import DashScopeEmbedder
 from .chromadb_store import ChromaStore
-from langchain_core.messages import HumanMessage
 
 _logger = logging.getLogger("gitintel")
 
 
 # ─── 数据模型 ───────────────────────────────────────────────────────────────
 
+
 class FactType(str, Enum):
     """事实类型，决定存储层次和过期策略"""
-    PROFILE    = "profile"    # 用户画像核心：名字/职业/位置 → 永不过期
-    PREFERENCE = "preference" # 用户偏好：喜欢/讨厌/习惯    → 长期有效（90天）
-    KNOWLEDGE  = "knowledge"  # 正在做的项目/技术栈         → 中期（30天）
-    TEMPORARY  = "temporary"  # 临时状态/情绪/代码问题     → 短期（7天）
-    IGNORE     = "ignore"     # 不值得存储：代码片段/报错    → 不存储
+
+    PROFILE = "profile"  # 用户画像核心：名字/职业/位置 → 永不过期
+    PREFERENCE = "preference"  # 用户偏好：喜欢/讨厌/习惯    → 长期有效（90天）
+    KNOWLEDGE = "knowledge"  # 正在做的项目/技术栈         → 中期（30天）
+    TEMPORARY = "temporary"  # 临时状态/情绪/代码问题     → 短期（7天）
+    IGNORE = "ignore"  # 不值得存储：代码片段/报错    → 不存储
 
 
 @dataclass
 class ExtractedFact:
     """从对话中抽取的事实"""
-    content: str           # 事实内容，如"用户喜欢鹿角蕨"
-    fact_type: FactType    # 事实类型
-    expires_at: float      # 过期时间戳（0=永不过期）
-    source_turn: float     # 来源对话的时间戳
+
+    content: str  # 事实内容，如"用户喜欢鹿角蕨"
+    fact_type: FactType  # 事实类型
+    expires_at: float  # 过期时间戳（0=永不过期）
+    source_turn: float  # 来源对话的时间戳
     confidence: float = 1.0  # 置信度（0-1）
 
     def is_expired(self) -> bool:
@@ -70,19 +71,28 @@ class ExtractedFact:
 @dataclass
 class MemoryResult:
     """记忆检索结果"""
+
     content: str
-    source: str   # "short_term" | "profile" | "permanent" | "temporary"
+    source: str  # "short_term" | "profile" | "permanent" | "temporary"
     score: float = 0.0
     metadata: dict = field(default_factory=dict)
 
 
 # ─── 异步抽取任务队列 ────────────────────────────────────────────────────────
 
+
 class ExtractionTask:
     """异步抽取任务"""
+
     __slots__ = (
-        "user_message", "assistant_message", "timestamp",
-        "session_id", "user_id", "result", "error", "_long_term",
+        "user_message",
+        "assistant_message",
+        "timestamp",
+        "session_id",
+        "user_id",
+        "result",
+        "error",
+        "_long_term",
     )
 
     def __init__(
@@ -119,7 +129,9 @@ class ExtractionQueue:
         with self._lock:
             self._queue.append(task)
         if not self._worker_started:
-            t = threading.Thread(target=self._worker, daemon=True, name="memory-extraction")
+            t = threading.Thread(
+                target=self._worker, daemon=True, name="memory-extraction"
+            )
             t.start()
             self._worker_started = True
 
@@ -151,6 +163,7 @@ class ExtractionQueue:
 
 
 # ─── LLM 抽取核心（同步版，供后台线程调用）───────────────────────────────────
+
 
 def _extract_facts_sync(task: ExtractionTask) -> list[ExtractedFact]:
     """
@@ -243,7 +256,11 @@ def _extract_facts_sync(task: ExtractionTask) -> list[ExtractedFact]:
                 continue
             try:
                 ft_str = item.get("fact_type", "ignore")
-                ft = FactType(ft_str) if ft_str in [e.value for e in FactType] else FactType.TEMPORARY
+                ft = (
+                    FactType(ft_str)
+                    if ft_str in [e.value for e in FactType]
+                    else FactType.TEMPORARY
+                )
             except ValueError:
                 ft = FactType.TEMPORARY
 
@@ -257,14 +274,18 @@ def _extract_facts_sync(task: ExtractionTask) -> list[ExtractedFact]:
             elif ft == FactType.TEMPORARY:
                 expires_in = 7 * 24 * 3600
 
-            facts.append(ExtractedFact(
-                content=item.get("content", "")[:80],
-                fact_type=ft,
-                expires_at=now + expires_in if expires_in > 0 else 0,
-                source_turn=task.timestamp,
-                confidence=float(item.get("confidence", 0.8)),
-            ))
-            _logger.info(f"[Extraction] 抽取事实: [{ft.value}] {item.get('content', '')[:50]}")
+            facts.append(
+                ExtractedFact(
+                    content=item.get("content", "")[:80],
+                    fact_type=ft,
+                    expires_at=now + expires_in if expires_in > 0 else 0,
+                    source_turn=task.timestamp,
+                    confidence=float(item.get("confidence", 0.8)),
+                )
+            )
+            _logger.info(
+                f"[Extraction] 抽取事实: [{ft.value}] {item.get('content', '')[:50]}"
+            )
 
         return facts
 
@@ -275,7 +296,10 @@ def _extract_facts_sync(task: ExtractionTask) -> list[ExtractedFact]:
 
 # ─── 规则快速抽取（同步，不走 LLM）─────────────────────────────────────────
 
-def _quick_extract_rule_based(user_msg: str, asst_msg: str, timestamp: float) -> list[ExtractedFact]:
+
+def _quick_extract_rule_based(
+    user_msg: str, asst_msg: str, timestamp: float
+) -> list[ExtractedFact]:
     """
     规则快速抽取（无 LLM）：仅用于偏好类关键词快速预提取。
     名字/职业等语义信息统一由 LLM 抽取，避免正则误匹配。
@@ -292,12 +316,14 @@ def _quick_extract_rule_based(user_msg: str, asst_msg: str, timestamp: float) ->
             fact = re.sub(r"[，,]\s*记住.*$", "", fact)
             fact = fact.strip()[:80]
             if len(fact) >= 3:
-                facts.append(ExtractedFact(
-                    content=fact,
-                    fact_type=FactType.PREFERENCE,
-                    expires_at=time.time() + 90 * 24 * 3600,
-                    source_turn=timestamp,
-                ))
+                facts.append(
+                    ExtractedFact(
+                        content=fact,
+                        fact_type=FactType.PREFERENCE,
+                        expires_at=time.time() + 90 * 24 * 3600,
+                        source_turn=timestamp,
+                    )
+                )
                 _logger.info(f"[QuickExtract] 偏好预提取: {fact[:50]}")
             break
 
@@ -305,6 +331,7 @@ def _quick_extract_rule_based(user_msg: str, asst_msg: str, timestamp: float) ->
 
 
 # ─── 短期记忆（消息缓冲）────────────────────────────────────────────────────
+
 
 class ShortTermMemory:
     """
@@ -363,7 +390,7 @@ class ShortTermMemory:
             messages = list(self._chat_memory.messages)
             if not messages:
                 return ""
-            recent = messages[-(self._max_turns * 2):]
+            recent = messages[-(self._max_turns * 2) :]
             lines = []
             for m in recent:
                 role = "用户" if m.type == "human" else "助手"
@@ -386,6 +413,7 @@ class ShortTermMemory:
 
 # ─── 长期记忆（分层向量存储）─────────────────────────────────────────────────
 
+
 class LongTermMemory:
     """
     长期记忆：异步轻量抽取 + 分层存储 + 按需检索。
@@ -402,9 +430,9 @@ class LongTermMemory:
     """
 
     LAYER_TO_DOCTYPE = {
-        "profile":    "memory_profile",
-        "permanent":  "memory_permanent",
-        "temporary":  "memory_temporary",
+        "profile": "memory_profile",
+        "permanent": "memory_permanent",
+        "temporary": "memory_temporary",
     }
 
     def __init__(
@@ -539,12 +567,14 @@ class LongTermMemory:
             )
             for r in raw:
                 meta = r.metadata if isinstance(r.metadata, dict) else {}
-                results.append(MemoryResult(
-                    content=r.content,
-                    source="profile",
-                    score=1.0,
-                    metadata=meta,
-                ))
+                results.append(
+                    MemoryResult(
+                        content=r.content,
+                        source="profile",
+                        score=1.0,
+                        metadata=meta,
+                    )
+                )
         except Exception as exc:
             _logger.warning(f"[LongTermMemory] get_profile_facts 失败: {exc}")
         return results
@@ -578,7 +608,9 @@ class LongTermMemory:
 
                     expires_at = meta.get("expires_at", 0)
                     if expires_at > 0 and now > expires_at:
-                        _logger.debug(f"[LongTermMemory] 过滤过期记录: {r.content[:40]}")
+                        _logger.debug(
+                            f"[LongTermMemory] 过滤过期记录: {r.content[:40]}"
+                        )
                         continue
 
                     pure_content = r.content
@@ -590,7 +622,9 @@ class LongTermMemory:
 
                     # 跨层去重
                     if content_hash in seen_content_hashes:
-                        _logger.debug(f"[LongTermMemory] 跨层去重 [{layer}]: {pure_content[:40]}")
+                        _logger.debug(
+                            f"[LongTermMemory] 跨层去重 [{layer}]: {pure_content[:40]}"
+                        )
                         continue
                     seen_content_hashes.add(content_hash)
 
@@ -622,9 +656,14 @@ class LongTermMemory:
                 # Question-Phrase 降权
                 question_penalty = 0.0
                 q_indicators = ("吗", "什么", "谁", "哪", "怎么", "多少", "是不是", "?")
-                if any(pure_content.endswith(q) or pure_content.startswith(q) for q in q_indicators):
+                if any(
+                    pure_content.endswith(q) or pure_content.startswith(q)
+                    for q in q_indicators
+                ):
                     question_penalty = 100.0
-                    _logger.debug(f"[LongTermMemory] Question-Phrase 降权: {pure_content[:40]}")
+                    _logger.debug(
+                        f"[LongTermMemory] Question-Phrase 降权: {pure_content[:40]}"
+                    )
 
                 # profile 层 boost
                 score_boost = 2000.0 if layer == "profile" else 0.0
@@ -635,14 +674,22 @@ class LongTermMemory:
                     age_days = (now - r_timestamp) / 86400.0
                     freshness_weight = max(0, 100.0 - age_days * 3.0)
 
-                final_score = base_score + score_boost - question_penalty + confidence * 10 + freshness_weight
+                final_score = (
+                    base_score
+                    + score_boost
+                    - question_penalty
+                    + confidence * 10
+                    + freshness_weight
+                )
 
-                results.append(MemoryResult(
-                    content=pure_content,
-                    source=layer,
-                    score=final_score,
-                    metadata=meta,
-                ))
+                results.append(
+                    MemoryResult(
+                        content=pure_content,
+                        source=layer,
+                        score=final_score,
+                        metadata=meta,
+                    )
+                )
                 _logger.debug(
                     f"[LongTermMemory] 最终候选 [{layer}]: {pure_content[:40]}, "
                     f"score={final_score:.2f} (base={base_score:.2f}, boost={score_boost}, "
@@ -668,9 +715,11 @@ class LongTermMemory:
 
 # ─── 用户画像（Profile 层特殊管理）──────────────────────────────────────────
 
+
 @dataclass
 class UserProfile:
     """用户画像：跨会话持久化用户身份信息"""
+
     user_id: str = ""
     name: str = ""
     bio: str = ""
@@ -704,7 +753,9 @@ class UserProfileManager:
         self.user_id = user_id
         self.long_term = long_term
 
-    def extract_and_update(self, user_message: str, assistant_message: str = "") -> bool:
+    def extract_and_update(
+        self, user_message: str, assistant_message: str = ""
+    ) -> bool:
         """
         画像同步更新入口。
 
@@ -786,6 +837,7 @@ def clear_short_term_cache(session_id: str) -> None:
 
 # ─── 多层记忆管理器 ─────────────────────────────────────────────────────────
 
+
 class MultiLayerMemory:
     """
     多层记忆管理器 — 统一短期 + 长期记忆接口。
@@ -841,7 +893,9 @@ class MultiLayerMemory:
             f"has_profile={self.user_profile is not None and self.user_profile.has_identity_info()}"
         )
 
-    def add_turn(self, user_message: str, assistant_message: str, metadata: dict = None) -> None:
+    def add_turn(
+        self, user_message: str, assistant_message: str, metadata: dict = None
+    ) -> None:
         """
         添加一轮对话到所有记忆层。
 
@@ -850,7 +904,9 @@ class MultiLayerMemory:
           2. 添加到短期记忆（同步，消息缓冲，会话内跨请求共享）
           3. 添加到长期记忆（异步抽取，后台线程执行 LLM 抽取）
         """
-        turn_timestamp = metadata.get("timestamp", time.time()) if metadata else time.time()
+        turn_timestamp = (
+            metadata.get("timestamp", time.time()) if metadata else time.time()
+        )
 
         # Layer 0: 画像抽取（同步）
         if self.user_profile:
@@ -961,13 +1017,13 @@ class MultiLayerMemory:
 
         return {
             "short_term": short_context,
-            "long_term":  long_context,
-            "profile":    profile_context,
-            "combined":   combined,
+            "long_term": long_context,
+            "profile": profile_context,
+            "combined": combined,
             # 向后兼容别名
-            "working":    short_context,
-            "semantic":   long_context,
-            "knowledge":  "",
+            "working": short_context,
+            "semantic": long_context,
+            "knowledge": "",
         }
 
     def clear_session(self) -> None:
@@ -978,6 +1034,7 @@ class MultiLayerMemory:
 
 
 # ─── 工厂函数 ────────────────────────────────────────────────────────────────
+
 
 def create_multi_layer_memory(
     session_id: str,
@@ -996,25 +1053,37 @@ def create_multi_layer_memory(
 
 # ─── 向后兼容别名（导出旧类名，不推荐继续使用）───────────────────────────────
 
+
 class WorkingMemory(ShortTermMemory):
     """向后兼容别名：WorkingMemory → ShortTermMemory"""
 
-    def __init__(self, llm=None, max_token_limit=2000, output_key="history", input_key="input"):
-        super().__init__(llm=llm, max_token_limit=max_token_limit, max_turns=20,
-                         output_key=output_key, input_key=input_key)
+    def __init__(
+        self, llm=None, max_token_limit=2000, output_key="history", input_key="input"
+    ):
+        super().__init__(
+            llm=llm,
+            max_token_limit=max_token_limit,
+            max_turns=20,
+            output_key=output_key,
+            input_key=input_key,
+        )
 
 
 class SemanticMemory(LongTermMemory):
     """向后兼容别名：SemanticMemory → LongTermMemory"""
 
-    def __init__(self, vectorstore=None, session_id="default", top_k=3, search_kwargs=None):
-        super().__init__(vectorstore=vectorstore, session_id=session_id,
-                         user_id="", top_k=top_k)
+    def __init__(
+        self, vectorstore=None, session_id="default", top_k=3, search_kwargs=None
+    ):
+        super().__init__(
+            vectorstore=vectorstore, session_id=session_id, user_id="", top_k=top_k
+        )
 
 
 class KnowledgeMemory(LongTermMemory):
     """向后兼容别名：KnowledgeMemory → LongTermMemory"""
 
     def __init__(self, vectorstore=None):
-        super().__init__(vectorstore=vectorstore, session_id="global",
-                         user_id="", top_k=5)
+        super().__init__(
+            vectorstore=vectorstore, session_id="global", user_id="", top_k=5
+        )

@@ -1,7 +1,9 @@
 """
 诊断脚本：直接检查 Chroma 数据库中实际存储的记忆内容。
 """
+
 import os
+
 os.environ["ANONYMIZED_TELEMETRY"] = "false"
 os.environ["CHROMA_TELEMETRY_DISABLED"] = "true"
 
@@ -10,6 +12,7 @@ from chromadb.config import Settings
 
 # posthog 7.x 与 chromadb 0.6.x 接口不兼容，禁用遥测
 import chromadb.telemetry.product.posthog as _posthog_module
+
 _posthog_module.posthog.capture = lambda *args, **kwargs: None
 
 CHROMA_DATA_DIR = "./data/chroma"
@@ -45,7 +48,7 @@ try:
             timestamp = metadata.get("timestamp", 0)
             content = all_docs.get("documents", [None] * len(all_docs["ids"]))[i]
 
-            print(f"  [{i+1}] id={all_docs['ids'][i]}")
+            print(f"  [{i + 1}] id={all_docs['ids'][i]}")
             print(f"      session_id={sid}, doc_type={doc_type}, timestamp={timestamp}")
             print(f"      user_message={repr(user_msg[:80])}")
             print(f"      assistant_message={repr(assistant_msg[:80])}")
@@ -66,7 +69,9 @@ try:
         for i in range(min(3, len(all_docs["ids"]))):
             metadata = all_docs["metadatas"][i] or {}
             content = all_docs.get("documents", [None] * len(all_docs["ids"]))[i]
-            print(f"  [{i+1}] title={metadata.get('title','')}, category={metadata.get('category','')}")
+            print(
+                f"  [{i + 1}] title={metadata.get('title', '')}, category={metadata.get('category', '')}"
+            )
             print(f"      content={repr((content or '')[:100])}")
 except Exception as e:
     print(f"  错误: {e}")

@@ -69,9 +69,11 @@ RAGAS_METRICS_INFO = {
 
 # ─── 评测结果数据结构 ──────────────────────────────────────────────────
 
+
 @dataclass
 class EvaluationResult:
     """单次评测结果"""
+
     question: str
     answer: str
     # 各指标得分
@@ -92,6 +94,7 @@ class EvaluationResult:
 @dataclass
 class BatchEvaluationResult:
     """批量评测结果"""
+
     results: list[EvaluationResult]
     average_scores: dict
     total_latency_ms: float
@@ -100,6 +103,7 @@ class BatchEvaluationResult:
 
 
 # ─── 单次评测函数 ──────────────────────────────────────────────────────
+
 
 async def evaluate_rag_response(
     question: str,
@@ -131,6 +135,7 @@ async def evaluate_rag_response(
 
 
 # ─── RAGASEvaluator ────────────────────────────────────────────────────
+
 
 class RAGASEvaluator:
     """
@@ -189,7 +194,11 @@ class RAGASEvaluator:
                 "OPENAI_BASE_URL",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
-            model = self._eval_llm_model or os.getenv("EVAL_LLM_MODEL") or "qwen3.6-plus-2026-04-02"
+            model = (
+                self._eval_llm_model
+                or os.getenv("EVAL_LLM_MODEL")
+                or "qwen3.6-plus-2026-04-02"
+            )
 
             self._eval_llm = ChatOpenAI(
                 model=model,
@@ -203,7 +212,9 @@ class RAGASEvaluator:
                 f"[RAGASEvaluator] 评测 LLM 初始化完成: model={model}, user={self.user_avatar}"
             )
         except Exception as exc:
-            _logger.warning(f"[RAGASEvaluator] 评测 LLM 初始化失败: {exc}，跳过 RAGAS 评测")
+            _logger.warning(
+                f"[RAGASEvaluator] 评测 LLM 初始化失败: {exc}，跳过 RAGAS 评测"
+            )
             self._eval_llm = None
 
     def _ensure_initialized(self):
@@ -233,7 +244,6 @@ class RAGASEvaluator:
         Returns:
             EvaluationResult
         """
-        import asyncio
 
         start = time.perf_counter()
         self._ensure_initialized()
@@ -251,7 +261,9 @@ class RAGASEvaluator:
             return self._empty_result(question, answer, start)
 
         # 构建 RAGAS Dataset（使用 EvaluationDataset.from_list）
-        dataset = self._build_dataset(question, answer, retrieved_contexts, ground_truth)
+        dataset = self._build_dataset(
+            question, answer, retrieved_contexts, ground_truth
+        )
 
         # 确定需要计算的指标
         metrics = self._build_metrics(ground_truth is not None)
@@ -286,7 +298,12 @@ class RAGASEvaluator:
             eval_error = f"{type(exc).__name__}: {exc}"
             _logger.warning(f"[RAGASEvaluator] RAGAS evaluate 失败: {eval_error}")
             # 部分失败不影响其他指标记录
-            for key in ["faithfulness", "answer_relevancy", "context_precision", "context_recall"]:
+            for key in [
+                "faithfulness",
+                "answer_relevancy",
+                "context_precision",
+                "context_recall",
+            ]:
                 if key not in scores:
                     scores[key] = None
 
@@ -363,11 +380,13 @@ class RAGASEvaluator:
 
         for i, item in enumerate(gathered):
             if isinstance(item, Exception):
-                results.append(self._error_result(
-                    samples[i].get("question", ""),
-                    samples[i].get("answer", ""),
-                    f"{type(item).__name__}: {item}",
-                ))
+                results.append(
+                    self._error_result(
+                        samples[i].get("question", ""),
+                        samples[i].get("answer", ""),
+                        f"{type(item).__name__}: {item}",
+                    )
+                )
             else:
                 results.append(item)
 
@@ -379,8 +398,17 @@ class RAGASEvaluator:
         valid_results = [r for r in results if r.error is None]
         average_scores = {}
         if valid_results:
-            for key in ["faithfulness", "answer_relevancy", "context_precision", "context_recall"]:
-                vals = [getattr(r, key) for r in valid_results if getattr(r, key) is not None]
+            for key in [
+                "faithfulness",
+                "answer_relevancy",
+                "context_precision",
+                "context_recall",
+            ]:
+                vals = [
+                    getattr(r, key)
+                    for r in valid_results
+                    if getattr(r, key) is not None
+                ]
                 if vals:
                     average_scores[key] = sum(vals) / len(vals)
             overall_vals = [r.overall_score for r in valid_results]
@@ -419,7 +447,12 @@ class RAGASEvaluator:
 
     def _build_metrics(self, has_ground_truth: bool) -> list:
         """根据是否需要 context_recall 构建指标列表。"""
-        from ragas.metrics import Faithfulness, ResponseRelevancy, ContextPrecision, ContextRecall
+        from ragas.metrics import (
+            Faithfulness,
+            ResponseRelevancy,
+            ContextPrecision,
+            ContextRecall,
+        )
 
         metrics = [
             Faithfulness(llm=self._eval_llm),
@@ -454,7 +487,9 @@ class RAGASEvaluator:
 
         return weighted_sum / total_weight
 
-    def _empty_result(self, question: str, answer: str, start: float) -> EvaluationResult:
+    def _empty_result(
+        self, question: str, answer: str, start: float
+    ) -> EvaluationResult:
         """返回空/无效输入时的降级结果。"""
         return EvaluationResult(
             question=question,
@@ -505,6 +540,7 @@ class RAGASEvaluator:
 
 
 # ─── 辅助函数 ──────────────────────────────────────────────────────────
+
 
 def _safe_float(value) -> Optional[float]:
     """安全地将值转换为 float。"""

@@ -100,17 +100,35 @@ ALL_TOOLS = [
 
 __all__ = [
     # GitHub
-    "get_repo_info", "get_file_tree", "read_file_content", "get_file_blobs",
-    "search_code", "batch_search_code", "get_commit_history", "get_pull_requests", "get_default_branch",
+    "get_repo_info",
+    "get_file_tree",
+    "read_file_content",
+    "get_file_blobs",
+    "search_code",
+    "batch_search_code",
+    "get_commit_history",
+    "get_pull_requests",
+    "get_default_branch",
     # Code
-    "parse_file_ast", "calculate_complexity", "detect_code_smells",
-    "summarize_code_file", "detect_imports", "detect_dependencies",
+    "parse_file_ast",
+    "calculate_complexity",
+    "detect_code_smells",
+    "summarize_code_file",
+    "detect_imports",
+    "detect_dependencies",
     # RAG
-    "rag_search_similar", "rag_search_by_repo", "rag_search_by_category",
-    "rag_search_code_pattern", "rag_store_suggestion", "rag_search_knowledge_base",
+    "rag_search_similar",
+    "rag_search_by_repo",
+    "rag_search_by_category",
+    "rag_search_code_pattern",
+    "rag_store_suggestion",
+    "rag_search_knowledge_base",
     "rag_store_analysis",
     # Chat
-    "lookup_repo_analysis", "analyze_code", "detect_code_language", "CHAT_TOOLS",
+    "lookup_repo_analysis",
+    "analyze_code",
+    "detect_code_language",
+    "CHAT_TOOLS",
     # All
     "ALL_TOOLS",
 ]

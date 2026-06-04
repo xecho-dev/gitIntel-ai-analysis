@@ -29,10 +29,10 @@ from chromadb.config import Settings as ChromaSettings
 # posthog 7.x 与 chromadb 0.6.x 接口不兼容，直接将 posthog.capture 替换为空函数
 # 确保在任何 chromadb 初始化之前执行
 import chromadb.telemetry.product.posthog as _posthog_module
+
 _orig_posthog_capture = _posthog_module.posthog.capture
 _posthog_module.posthog.capture = lambda *args, **kwargs: None
 from langchain_chroma import Chroma
-from langchain_community.embeddings import DashScopeEmbeddings
 
 from .embeddings import DashScopeEmbedder
 
@@ -52,6 +52,7 @@ CHROMA_DATA_DIR = os.getenv("CHROMA_DATA_DIR", "./data/chroma")
 
 
 # ─── 数据模型 ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class RAGDocument:
@@ -73,11 +74,13 @@ class RAGDocument:
 
     # ── 文档类型（用于区分不同来源）─────────────────────────────
     doc_type: str = "analysis"  # analysis | conversation_history | best_practice
-    session_id: str = ""         # 会话 ID，用于隔离对话历史
+    session_id: str = ""  # 会话 ID，用于隔离对话历史
 
     # ── 技术栈维度（元数据）────────────────────────────────────
-    tech_stack: list[str] = field(default_factory=list)  # ["react", "typescript", "next.js"]
-    languages: list[str] = field(default_factory=list)   # ["TypeScript", "Python"]
+    tech_stack: list[str] = field(
+        default_factory=list
+    )  # ["react", "typescript", "next.js"]
+    languages: list[str] = field(default_factory=list)  # ["TypeScript", "Python"]
     project_scale: str = ""  # small | medium | large
 
     # ── 核心价值：code_fix（精确修改方案）────────────────────
@@ -91,8 +94,8 @@ class RAGDocument:
     # }
 
     # ── 问题上下文（帮助理解适用场景）─────────────────────────
-    issue_type: str = ""      # N+1查询 | 硬编码密码 | 循环依赖 | ...
-    verified: bool = False    # 是否经过工具验证
+    issue_type: str = ""  # N+1查询 | 硬编码密码 | 循环依赖 | ...
+    verified: bool = False  # 是否经过工具验证
 
     # ── 标签与元数据 ──────────────────────────────────────────
     tags: list[str] = field(default_factory=list)
@@ -149,20 +152,28 @@ class RAGDocument:
             "doc_type": self.doc_type,
             "session_id": self.session_id,
             # 对话历史字段（供 SemanticMemory 检索和格式化使用）
-            "user_message": self.metadata.get("user_message", "") if isinstance(self.metadata, dict) else "",
-            "assistant_message": self.metadata.get("assistant_message", "") if isinstance(self.metadata, dict) else "",
+            "user_message": self.metadata.get("user_message", "")
+            if isinstance(self.metadata, dict)
+            else "",
+            "assistant_message": self.metadata.get("assistant_message", "")
+            if isinstance(self.metadata, dict)
+            else "",
             # 技术栈维度
             "tech_stack": ",".join(self.tech_stack) if self.tech_stack else "",
             "languages": ",".join(self.languages) if self.languages else "",
             "project_scale": self.project_scale,
             # code_fix
-            "code_fix": json.dumps(self.code_fix) if isinstance(self.code_fix, dict) else str(self.code_fix),
+            "code_fix": json.dumps(self.code_fix)
+            if isinstance(self.code_fix, dict)
+            else str(self.code_fix),
             "verified": "true" if self.verified else "false",
             # 问题上下文
             "issue_type": self.issue_type,
             # 标签与元数据
             "tags": ",".join(self.tags) if self.tags else "",
-            "metadata": json.dumps(self.metadata) if isinstance(self.metadata, dict) else str(self.metadata),
+            "metadata": json.dumps(self.metadata)
+            if isinstance(self.metadata, dict)
+            else str(self.metadata),
         }
 
     def to_dict(self) -> dict:
@@ -220,10 +231,16 @@ class SearchResult:
 
         # 解析 verified
         verified_str = metadata.get("verified", "false")
-        verified = verified_str.lower() == "true" if isinstance(verified_str, str) else bool(verified_str)
+        verified = (
+            verified_str.lower() == "true"
+            if isinstance(verified_str, str)
+            else bool(verified_str)
+        )
 
         return cls(
-            id=metadata.get("id", doc.id) if hasattr(doc, "id") else str(hash(doc.page_content[:50] if doc.page_content else "")),
+            id=metadata.get("id", doc.id)
+            if hasattr(doc, "id")
+            else str(hash(doc.page_content[:50] if doc.page_content else "")),
             score=score,
             repo_url=metadata.get("repo_url", ""),
             category=metadata.get("category", ""),
@@ -242,6 +259,7 @@ class SearchResult:
 
 
 # ─── Chroma Store ─────────────────────────────────────────────────────────────
+
 
 class ChromaStore:
     """
@@ -285,16 +303,22 @@ class ChromaStore:
                              "knowledge" → gitintel_knowledge
                              "memory"    → gitintel_memory
         """
-        self.persist_directory = persist_directory or os.getenv("CHROMA_DATA_DIR", CHROMA_DATA_DIR)
+        self.persist_directory = persist_directory or os.getenv(
+            "CHROMA_DATA_DIR", CHROMA_DATA_DIR
+        )
         self._ensure_data_dir()
 
         # 确定 collection 名称：显式参数 > collection_type > 环境变量 > 默认值
         if collection_name:
             self.collection_name = collection_name
         elif collection_type == "knowledge":
-            self.collection_name = os.getenv("CHROMA_COLLECTION_KNOWLEDGE", COLLECTION_KNOWLEDGE)
+            self.collection_name = os.getenv(
+                "CHROMA_COLLECTION_KNOWLEDGE", COLLECTION_KNOWLEDGE
+            )
         elif collection_type == "memory":
-            self.collection_name = os.getenv("CHROMA_COLLECTION_MEMORY", COLLECTION_MEMORY)
+            self.collection_name = os.getenv(
+                "CHROMA_COLLECTION_MEMORY", COLLECTION_MEMORY
+            )
         else:
             # 兜底：向后兼容，优先读旧的 DASHVECTOR_COLLECTION，其次读 KNOWLEDGE
             self.collection_name = (
@@ -335,7 +359,9 @@ class ChromaStore:
                     embedding_function=self.embedder._embeddings,
                     persist_directory=self.persist_directory,
                 )
-                _logger.info(f"[ChromaStore] VectorStore 初始化成功: {self.collection_name}")
+                _logger.info(
+                    f"[ChromaStore] VectorStore 初始化成功: {self.collection_name}"
+                )
             except Exception as exc:
                 _logger.error(f"[ChromaStore] VectorStore 初始化失败: {exc}")
                 return None
@@ -385,7 +411,9 @@ class ChromaStore:
                 results = collection.get(where={"session_id": session_id})
                 if results and results.get("ids"):
                     collection.delete(ids=results["ids"])
-                    _logger.info(f"[ChromaStore] 删除会话 {session_id} 的 {len(results['ids'])} 条记忆")
+                    _logger.info(
+                        f"[ChromaStore] 删除会话 {session_id} 的 {len(results['ids'])} 条记忆"
+                    )
             except Exception:
                 # Chroma where 查询可能不支持，尝试全量扫描
                 all_docs = collection.get(limit=10000)
@@ -397,7 +425,9 @@ class ChromaStore:
                     ]
                     if ids_to_delete:
                         collection.delete(ids=ids_to_delete)
-                        _logger.info(f"[ChromaStore] 删除会话 {session_id} 的 {len(ids_to_delete)} 条记忆")
+                        _logger.info(
+                            f"[ChromaStore] 删除会话 {session_id} 的 {len(ids_to_delete)} 条记忆"
+                        )
 
             return True
 
@@ -526,7 +556,11 @@ class ChromaStore:
         # 解析技术栈
         tech_stack = self._extract_tech_stack(tech_stack_data)
         languages = tech_stack_data.get("languages", []) or []
-        if isinstance(languages, list) and languages and not isinstance(languages[0], str):
+        if (
+            isinstance(languages, list)
+            and languages
+            and not isinstance(languages[0], str)
+        ):
             languages = [l.get("name", "") for l in languages if l.get("name")]
 
         # 项目规模
@@ -570,7 +604,9 @@ class ChromaStore:
                 counts["dependency"] = stored
                 total_stored += stored
 
-        _logger.info(f"[ChromaStore] 综合存储完成: repo={repo_url}, 共 {total_stored} 条")
+        _logger.info(
+            f"[ChromaStore] 综合存储完成: repo={repo_url}, 共 {total_stored} 条"
+        )
         return {"success": True, "counts": counts, "total": total_stored}
 
     # ─── 辅助方法 ─────────────────────────────────────────────────────────────
@@ -624,19 +660,21 @@ class ChromaStore:
                 continue
 
             if len(content) > 10:
-                docs.append(RAGDocument(
-                    repo_url=repo_url,
-                    category="architecture",
-                    title=f"架构问题: {title}",
-                    content=content,
-                    priority="medium",
-                    tech_stack=tech_stack,
-                    project_scale=project_scale,
-                    issue_type="architecture",
-                    verified=True,
-                    tags=["architecture", "concern"],
-                    metadata={"source": "architecture_analysis"},
-                ))
+                docs.append(
+                    RAGDocument(
+                        repo_url=repo_url,
+                        category="architecture",
+                        title=f"架构问题: {title}",
+                        content=content,
+                        priority="medium",
+                        tech_stack=tech_stack,
+                        project_scale=project_scale,
+                        issue_type="architecture",
+                        verified=True,
+                        tags=["architecture", "concern"],
+                        metadata={"source": "architecture_analysis"},
+                    )
+                )
 
         patterns = arch_data.get("patterns", []) or []
         for pattern in patterns:
@@ -650,19 +688,21 @@ class ChromaStore:
                 continue
 
             if len(content) > 10:
-                docs.append(RAGDocument(
-                    repo_url=repo_url,
-                    category="architecture",
-                    title=f"架构模式: {title}",
-                    content=content,
-                    priority="low",
-                    tech_stack=tech_stack,
-                    project_scale=project_scale,
-                    issue_type="pattern",
-                    verified=True,
-                    tags=["architecture", "pattern"],
-                    metadata={"source": "architecture_analysis"},
-                ))
+                docs.append(
+                    RAGDocument(
+                        repo_url=repo_url,
+                        category="architecture",
+                        title=f"架构模式: {title}",
+                        content=content,
+                        priority="low",
+                        tech_stack=tech_stack,
+                        project_scale=project_scale,
+                        issue_type="pattern",
+                        verified=True,
+                        tags=["architecture", "pattern"],
+                        metadata={"source": "architecture_analysis"},
+                    )
+                )
 
         return docs
 
@@ -681,7 +721,8 @@ class ChromaStore:
         if not risky_deps:
             all_deps = dep_data.get("deps", []) or []
             risky_deps = [
-                d for d in all_deps
+                d
+                for d in all_deps
                 if isinstance(d, dict) and d.get("risk_level") in ("high", "高危")
             ]
 
@@ -692,25 +733,27 @@ class ChromaStore:
                 risk = dep.get("risk_level", "unknown")
                 reason = dep.get("reason", dep.get("description", ""))
 
-                docs.append(RAGDocument(
-                    repo_url=repo_url,
-                    category="dependency",
-                    title=f"高危依赖: {name}@{version}",
-                    content=f"依赖 {name}@{version} 被标记为 {risk}。{reason}",
-                    priority="high" if risk in ("high", "高危") else "medium",
-                    tech_stack=tech_stack,
-                    languages=languages,
-                    project_scale=project_scale,
-                    issue_type="vulnerable_dependency",
-                    verified=True,
-                    tags=["dependency", "security", "vulnerability"],
-                    metadata={
-                        "package": name,
-                        "version": version,
-                        "risk_level": risk,
-                        "source": "dependency_analysis",
-                    },
-                ))
+                docs.append(
+                    RAGDocument(
+                        repo_url=repo_url,
+                        category="dependency",
+                        title=f"高危依赖: {name}@{version}",
+                        content=f"依赖 {name}@{version} 被标记为 {risk}。{reason}",
+                        priority="high" if risk in ("high", "高危") else "medium",
+                        tech_stack=tech_stack,
+                        languages=languages,
+                        project_scale=project_scale,
+                        issue_type="vulnerable_dependency",
+                        verified=True,
+                        tags=["dependency", "security", "vulnerability"],
+                        metadata={
+                            "package": name,
+                            "version": version,
+                            "risk_level": risk,
+                            "source": "dependency_analysis",
+                        },
+                    )
+                )
 
         outdated_deps = dep_data.get("outdated_deps", []) or []
         for dep in outdated_deps[:3]:
@@ -718,23 +761,25 @@ class ChromaStore:
                 name = dep.get("name", "")
                 suggestion = dep.get("suggestion", dep.get("alternative", ""))
 
-                docs.append(RAGDocument(
-                    repo_url=repo_url,
-                    category="dependency",
-                    title=f"过时依赖: {name}",
-                    content=f"依赖 {name} 已过时。迁移建议: {suggestion}",
-                    priority="medium",
-                    tech_stack=tech_stack,
-                    languages=languages,
-                    project_scale=project_scale,
-                    issue_type="outdated_dependency",
-                    verified=True,
-                    tags=["dependency", "outdated", "migration"],
-                    metadata={
-                        "package": name,
-                        "source": "dependency_analysis",
-                    },
-                ))
+                docs.append(
+                    RAGDocument(
+                        repo_url=repo_url,
+                        category="dependency",
+                        title=f"过时依赖: {name}",
+                        content=f"依赖 {name} 已过时。迁移建议: {suggestion}",
+                        priority="medium",
+                        tech_stack=tech_stack,
+                        languages=languages,
+                        project_scale=project_scale,
+                        issue_type="outdated_dependency",
+                        verified=True,
+                        tags=["dependency", "outdated", "migration"],
+                        metadata={
+                            "package": name,
+                            "source": "dependency_analysis",
+                        },
+                    )
+                )
 
         return docs
 
@@ -863,7 +908,9 @@ class ChromaStore:
                 results = collection.get(where={"repo_url": repo_url})
                 if results and results.get("ids"):
                     collection.delete(ids=results["ids"])
-                    _logger.info(f"[ChromaStore] 删除仓库 {repo_url} 的 {len(results['ids'])} 条记忆")
+                    _logger.info(
+                        f"[ChromaStore] 删除仓库 {repo_url} 的 {len(results['ids'])} 条记忆"
+                    )
             except Exception:
                 # 回退：全量扫描
                 all_docs = collection.get(limit=10000)
@@ -875,7 +922,9 @@ class ChromaStore:
                     ]
                     if ids_to_delete:
                         collection.delete(ids=ids_to_delete)
-                        _logger.info(f"[ChromaStore] 删除仓库 {repo_url} 的 {len(ids_to_delete)} 条记忆")
+                        _logger.info(
+                            f"[ChromaStore] 删除仓库 {repo_url} 的 {len(ids_to_delete)} 条记忆"
+                        )
 
             return True
 
@@ -914,14 +963,19 @@ class ChromaStore:
             if results and results.get("documents"):
                 chroma_ids = results.get("ids", [])
                 for i, doc_content in enumerate(results["documents"]):
-                    metadata = results["metadatas"][i] if results.get("metadatas") else {}
+                    metadata = (
+                        results["metadatas"][i] if results.get("metadatas") else {}
+                    )
                     # 注入 Chroma 原生 ID，确保后续可删除
                     chroma_id = chroma_ids[i] if i < len(chroma_ids) else None
                     if chroma_id:
                         metadata["id"] = chroma_id
                     from langchain_core.documents import Document
+
                     doc = Document(page_content=doc_content, metadata=metadata)
-                    search_results.append(SearchResult.from_langchain_doc(doc, score=1.0))
+                    search_results.append(
+                        SearchResult.from_langchain_doc(doc, score=1.0)
+                    )
 
             _logger.debug(
                 f"[ChromaStore] get_by_session_category: "

@@ -29,7 +29,9 @@ class DashScopeEmbedder:
         Args:
             api_key: DashScope API 密钥，默认从环境变量读取
         """
-        self.api_key = api_key or os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.api_key = (
+            api_key or os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+        )
 
         if not self.api_key:
             _logger.warning("[DashScopeEmbedder] 未设置 API 密钥，向量生成将不可用")
@@ -41,10 +43,10 @@ class DashScopeEmbedder:
                     dashscope_api_key=self.api_key,
                 )
                 self._available = True
-                key_preview = self.api_key[:8] + "..." if len(self.api_key) > 8 else "***"
-                _logger.debug(
-                    f"[DashScopeEmbedder] 初始化完成: api_key={key_preview}"
+                key_preview = (
+                    self.api_key[:8] + "..." if len(self.api_key) > 8 else "***"
                 )
+                _logger.debug(f"[DashScopeEmbedder] 初始化完成: api_key={key_preview}")
             except Exception as e:
                 _logger.error(f"[DashScopeEmbedder] 初始化失败: {e}")
                 self._embeddings = None

@@ -2,6 +2,7 @@
 管理员身份验证中间件和实用程序。
 使用Supabase验证登录时颁发的管理员令牌。
 """
+
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -33,13 +34,15 @@ def create_admin_token(
     token = _generate_token()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=ADMIN_TOKEN_TTL_HOURS)
 
-    sb.table("admin_tokens").insert({
-        "admin_user_id": admin_user_id,
-        "token": token,
-        "expires_at": expires_at.isoformat(),
-        "ip_address": ip_address,
-        "user_agent": user_agent,
-    }).execute()
+    sb.table("admin_tokens").insert(
+        {
+            "admin_user_id": admin_user_id,
+            "token": token,
+            "expires_at": expires_at.isoformat(),
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+        }
+    ).execute()
 
     return token, expires_at
 
@@ -99,7 +102,9 @@ def revoke_admin_token(token: str) -> bool:
 def revoke_all_tokens_for_user(admin_user_id: str) -> int:
     """Revoke all tokens for a given admin user."""
     sb = get_supabase_admin()
-    result = sb.table("admin_tokens").delete().eq("admin_user_id", admin_user_id).execute()
+    result = (
+        sb.table("admin_tokens").delete().eq("admin_user_id", admin_user_id).execute()
+    )
     return len(result.data)
 
 
@@ -139,12 +144,14 @@ def get_admin_user_by_username(username: str) -> Optional[dict]:
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
     import bcrypt
+
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, hashed: str) -> bool:
     """Verify a password against a bcrypt hash."""
     import bcrypt
+
     try:
         return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:

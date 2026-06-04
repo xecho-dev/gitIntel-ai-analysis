@@ -102,7 +102,7 @@ def get_git_status(repo_path: str = ".") -> GitStatus:
             clean=clean,
             current_branch=current_branch,
         )
-    except Exception as e:
+    except Exception:
         return GitStatus(
             is_repo=False,
             staged_files=[],

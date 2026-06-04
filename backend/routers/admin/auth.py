@@ -2,12 +2,13 @@
 Admin 认证相关路由 (/api/admin/*)
 管理员登录、注销、个人信息
 """
+
 from datetime import datetime, timezone
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Request, Depends, HTTPException
 
-from dependencies import get_current_admin, get_sb_client
+from dependencies import get_current_admin
 from supabase_client import get_supabase_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin-auth"])
@@ -57,9 +58,11 @@ async def api_admin_login(req: AdminLoginRequest, request: Request):
     # 4. 更新最后登录时间
     try:
         sb = get_supabase_admin()
-        sb.table("admin_users").update({
-            "last_login_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", admin_user["id"]).execute()
+        sb.table("admin_users").update(
+            {
+                "last_login_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ).eq("id", admin_user["id"]).execute()
     except Exception:
         pass  # 不影响登录流程
 

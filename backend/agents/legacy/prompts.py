@@ -4,7 +4,8 @@ LangChain Prompts — 为每个分析 Agent 定义结构化的 Prompt 模板。
 这些 Prompts 与 LangChain 的 Runnable 协议兼容，可配合 .invoke() / .stream()
 使用，也可以在 Agent 内部作为 LLM 调用的模板。
 """
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+
+from langchain_core.prompts import ChatPromptTemplate
 
 # ─── 全局系统提示词 ────────────────────────────────────────────────
 
@@ -49,10 +50,12 @@ def build_suggestion_prompt(
     analysis_context: str,
 ) -> ChatPromptTemplate:
     """构建 SuggestionAgent 的 LangChain Prompt。"""
-    return ChatPromptTemplate.from_messages([
-        ("system", SUGGESTION_SYSTEM),
-        ("human", SUGGESTION_HUMAN),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", SUGGESTION_SYSTEM),
+            ("human", SUGGESTION_HUMAN),
+        ]
+    )
 
 
 # ─── RepoLoaderAgent LLM 决策 Prompt ─────────────────────────────────────
@@ -118,10 +121,12 @@ go.mod, Cargo.toml, Gemfile, composer.json, pom.xml, build.gradle
 返回格式（必须是合法的 JSON 对象，不要用 markdown 包裹）：
 {json_example}
 """
-    return ChatPromptTemplate.from_messages([
-        ("system", system_str),
-        ("human", human_str),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", system_str),
+            ("human", human_str),
+        ]
+    )
 
 
 REPO_LOADER_DECISION_HUMAN = """仓库: {repo_path}
@@ -151,22 +156,31 @@ def build_repo_loader_decision_prompt(
     p2_files: list[dict],
     max_extra: int = 30,
 ) -> ChatPromptTemplate:
-    p2_list = "\n".join(f"- {f['path']} (~{f.get('size', 0)} bytes)" for f in p2_files[:50])
+    p2_list = "\n".join(
+        f"- {f['path']} (~{f.get('size', 0)} bytes)" for f in p2_files[:50]
+    )
     loaded_paths_str = "\n".join(f"- {p}" for p in loaded_paths[:50])
-    summaries_parts = [f"【{k}】: {v[:200]}" for k, v in list(content_summaries.items())[:20]]
+    summaries_parts = [
+        f"【{k}】: {v[:200]}" for k, v in list(content_summaries.items())[:20]
+    ]
     summaries_str = "\n\n".join(summaries_parts)
-    return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
-        ("human", REPO_LOADER_DECISION_HUMAN.format(
-            repo_path=repo_path,
-            loaded_count=len(loaded_paths),
-            loaded_paths=loaded_paths_str,
-            content_summaries=summaries_str,
-            p2_count=len(p2_files),
-            p2_list=p2_list,
-            max_extra=max_extra,
-        )),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", REPO_LOADER_SYSTEM.format(system_context="")),
+            (
+                "human",
+                REPO_LOADER_DECISION_HUMAN.format(
+                    repo_path=repo_path,
+                    loaded_count=len(loaded_paths),
+                    loaded_paths=loaded_paths_str,
+                    content_summaries=summaries_str,
+                    p2_count=len(p2_files),
+                    p2_list=p2_list,
+                    max_extra=max_extra,
+                ),
+            ),
+        ]
+    )
 
 
 # ─── P1 决策 Prompt ─────────────────────────────────────────────────
@@ -202,17 +216,22 @@ def build_p1_decision_prompt(
     p2_count: int,
 ) -> ChatPromptTemplate:
     p1_list = "\n".join(f"- {p}" for p in p1_files[:30])
-    return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
-        ("human", P1_DECISION_HUMAN.format(
-            repo_path=repo_path,
-            p0_summary=p0_summary,
-            p0_loaded_count=p0_loaded_count,
-            p1_list=p1_list,
-            p1_count=p1_count,
-            p2_count=p2_count,
-        )),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", REPO_LOADER_SYSTEM.format(system_context="")),
+            (
+                "human",
+                P1_DECISION_HUMAN.format(
+                    repo_path=repo_path,
+                    p0_summary=p0_summary,
+                    p0_loaded_count=p0_loaded_count,
+                    p1_list=p1_list,
+                    p1_count=p1_count,
+                    p2_count=p2_count,
+                ),
+            ),
+        ]
+    )
 
 
 # ─── P2 决策 Prompt ─────────────────────────────────────────────────
@@ -248,18 +267,25 @@ def build_p2_decision_prompt(
     p2_files: list[dict],
     max_extra: int = 30,
 ) -> ChatPromptTemplate:
-    p2_list = "\n".join(f"- {f['path']} (~{f.get('size', 0)} bytes)" for f in p2_files[:50])
-    return ChatPromptTemplate.from_messages([
-        ("system", REPO_LOADER_SYSTEM.format(system_context="")),
-        ("human", P2_DECISION_HUMAN.format(
-            repo_path=repo_path,
-            code_summary=code_summary,
-            loaded_count=loaded_count,
-            p2_list=p2_list,
-            p2_count=len(p2_files),
-            max_extra=max_extra,
-        )),
-    ])
+    p2_list = "\n".join(
+        f"- {f['path']} (~{f.get('size', 0)} bytes)" for f in p2_files[:50]
+    )
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", REPO_LOADER_SYSTEM.format(system_context="")),
+            (
+                "human",
+                P2_DECISION_HUMAN.format(
+                    repo_path=repo_path,
+                    code_summary=code_summary,
+                    loaded_count=loaded_count,
+                    p2_list=p2_list,
+                    p2_count=len(p2_files),
+                    max_extra=max_extra,
+                ),
+            ),
+        ]
+    )
 
 
 # ─── 通用摘要 Prompt ────────────────────────────────────────────────
@@ -284,14 +310,15 @@ SUMMARY_HUMAN = """请为以下仓库分析撰写一份 200 字以内的中文�
 """
 
 
-
 def build_summary_prompt(
     repo_path: str,
     branch: str,
     analysis_summary: str,
 ) -> ChatPromptTemplate:
     """构建摘要报告的 LangChain Prompt。"""
-    return ChatPromptTemplate.from_messages([
-        ("system", SUMMARY_SYSTEM),
-        ("human", SUMMARY_HUMAN),
-    ])
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", SUMMARY_SYSTEM),
+            ("human", SUMMARY_HUMAN),
+        ]
+    )

@@ -20,18 +20,16 @@ GitHub 工具集 — 封装所有 GitHub API 操作，供 Agent 通过 Function 
   - 缓存按 (owner, repo, ref) 隔离，不同仓库 / 分支互不影响。
   - 缓存在进程生命周期内有效，适合单次分析流程。
 """
+
 import asyncio
 import base64
-import functools
-import json
 import logging
 import os
-import re
 from typing import Any
 
 from langchain_core.tools import tool
 
-from utils.tool_result import ToolSuccess, ToolError, ToolWarn
+from utils.tool_result import ToolSuccess, ToolError
 
 logger = logging.getLogger("gitintel")
 
@@ -42,7 +40,9 @@ GITHUB_API_BASE = "https://api.github.com"
 
 # 缓存容量限制，防止大仓库撑爆内存
 _MAX_CACHE_ENTRIES_PER_TOOL = int(os.getenv("GITINTEL_MAX_CACHE_ENTRIES", "200"))
-_MAX_CACHED_FILE_SIZE = int(os.getenv("GITINTEL_MAX_CACHED_FILE_KB", "512")) * 1024  # 超过此大小的文件内容不缓存
+_MAX_CACHED_FILE_SIZE = (
+    int(os.getenv("GITINTEL_MAX_CACHED_FILE_KB", "512")) * 1024
+)  # 超过此大小的文件内容不缓存
 
 
 def _safe_async_run(coro_fn):
@@ -53,6 +53,7 @@ def _safe_async_run(coro_fn):
     from a running event loop" 错误。
     """
     import asyncio
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -60,9 +61,12 @@ def _safe_async_run(coro_fn):
 
     # 已有 loop，在当前线程中创建 task
     import concurrent.futures
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+
         async def _wrapper():
             return await coro_fn()
+
         future = executor.submit(asyncio.run, _wrapper())
         return future.result()
 
@@ -87,7 +91,9 @@ class _ToolCache:
         # 记录插入顺序，用于 LRU 淘汰
         self._insertion_order: list[str] = []
 
-    def _make_key(self, tool_name: str, owner: str, repo: str, ref: str, **extra: Any) -> str:
+    def _make_key(
+        self, tool_name: str, owner: str, repo: str, ref: str, **extra: Any
+    ) -> str:
         parts = [tool_name, owner, repo, ref]
         for k in sorted(extra.keys()):
             parts.append(f"{k}={extra[k]}")
@@ -96,7 +102,9 @@ class _ToolCache:
     def _evict_if_needed(self, key: str) -> None:
         """超过容量时淘汰最早的同工具记录。"""
         tool_name = key.split("|", 1)[0]
-        same_tool_keys = [k for k in self._insertion_order if k.startswith(tool_name + "|")]
+        same_tool_keys = [
+            k for k in self._insertion_order if k.startswith(tool_name + "|")
+        ]
         if len(same_tool_keys) >= _MAX_CACHE_ENTRIES_PER_TOOL:
             oldest = same_tool_keys[0]
             self._data.pop(oldest, None)
@@ -106,7 +114,9 @@ class _ToolCache:
         key = self._make_key(tool_name, owner, repo, ref, **extra)
         return self._data.get(key)
 
-    def set(self, tool_name: str, owner: str, repo: str, ref: str, value: Any, **extra: Any) -> None:
+    def set(
+        self, tool_name: str, owner: str, repo: str, ref: str, value: Any, **extra: Any
+    ) -> None:
         key = self._make_key(tool_name, owner, repo, ref, **extra)
         # 大文件内容不缓存（避免单个大文件撑爆内存）
         if isinstance(value, str) and len(value) > _MAX_CACHED_FILE_SIZE:
@@ -135,8 +145,9 @@ class _ToolCache:
 _tool_cache = _ToolCache()
 
 
-def _cached_call(tool_name: str, owner: str, repo: str, ref: str,
-                  uncached_fn: callable, **extra: Any) -> Any:
+def _cached_call(
+    tool_name: str, owner: str, repo: str, ref: str, uncached_fn: callable, **extra: Any
+) -> Any:
     """检查缓存，miss 时调用 uncached_fn 并存入缓存。"""
     hit = _tool_cache.get(tool_name, owner, repo, ref, **extra)
     if hit is not None:
@@ -236,9 +247,7 @@ async def _get_file_tree_impl(owner: str, repo: str, ref: str) -> list[dict]:
         return data.get("tree", [])
 
 
-async def _read_file_content_impl(
-    owner: str, repo: str, path: str, ref: str
-) -> str:
+async def _read_file_content_impl(owner: str, repo: str, path: str, ref: str) -> str:
     async with __import__("httpx").AsyncClient(timeout=20.0) as client:
         resp = await client.get(
             f"{GITHUB_API_BASE}/repos/{owner}/{repo}/contents/{path}",
@@ -316,10 +325,11 @@ async def _search_code_impl(
             except httpx.ConnectError as e:
                 if attempt < 2:
                     import asyncio
+
                     logger.warning(
                         f"[github_tools] search_code ConnectError (attempt {attempt + 1}/3): {e}, 重试中..."
                     )
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                     continue
                 raise  # 第三次失败才上抛
 
@@ -356,7 +366,8 @@ async def _search_code_impl(
                 # 可能是速率限制，稍后重试
                 if attempt < 2:
                     import asyncio
-                    await asyncio.sleep(2 ** attempt)  # 指数退避
+
+                    await asyncio.sleep(2**attempt)  # 指数退避
                     continue
                 logger.warning(f"[github_tools] search_code 403: q='{q}', 速率限制")
                 return []
@@ -535,7 +546,9 @@ def get_file_tree(owner: str, repo: str, ref: str) -> str:
         result = ToolError(f"获取文件树失败: {e}").to_str()
 
     tree_len = len(data) if isinstance(data, list) else 0
-    logger.info(f"[github_tools] get_file_tree({owner}/{repo}@{ref}) -> {tree_len} items")
+    logger.info(
+        f"[github_tools] get_file_tree({owner}/{repo}@{ref}) -> {tree_len} items"
+    )
     return result
 
 
@@ -568,14 +581,21 @@ def read_file_content(path: str, owner: str = "", repo: str = "", ref: str = "")
         return _safe_async_run(lambda: _read_file_content_impl(owner, repo, path, ref))
 
     try:
-        content = _cached_call("read_file_content", owner, repo, ref, _uncached, path=path)
+        content = _cached_call(
+            "read_file_content", owner, repo, ref, _uncached, path=path
+        )
         if len(content) > 512 * 1024:
-            content = content[:512 * 1024] + f"\n... [文件过大，已截断到 512KB，原始大小 {len(content)} 字节]"
+            content = (
+                content[: 512 * 1024]
+                + f"\n... [文件过大，已截断到 512KB，原始大小 {len(content)} 字节]"
+            )
         result = ToolSuccess(content).to_str()
     except Exception as e:
         result = ToolError(f"读取文件失败: {e}").to_str()
 
-    logger.debug(f"[github_tools] read_file_content({owner}/{repo}/{path}@{ref}) -> {len(result)} chars")
+    logger.debug(
+        f"[github_tools] read_file_content({owner}/{repo}/{path}@{ref}) -> {len(result)} chars"
+    )
     return result
 
 
@@ -596,7 +616,6 @@ def get_file_blobs(owner: str, repo: str, paths: list[str], ref: str) -> str:
         JSON 对象字符串，key 为文件路径，value 为文件内容。
         单个文件内容超过 200KB 时截断。
     """
-    import asyncio
 
     # 逐个文件检查缓存，未命中才请求
     paths_to_fetch = []
@@ -609,6 +628,7 @@ def get_file_blobs(owner: str, repo: str, paths: list[str], ref: str) -> str:
             paths_to_fetch.append(p)
 
     if paths_to_fetch:
+
         async def _fetch_missing():
             return await _get_file_blobs_impl(owner, repo, paths_to_fetch, ref)
 
@@ -620,10 +640,12 @@ def get_file_blobs(owner: str, repo: str, paths: list[str], ref: str) -> str:
     # 截断过大内容
     for k, v in list(result_map.items()):
         if len(v) > 200 * 1024:
-            result_map[k] = v[:200 * 1024] + f"\n... [已截断到 200KB]"
+            result_map[k] = v[: 200 * 1024] + "\n... [已截断到 200KB]"
 
     result = ToolSuccess(result_map).to_str()
-    logger.info(f"[github_tools] get_file_blobs({owner}/{repo}) -> {len(result_map)} files ({len(paths_to_fetch)} fresh)")
+    logger.info(
+        f"[github_tools] get_file_blobs({owner}/{repo}) -> {len(result_map)} files ({len(paths_to_fetch)} fresh)"
+    )
     return result
 
 
@@ -655,9 +677,9 @@ def search_code(query: str, language: str = "", owner: str = "", repo: str = "")
         - query 为空：返回错误提示，请提供有效的搜索关键词
         - 搜索结果为空：可能关键词不匹配，尝试更通用的词
     """
-    import asyncio
 
     try:
+
         async def _run():
             return await _search_code_impl(owner, repo, query, language)
 
@@ -667,7 +689,9 @@ def search_code(query: str, language: str = "", owner: str = "", repo: str = "")
         result = ToolError(f"搜索代码失败: {e}").to_str()
         items = []
 
-    logger.info(f"[github_tools] search_code({owner}/{repo}, '{query}') -> {len(items)} results")
+    logger.info(
+        f"[github_tools] search_code({owner}/{repo}, '{query}') -> {len(items)} results"
+    )
     return result
 
 
@@ -718,12 +742,16 @@ def batch_search_code(queries: list[dict], owner: str = "", repo: str = "") -> s
     except Exception as e:
         result = ToolError(f"批量搜索失败: {e}").to_str()
 
-    logger.info(f"[github_tools] batch_search_code({owner}/{repo}) -> {len(queries[:20])} queries")
+    logger.info(
+        f"[github_tools] batch_search_code({owner}/{repo}) -> {len(queries[:20])} queries"
+    )
     return result
 
 
 @tool
-def get_commit_history(owner: str, repo: str, ref: str = "main", limit: int = 30) -> str:
+def get_commit_history(
+    owner: str, repo: str, ref: str = "main", limit: int = 30
+) -> str:
     """获取仓库的最近提交历史。
 
     用途：Agent 可以了解仓库的开发活跃度和最近的变更重点。
@@ -739,6 +767,7 @@ def get_commit_history(owner: str, repo: str, ref: str = "main", limit: int = 30
         JSON 数组字符串，每条包含 sha, message, author, date
     """
     try:
+
         async def _run():
             return await _get_commit_history_impl(owner, repo, ref, min(limit, 100))
 
@@ -751,7 +780,9 @@ def get_commit_history(owner: str, repo: str, ref: str = "main", limit: int = 30
 
 
 @tool
-def get_pull_requests(owner: str, repo: str, state: str = "open", limit: int = 20) -> str:
+def get_pull_requests(
+    owner: str, repo: str, state: str = "open", limit: int = 20
+) -> str:
     """获取仓库的 Pull Request 列表。
 
     用途：Agent 可以了解仓库的协作状态和开放的问题。
@@ -767,6 +798,7 @@ def get_pull_requests(owner: str, repo: str, state: str = "open", limit: int = 2
         JSON 数组字符串，每条包含 number, title, state, user, labels 等
     """
     try:
+
         async def _run():
             return await _get_pull_requests_impl(owner, repo, state, min(limit, 100))
 
@@ -792,6 +824,7 @@ def get_default_branch(owner: str, repo: str) -> str:
     Returns:
         默认分支名称字符串（如 "main"）
     """
+
     def _uncached():
         return _safe_async_run(lambda: _get_default_branch_impl(owner, repo))
 

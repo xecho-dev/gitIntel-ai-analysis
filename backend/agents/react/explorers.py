@@ -15,6 +15,7 @@
 用法：
     results = await ExplorerOrchestrator().explore_all("owner", "repo", "main")
 """
+
 import asyncio
 import json
 import logging
@@ -26,7 +27,7 @@ from typing import Any
 from langchain.agents import create_agent
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, BaseMessage, trim_messages
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, trim_messages
 from langchain_core.runnables import Runnable
 from langchain_core.tools import StructuredTool
 
@@ -39,7 +40,9 @@ logger = logging.getLogger("gitintel")
 
 _MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
 _EXPLORER_MAX_ITERATIONS = int(os.getenv("EXPLORER_MAX_ITERATIONS", "3"))
-_EXPLORER_MIN_TOOL_CALLS = int(os.getenv("EXPLORER_MIN_TOOL_CALLS", "1"))  # 降低到 1，小仓库配置文件已提供足够信息
+_EXPLORER_MIN_TOOL_CALLS = int(
+    os.getenv("EXPLORER_MIN_TOOL_CALLS", "1")
+)  # 降低到 1，小仓库配置文件已提供足够信息
 _TOOL_RESULT_TRUNCATE = int(os.getenv("TOOL_RESULT_TRUNCATE", "1500"))
 
 # ─── 上下文压缩配置 ───────────────────────────────────────────────────────────
@@ -53,8 +56,11 @@ _MAX_HISTORY_TOKENS = int(os.getenv("MAX_HISTORY_TOKENS", "6000"))
 
 # ─── 工具工厂 ────────────────────────────────────────────────────────────────
 
+
 def _get_explorer_tools(
-    owner: str, repo: str, branch: str,
+    owner: str,
+    repo: str,
+    branch: str,
     languages: list[str] | None = None,
 ) -> list[StructuredTool]:
     """构建带 owner/repo/branch 注入的 Explorer 工具列表。"""
@@ -65,7 +71,10 @@ def _get_explorer_tools(
         batch_search_code,
         detect_code_smells,
     ]
-    return [inject_context(t, owner=owner, repo=repo, ref=branch, languages=languages) for t in base_tools]
+    return [
+        inject_context(t, owner=owner, repo=repo, ref=branch, languages=languages)
+        for t in base_tools
+    ]
 
 
 # ─── System Prompts ───────────────────────────────────────────────────────────
@@ -108,10 +117,10 @@ _TECH_STACK_EXPLORER_INSTRUCTIONS = _UNIFIED_EXPLORER_PROMPT.format(
     role="技术架构师，负责识别 GitHub 仓库的技术栈",
     mission="识别仓库的：①编程语言 ②框架/库 ③基础设施 ④包管理器 ⑤部署方式",
     principles="- **配置文件是直接证据**：requirements.txt/pyproject.toml/package.json 列出依赖 = 有效证据\n"
-               "- **代码验证是补充验证**：import 语句可以提升 confidence，但非必须\n"
-               "- **高效工作流**：分析配置文件 → 补充代码验证（如有必要）→ 输出结论\n"
-               "- **小仓库简化**：少于 20 个文件时，配置文件信息通常足够，无需过度代码搜索\n"
-               "- **批量操作**：一次工具调用完成多个任务",
+    "- **代码验证是补充验证**：import 语句可以提升 confidence，但非必须\n"
+    "- **高效工作流**：分析配置文件 → 补充代码验证（如有必要）→ 输出结论\n"
+    "- **小仓库简化**：少于 20 个文件时，配置文件信息通常足够，无需过度代码搜索\n"
+    "- **批量操作**：一次工具调用完成多个任务",
     output_schema="""{
   "languages": [{"name": "...", "confidence": 0.0-1.0, "evidence": ["..."]}],
   "frameworks": [{"name": "...", "confidence": 0.0-1.0, "status": "confirmed|unconfirmed", "evidence": ["..."]}],
@@ -123,7 +132,7 @@ _TECH_STACK_EXPLORER_INSTRUCTIONS = _UNIFIED_EXPLORER_PROMPT.format(
   "overall_confidence": 0.0-1.0,
   "summary": "一句话描述",
   "unverified_claims": ["..."]
-}"""
+}""",
 )
 
 
@@ -131,9 +140,9 @@ _QUALITY_EXPLORER_INSTRUCTIONS = _UNIFIED_EXPLORER_PROMPT.format(
     role="代码审计专家，负责发现代码质量问题和潜在风险",
     mission="发现：①代码异味 ②安全问题 ③性能隐患 ④测试覆盖不足 ⑤可维护性问题",
     principles="- **每个 hotspot 必须有精确位置**：file + line\n"
-               "- **每个建议必须可执行**：不是\"建议优化\"，而是\"在 xxx.py:23 将 yyy 改为 zzz\"\n"
-               "- **没有发现问题也是有效结论**：输出 positive_patterns\n"
-               "- evidence 驱动评分，禁止主观臆断",
+    '- **每个建议必须可执行**：不是"建议优化"，而是"在 xxx.py:23 将 yyy 改为 zzz"\n'
+    "- **没有发现问题也是有效结论**：输出 positive_patterns\n"
+    "- evidence 驱动评分，禁止主观臆断",
     output_schema="""{
   "hotspots": [{"type": "security|smell|performance", "file": "...", "line": 42, "severity": "high|medium|low", "description": "...", "suggestion": "...", "evidence": "..."}],
   "quality_score": 0-100,
@@ -143,7 +152,7 @@ _QUALITY_EXPLORER_INSTRUCTIONS = _UNIFIED_EXPLORER_PROMPT.format(
   "qualityComplexity": "Low|Medium|High",
   "qualityMaintainability": "Low|Medium|High",
   "llmPowered": true
-}"""
+}""",
 )
 
 
@@ -151,8 +160,8 @@ _ARCHITECTURE_EXPLORER_INSTRUCTIONS = _UNIFIED_EXPLORER_PROMPT.format(
     role="软件架构专家，负责识别仓库的架构模式和设计决策",
     mission="识别：①架构风格 ②设计模式 ③分层架构 ④模块组织 ⑤组件关系",
     principles="- **components 必须有依赖链**：每个组件必须明确 depends_on\n"
-               "- **架构风格必须有目录/文件证据**\n"
-               "- **组件关系必须可追溯**：找到具体的 import 语句",
+    "- **架构风格必须有目录/文件证据**\n"
+    "- **组件关系必须可追溯**：找到具体的 import 语句",
     output_schema="""{
   "architecture_style": "单体|分层|微服务|CleanArchitecture|DDD",
   "style_evidence": "根据 [具体目录/文件] 推断为 [架构风格]",
@@ -164,11 +173,12 @@ _ARCHITECTURE_EXPLORER_INSTRUCTIONS = _UNIFIED_EXPLORER_PROMPT.format(
   "summary": "深度架构描述",
   "strengths": ["..."],
   "concerns": ["..."]
-}"""
+}""",
 )
 
 
 # ─── 结果结构 ───────────────────────────────────────────────────────────────
+
 
 @dataclass
 class ExplorerResult:
@@ -196,6 +206,7 @@ class ExplorerResult:
 
 
 # ─── 工具调用事件收集器（带上下文压缩）────────────────────────────────────────
+
 
 class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
     """通过 LangChain astream_events 收集工具调用记录，并自动压缩上下文。
@@ -231,7 +242,7 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
 
         # 目录结构：压缩为统计摘要
         if tool_name == "get_file_tree":
-            lines = [l for l in raw_result.strip().split('\n') if l.strip()]
+            lines = [l for l in raw_result.strip().split("\n") if l.strip()]
             return f"[目录] {len(lines)} 个条目，顶级: {', '.join(l.split('/')[0] if '/' in l else l for l in lines[:3])}"
 
         # 代码搜索：压缩为匹配数
@@ -241,40 +252,56 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
             total_queries = 0
             try:
                 import json
+
                 data = json.loads(raw_result)
                 for r in data:
                     total_match += len(r.get("results", []))
                     total_queries += 1
             except Exception:
                 pass
-            match = re.search(r'(\d+)\s*(?:match|result|matche?s?)', raw_result, re.I)
-            count = str(total_match) if total_match else (match.group(1) if match else "?")
+            match = re.search(r"(\d+)\s*(?:match|result|matche?s?)", raw_result, re.I)
+            count = (
+                str(total_match) if total_match else (match.group(1) if match else "?")
+            )
             # 提取前几个匹配的文件名
-            file_matches = re.findall(r'[\w/.-]+\.(py|js|ts|tsx|jsx|go|java|rs)[^\n]*', raw_result)
+            file_matches = re.findall(
+                r"[\w/.-]+\.(py|js|ts|tsx|jsx|go|java|rs)[^\n]*", raw_result
+            )
             files = ", ".join(set(file_matches[:3])) if file_matches else ""
             return f"[批量搜索] {total_queries} 查询, ~{count} 处匹配{f' ({files})' if files else ''}"
 
         # 文件读取：保留前几行
         if tool_name in ("read_file_content", "get_file_blobs"):
-            lines = raw_result.strip().split('\n')
-            preview = '\n'.join(lines[:8])
+            lines = raw_result.strip().split("\n")
+            preview = "\n".join(lines[:8])
             suffix = f"\n... ({len(lines)} 行)" if len(lines) > 8 else ""
-            truncated = preview[:self._compressed_chars]
-            return (truncated + "..." + suffix) if len(preview) > self._compressed_chars else truncated + suffix
+            truncated = preview[: self._compressed_chars]
+            return (
+                (truncated + "..." + suffix)
+                if len(preview) > self._compressed_chars
+                else truncated + suffix
+            )
 
         # AST 解析：只保留关键信息
         if tool_name in ("parse_file_ast", "detect_code_smells"):
             # 提取函数/类数量等关键统计
-            func_count = len(re.findall(r'def\s+\w+', raw_result))
-            class_count = len(re.findall(r'class\s+\w+', raw_result))
-            return f"[分析] {func_count} 函数, {class_count} 类: {raw_result[:self._compressed_chars]}"
+            func_count = len(re.findall(r"def\s+\w+", raw_result))
+            class_count = len(re.findall(r"class\s+\w+", raw_result))
+            return f"[分析] {func_count} 函数, {class_count} 类: {raw_result[: self._compressed_chars]}"
 
         # 默认截断
-        return raw_result[:self._compressed_chars] + ("..." if len(raw_result) > self._compressed_chars else "")
+        return raw_result[: self._compressed_chars] + (
+            "..." if len(raw_result) > self._compressed_chars else ""
+        )
 
     async def on_tool_start(
-        self, serialized: dict, input: Any = "",
-        *, run_id: str | None = None, parent_run_id: str | None = None, **kwargs
+        self,
+        serialized: dict,
+        input: Any = "",
+        *,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         name = serialized.get("name", "unknown")
         self._current_tool_name = name
@@ -283,7 +310,12 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
         self._current_output = ""
 
     async def on_tool_end(
-        self, output: Any, *, run_id: str | None = None, parent_run_id: str | None = None, **kwargs
+        self,
+        output: Any,
+        *,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         if self._in_tool:
             # 提取原始结果
@@ -293,29 +325,37 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
                 raw_result = str(output)
 
             # 保存原始记录（用于审计）
-            self._raw_tool_calls.append({
-                "iteration": len(self._raw_tool_calls) + 1,
-                "tool": self._current_tool_name,
-                "args": self._current_inputs,
-                "raw_result": raw_result[:_TOOL_RESULT_TRUNCATE],
-            })
+            self._raw_tool_calls.append(
+                {
+                    "iteration": len(self._raw_tool_calls) + 1,
+                    "tool": self._current_tool_name,
+                    "args": self._current_inputs,
+                    "raw_result": raw_result[:_TOOL_RESULT_TRUNCATE],
+                }
+            )
 
             # 压缩结果用于上下文
-            compressed_result = self._compress_tool_result(raw_result[:_TOOL_RESULT_TRUNCATE], self._current_tool_name)
+            compressed_result = self._compress_tool_result(
+                raw_result[:_TOOL_RESULT_TRUNCATE], self._current_tool_name
+            )
             iteration = len(self.tool_calls) + 1
-            self.tool_calls.append({
-                "iteration": iteration,
-                "tool": self._current_tool_name,
-                "args": self._current_inputs,
-                "result": compressed_result,
-                "elapsed_ms": 0,
-            })
+            self.tool_calls.append(
+                {
+                    "iteration": iteration,
+                    "tool": self._current_tool_name,
+                    "args": self._current_inputs,
+                    "result": compressed_result,
+                    "elapsed_ms": 0,
+                }
+            )
 
             # 周期性压缩工具调用历史
             if len(self.tool_calls) > self._max_tool_results:
                 self._trim_tool_calls()
 
-            self._check_error_pattern(compressed_result, self._current_tool_name, self.tool_calls)
+            self._check_error_pattern(
+                compressed_result, self._current_tool_name, self.tool_calls
+            )
         self._in_tool = False
 
     def _trim_tool_calls(self):
@@ -323,31 +363,38 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
         if len(self.tool_calls) > self._max_tool_results:
             # 生成历史摘要
             summary_parts = []
-            for tc in self.tool_calls[:-self._max_tool_results]:
+            for tc in self.tool_calls[: -self._max_tool_results]:
                 summary_parts.append(f"[{tc['tool']}] {tc['result'][:80]}...")
 
             # 保留摘要记录
-            summary = f"[早期探索摘要 ({len(self.tool_calls) - self._max_tool_results} 次调用)]: " + "; ".join(summary_parts)
-            self.tool_calls = self.tool_calls[-self._max_tool_results:]
+            summary = (
+                f"[早期探索摘要 ({len(self.tool_calls) - self._max_tool_results} 次调用)]: "
+                + "; ".join(summary_parts)
+            )
+            self.tool_calls = self.tool_calls[-self._max_tool_results :]
             # 将摘要作为最后一条记录（可被后续覆盖）
             logger.debug(f"压缩了 {len(summary_parts)} 条早期工具调用为摘要")
 
     async def on_tool_error(self, error: str, **kwargs):
         if self._in_tool:
             error_str = str(error)[:200]
-            self.tool_calls.append({
-                "iteration": len(self.tool_calls) + 1,
-                "tool": self._current_tool_name,
-                "args": self._current_inputs,
-                "error": error_str,
-                "result": "",
-            })
-            self._check_error_pattern(error_str, self._current_tool_name, self.tool_calls)
+            self.tool_calls.append(
+                {
+                    "iteration": len(self.tool_calls) + 1,
+                    "tool": self._current_tool_name,
+                    "args": self._current_inputs,
+                    "error": error_str,
+                    "result": "",
+                }
+            )
+            self._check_error_pattern(
+                error_str, self._current_tool_name, self.tool_calls
+            )
         self._in_tool = False
 
     async def on_chat_model_end(self, output, **kwargs):
         try:
-            content = output.content if hasattr(output, 'content') else str(output)
+            content = output.content if hasattr(output, "content") else str(output)
             self.messages.append(AIMessage(content=content))
 
             # 使用 LangChain 的 trim_messages 压缩消息历史
@@ -370,6 +417,7 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
 
     def _get_token_counter(self):
         """获取 token 计数器（使用简单的字符估算）。"""
+
         # 简单估算：中文约 1.5 token/字符，英文约 4 token/字符，平均约 2.5 token/字符
         def simple_token_counter(messages: list[BaseMessage]) -> int:
             total = 0
@@ -378,6 +426,7 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
                 # 粗略估算
                 total += len(content) // 2
             return total
+
         return simple_token_counter
 
     def get_compressed_context(self) -> str:
@@ -387,12 +436,14 @@ class ToolCallCollector(ErrorLoopDetector, BaseCallbackHandler):
             f"消息历史: {len(self.messages)} 条",
         ]
         for tc in self.tool_calls[-5:]:  # 最近 5 次
-            lines.append(f"  [{tc['iteration']}] {tc['tool']}: {tc.get('result', tc.get('error', ''))[:60]}")
+            lines.append(
+                f"  [{tc['iteration']}] {tc['tool']}: {tc.get('result', tc.get('error', ''))[:60]}"
+            )
         return "\n".join(lines)
 
 
-
 # ─── 基础 Explorer ─────────────────────────────────────────────────────────
+
 
 class BaseExplorerAgent:
     """所有探索 Agent 的基类——基于 LangChain create_agent。
@@ -414,7 +465,9 @@ class BaseExplorerAgent:
         self.llm = llm
         self._agent_runnable: Runnable | None = None
 
-    def _get_tools(self, owner: str, repo: str, branch: str, languages: list[str] | None = None) -> list[StructuredTool]:
+    def _get_tools(
+        self, owner: str, repo: str, branch: str, languages: list[str] | None = None
+    ) -> list[StructuredTool]:
         return _get_explorer_tools(owner, repo, branch, languages=languages)
 
     async def explore(
@@ -437,6 +490,7 @@ class BaseExplorerAgent:
             languages: GitHub API 返回的前 N 个语言，用于过滤 get_file_tree 结果
         """
         import time
+
         t0 = time.time()
 
         result = ExplorerResult(explorer_type=self.__class__.__name__)
@@ -444,12 +498,16 @@ class BaseExplorerAgent:
         # 分支修正
         actual_branch = await self._resolve_branch(owner, repo, branch)
         if actual_branch and actual_branch != branch:
-            logger.info(f"[{self.__class__.__name__}] 分支修正: {branch} -> {actual_branch}")
+            logger.info(
+                f"[{self.__class__.__name__}] 分支修正: {branch} -> {actual_branch}"
+            )
             branch = actual_branch
 
         try:
             # 构建任务上下文（优先使用提炼摘要）
-            task_context = self._build_task_context(owner, repo, branch, file_contents, file_summaries)
+            task_context = self._build_task_context(
+                owner, repo, branch, file_contents, file_summaries
+            )
             full_prompt = f"{self.system_prompt}\n\n{task_context}"
 
             # 获取工具（已注入 owner/repo/branch/languages，get_file_tree 结果会被过滤）
@@ -480,7 +538,10 @@ class BaseExplorerAgent:
             try:
                 response = await agent.with_config(run_name=explorer_run_name).ainvoke(
                     {"messages": [HumanMessage(content=task_context)]},
-                    config={"callbacks": [collector], "max_iterations": self.max_iterations},
+                    config={
+                        "callbacks": [collector],
+                        "max_iterations": self.max_iterations,
+                    },
                 )
             except ToolLoopInterrupt as e:
                 logger.warning(
@@ -490,7 +551,7 @@ class BaseExplorerAgent:
                 result.tool_calls = collector.tool_calls
                 result.findings = self._force_reduce_confidence(
                     result.findings,
-                    f"因错误循环提前中断，已完成 {len(collector.tool_calls)} 次工具调用"
+                    f"因错误循环提前中断，已完成 {len(collector.tool_calls)} 次工具调用",
                 )
                 result.error = "explorer_stopped_due_to_error_loop"
                 return result
@@ -505,7 +566,7 @@ class BaseExplorerAgent:
                 result.tool_calls = collector.tool_calls
                 result.findings = self._force_reduce_confidence(
                     result.findings,
-                    f"因错误循环提前终止，只完成 {len(collector.tool_calls)} 次工具调用"
+                    f"因错误循环提前终止，只完成 {len(collector.tool_calls)} 次工具调用",
                 )
                 result.error = "explorer_stopped_due_to_error_loop"
 
@@ -526,7 +587,9 @@ class BaseExplorerAgent:
 
             result.reasoning = self._extract_reasoning(final_text)
             result.findings = self._extract_json(final_text)
-            result.findings = self._anchor_evidence(result.findings, collector.tool_calls)
+            result.findings = self._anchor_evidence(
+                result.findings, collector.tool_calls
+            )
             result.tool_calls = collector.tool_calls
 
             # 如果没有收集到工具调用（LLM 直接返回了结论），强制要求
@@ -537,7 +600,7 @@ class BaseExplorerAgent:
                 )
                 result.findings = self._force_reduce_confidence(
                     result.findings,
-                    f"工具调用不足，只完成 {len(result.tool_calls)}/{self.min_tool_calls}"
+                    f"工具调用不足，只完成 {len(result.tool_calls)}/{self.min_tool_calls}",
                 )
 
         except Exception as e:
@@ -554,10 +617,15 @@ class BaseExplorerAgent:
     # Token 限制配置
     _MAX_CONTEXT_TOKENS = int(os.getenv("EXPLORER_MAX_CONTEXT_TOKENS", "4000"))
     _MAX_SUMMARY_ITEMS = int(os.getenv("EXPLORER_MAX_SUMMARY_ITEMS", "20"))
-    _MAX_CONTEXT_CHARS = int(os.getenv("EXPLORER_MAX_CONTEXT_CHARS", "8000"))  # 硬截断字符数
+    _MAX_CONTEXT_CHARS = int(
+        os.getenv("EXPLORER_MAX_CONTEXT_CHARS", "8000")
+    )  # 硬截断字符数
 
     def _build_task_context(
-        self, owner: str, repo: str, branch: str,
+        self,
+        owner: str,
+        repo: str,
+        branch: str,
         file_contents: dict[str, str] | None = None,
         file_summaries: dict | None = None,
     ) -> str:
@@ -587,7 +655,7 @@ class BaseExplorerAgent:
                 sorted_summaries = sorted(
                     file_summaries.items(),
                     key=lambda x: get_complexity_score(x[1]),
-                    reverse=True
+                    reverse=True,
                 )
                 file_summaries = dict(sorted_summaries[:max_items])
                 parts.append(
@@ -608,9 +676,21 @@ class BaseExplorerAgent:
                 by_purpose[purpose].append(summary)
 
             # 展示摘要（精简版）
-            for purpose in ["main", "config", "api", "service", "model", "test", "util", "middleware", "unknown"]:
+            for purpose in [
+                "main",
+                "config",
+                "api",
+                "service",
+                "model",
+                "test",
+                "util",
+                "middleware",
+                "unknown",
+            ]:
                 if purpose in by_purpose:
-                    parts.append(f"### {purpose.upper()} ({len(by_purpose[purpose])} 个)\n")
+                    parts.append(
+                        f"### {purpose.upper()} ({len(by_purpose[purpose])} 个)\n"
+                    )
                     for summary in by_purpose[purpose][:5]:  # 每个分类最多 5 个
                         path = getattr(summary, "path", "unknown")
                         lang = getattr(summary, "language", "?")
@@ -633,7 +713,15 @@ class BaseExplorerAgent:
                     parts.append("\n")
 
             # 检查是否有配置文件已加载
-            config_files = ["requirements.txt", "pyproject.toml", "package.json", "package-lock.json", "go.mod", "Gemfile", "Cargo.toml"]
+            config_files = [
+                "requirements.txt",
+                "pyproject.toml",
+                "package.json",
+                "package-lock.json",
+                "go.mod",
+                "Gemfile",
+                "Cargo.toml",
+            ]
             has_config = any(
                 any(cfg in path for cfg in config_files)
                 for path in file_summaries.keys()
@@ -648,7 +736,7 @@ class BaseExplorerAgent:
                 "\n📌 **高效行动指南**：\n"
                 "1. **直接分析**：基于文件摘要中的 imports 字段提取依赖信息\n"
                 "2. **快速验证**：如需代码证据，用 batch_search_code 批量搜索关键词\n"
-                f"3. **精简工具调用**：目标 1-2 次工具调用即可给出结论\n"
+                "3. **精简工具调用**：目标 1-2 次工具调用即可给出结论\n"
             )
 
         # ── 回退：使用原始文件内容（已废弃）───────────────────────────────────
@@ -694,7 +782,7 @@ class BaseExplorerAgent:
                 f"[{self.__class__.__name__}] 上下文过长 ({len(result)} chars)，"
                 f"截断至 {self._MAX_CONTEXT_CHARS} chars"
             )
-            result = result[:self._MAX_CONTEXT_CHARS] + "\n\n[⚠️ 上下文已截断]"
+            result = result[: self._MAX_CONTEXT_CHARS] + "\n\n[⚠️ 上下文已截断]"
         return result
 
     def _extract_reasoning(self, text: str) -> str:
@@ -768,7 +856,10 @@ class BaseExplorerAgent:
                     fw["status"] = "partially_verified"
                     fw["unverified_evidence"] = unverified
 
-        if findings.get("overall_confidence") and len(tool_calls_log) < _EXPLORER_MIN_TOOL_CALLS:
+        if (
+            findings.get("overall_confidence")
+            and len(tool_calls_log) < _EXPLORER_MIN_TOOL_CALLS
+        ):
             findings["overall_confidence"] = round(
                 findings.get("overall_confidence", 1.0) * 0.5, 2
             )
@@ -778,7 +869,9 @@ class BaseExplorerAgent:
 
         return findings
 
-    def _verify_evidence(self, evidence: str, tool_results: dict[str, list[str]]) -> bool:
+    def _verify_evidence(
+        self, evidence: str, tool_results: dict[str, list[str]]
+    ) -> bool:
         if not evidence or not tool_results:
             return False
         evidence_lower = evidence.lower()
@@ -823,6 +916,7 @@ class BaseExplorerAgent:
             return branch
         try:
             from tools.github_tools import _get_default_branch_impl
+
             result = await _get_default_branch_impl(owner, repo)
             return result if result else "main"
         except Exception as e:
@@ -831,6 +925,7 @@ class BaseExplorerAgent:
 
 
 # ─── 具体 Explorer ───────────────────────────────────────────────────────────
+
 
 class TechStackExplorer(BaseExplorerAgent):
     def __init__(self, llm: BaseChatModel):
@@ -855,6 +950,7 @@ class ArchitectureExplorer(BaseExplorerAgent):
 
 # ─── 编排器 ────────────────────────────────────────────────────────────────
 
+
 class ExplorerOrchestrator:
     """并行探索编排器。
 
@@ -863,9 +959,14 @@ class ExplorerOrchestrator:
 
     def __init__(self):
         from utils.llm_factory import get_llm_with_tracking
-        self.llm = get_llm_with_tracking(agent_name="Explorer", max_tokens=_MAX_OUTPUT_TOKENS)
+
+        self.llm = get_llm_with_tracking(
+            agent_name="Explorer", max_tokens=_MAX_OUTPUT_TOKENS
+        )
         if self.llm is None:
-            raise RuntimeError("LLM 不可用，请确保 OPENAI_API_KEY 或 ANTHROPIC_API_KEY 已配置。")
+            raise RuntimeError(
+                "LLM 不可用，请确保 OPENAI_API_KEY 或 ANTHROPIC_API_KEY 已配置。"
+            )
 
     async def explore_all(
         self,
@@ -886,7 +987,9 @@ class ExplorerOrchestrator:
             file_summaries: 提炼后的文件摘要（推荐，大幅减少 token）
             languages: GitHub API 返回的前 N 个语言，用于过滤 get_file_tree 结果
         """
-        logger.info(f"[ExplorerOrchestrator] 开始并行探索: {owner}/{repo}, summaries={len(file_summaries) if file_summaries else 0}, languages={languages}")
+        logger.info(
+            f"[ExplorerOrchestrator] 开始并行探索: {owner}/{repo}, summaries={len(file_summaries) if file_summaries else 0}, languages={languages}"
+        )
 
         explorers = [
             TechStackExplorer(self.llm),
@@ -895,7 +998,9 @@ class ExplorerOrchestrator:
         ]
 
         tasks = [
-            _safe_explore(explorer, owner, repo, branch, file_contents, file_summaries, languages)
+            _safe_explore(
+                explorer, owner, repo, branch, file_contents, file_summaries, languages
+            )
             for explorer in explorers
         ]
 
@@ -928,14 +1033,20 @@ class ExplorerOrchestrator:
 
 async def _safe_explore(
     explorer: BaseExplorerAgent,
-    owner: str, repo: str, branch: str,
+    owner: str,
+    repo: str,
+    branch: str,
     file_contents: dict[str, str] | None,
     file_summaries: dict | None,
     languages: list[str] | None,
 ) -> ExplorerResult:
     """执行单个 Explorer，捕获所有异常确保 orchestrator 不崩溃。"""
     try:
-        return await explorer.explore(owner, repo, branch, file_contents, file_summaries, languages=languages)
+        return await explorer.explore(
+            owner, repo, branch, file_contents, file_summaries, languages=languages
+        )
     except Exception as e:
-        logger.error(f"[{explorer.__class__.__name__}] explore 异常: {e}", exc_info=True)
+        logger.error(
+            f"[{explorer.__class__.__name__}] explore 异常: {e}", exc_info=True
+        )
         return ExplorerResult(explorer_type=explorer.__class__.__name__, error=str(e))

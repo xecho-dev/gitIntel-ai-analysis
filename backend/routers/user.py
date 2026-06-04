@@ -2,6 +2,7 @@
 用户资料相关路由 (/api/user)
 用户资料查询和更新
 """
+
 from fastapi import APIRouter, Request
 
 from dependencies import get_auth_user_id, get_sb_client

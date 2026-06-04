@@ -2,6 +2,7 @@
 历史记录相关路由 (/api/history)
 用户的分析历史 CRUD 操作
 """
+
 from fastapi import APIRouter, Query, Request, HTTPException
 
 from dependencies import get_auth_user_id, get_sb_client
@@ -36,8 +37,14 @@ async def api_save_analysis(req: SaveAnalysisRequest, request: Request):
             detail="用户资料未同步，请先在账户中心完成 GitHub 资料同步后再保存。",
         )
 
-    result = save_analysis(sb, auth_user_id, req.repo_url, req.branch, req.result_data,
-                           thread_id=f"{req.repo_url}::{req.branch}")
+    result = save_analysis(
+        sb,
+        auth_user_id,
+        req.repo_url,
+        req.branch,
+        req.result_data,
+        thread_id=f"{req.repo_url}::{req.branch}",
+    )
     return {"id": result.id, "created_at": result.created_at}
 
 

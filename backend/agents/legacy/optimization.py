@@ -8,6 +8,7 @@
   - suggestions: Suggestion[]
   其中 Suggestion: { id, type, title, description, priority }
 """
+
 from typing import AsyncGenerator
 
 from .base_agent import AgentEvent, _make_event
@@ -41,10 +42,7 @@ class OptimizationAgent(SuggestionAgent):
         内部委托给 SuggestionAgent，将返回的 suggestion 结果映射为
         前端期望的 OptimizationResult 格式。
         """
-        yield _make_event(
-            self.name, "status",
-            "正在生成优化建议…", 10, None
-        )
+        yield _make_event(self.name, "status", "正在生成优化建议…", 10, None)
 
         # 委托给 SuggestionAgent
         async for event in SuggestionAgent.stream(
@@ -70,17 +68,14 @@ class OptimizationAgent(SuggestionAgent):
                         "title": s.get("title", ""),
                         "description": s.get("description", ""),
                         "priority": s.get("priority", "medium"),
-                        **(
-                            {"code_fix": s["code_fix"]}
-                            if s.get("code_fix")
-                            else {}
-                        ),
+                        **({"code_fix": s["code_fix"]} if s.get("code_fix") else {}),
                     }
                     for s in suggestions
                 ]
 
                 yield _make_event(
-                    self.name, "result",
+                    self.name,
+                    "result",
                     event.get("message") or "优化建议生成完成",
                     100,
                     {

@@ -8,7 +8,6 @@ Retriever — 多策略检索层。
   4. 按意图/类别过滤
 """
 
-import json
 import logging
 from typing import Optional
 
@@ -18,6 +17,7 @@ _logger = logging.getLogger("gitintel")
 
 
 # ─── Retriever ──────────────────────────────────────────────────────────
+
 
 class MultiStrategyRetriever:
     """
@@ -146,7 +146,8 @@ class MultiStrategyRetriever:
 
         # 提取查询关键词
         import re
-        words = re.split(r'[\s,，。.、]+', query.lower())
+
+        words = re.split(r"[\s,，。.、]+", query.lower())
         words = [w for w in words if len(w) >= 2]
 
         filtered_results = []

@@ -1,4 +1,5 @@
 """代码解析工具 — 提取文件结构信息（语言检测、类/函数/导入解析）。"""
+
 import re
 from dataclasses import dataclass, field
 
@@ -7,26 +8,57 @@ from dataclasses import dataclass, field
 
 EXT_TO_LANGUAGE: dict[str, str] = {
     # JavaScript/TypeScript 生态
-    "js": "javascript", "jsx": "javascript", "mjs": "javascript",
-    "ts": "typescript", "tsx": "tsx", "mts": "typescript",
-    "vue": "vue", "svelte": "svelte",
+    "js": "javascript",
+    "jsx": "javascript",
+    "mjs": "javascript",
+    "ts": "typescript",
+    "tsx": "tsx",
+    "mts": "typescript",
+    "vue": "vue",
+    "svelte": "svelte",
     # Python 生态
-    "py": "python", "pyw": "python", "pyx": "python",
+    "py": "python",
+    "pyw": "python",
+    "pyx": "python",
     # 后端语言
-    "go": "go", "rs": "rust", "java": "java", "kt": "kotlin",
-    "scala": "scala", "rb": "ruby", "php": "php",
+    "go": "go",
+    "rs": "rust",
+    "java": "java",
+    "kt": "kotlin",
+    "scala": "scala",
+    "rb": "ruby",
+    "php": "php",
     # 前端/样式
-    "css": "css", "scss": "css", "sass": "css", "less": "css",
-    "html": "html", "htm": "html",
+    "css": "css",
+    "scss": "css",
+    "sass": "css",
+    "less": "css",
+    "html": "html",
+    "htm": "html",
     # 配置/数据
-    "json": "json", "yaml": "yaml", "yml": "yaml", "toml": "toml",
-    "xml": "xml", "md": "markdown", "mdx": "markdown",
+    "json": "json",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "toml": "toml",
+    "xml": "xml",
+    "md": "markdown",
+    "mdx": "markdown",
     # 低级语言
-    "c": "c", "cpp": "cpp", "cc": "cpp", "cxx": "cpp", "h": "c", "hpp": "cpp",
-    "swift": "swift", "cs": "csharp", "dart": "dart",
+    "c": "c",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "h": "c",
+    "hpp": "cpp",
+    "swift": "swift",
+    "cs": "csharp",
+    "dart": "dart",
     # Shell/脚本
-    "sh": "shell", "bash": "shell", "zsh": "shell",
-    "sql": "sql", "r": "r",
+    "sh": "shell",
+    "bash": "shell",
+    "zsh": "shell",
+    "sql": "sql",
+    "r": "r",
 }
 
 # 函数定义关键词
@@ -52,14 +84,48 @@ FUNC_KEYWORDS: dict[str, list[str]] = {
 # 语言特征检测规则
 LANGUAGE_CONTENT_SIGNATURES: list[tuple[str, list[str]]] = [
     ("vue", ["<template", "<script", "<style", "export default", "new Vue("]),
-    ("javascript", ["const ", "let ", "var ", "function ", "=>", "require(", "module.exports", "import "]),
-    ("typescript", [": string", ": number", ": boolean", "interface ", "type ", "<T>", "as const"]),
-    ("python", ["def ", "import ", "from ", "class ", "if __name__", "print(", "self."]),
-    ("go", ["func ", "package ", "import (", 'fmt.', " := ", "go func", "defer "]),
+    (
+        "javascript",
+        [
+            "const ",
+            "let ",
+            "var ",
+            "function ",
+            "=>",
+            "require(",
+            "module.exports",
+            "import ",
+        ],
+    ),
+    (
+        "typescript",
+        [": string", ": number", ": boolean", "interface ", "type ", "<T>", "as const"],
+    ),
+    (
+        "python",
+        ["def ", "import ", "from ", "class ", "if __name__", "print(", "self."],
+    ),
+    ("go", ["func ", "package ", "import (", "fmt.", " := ", "go func", "defer "]),
     ("rust", ["fn ", "let ", "mut ", "impl ", "pub ", "use ", "mod ", "-> ", "::"]),
-    ("java", ["public class", "private ", "protected ", "System.out.", "void ", "import java."]),
-    ("html", ["<!DOCTYPE", "<html", "<head", "<body", "<div", "<span", "<script", "<style"]),
-    ("css", ["{", "}", "color:", "background:", "margin:", "padding:", "@media", ".class"]),
+    (
+        "java",
+        [
+            "public class",
+            "private ",
+            "protected ",
+            "System.out.",
+            "void ",
+            "import java.",
+        ],
+    ),
+    (
+        "html",
+        ["<!DOCTYPE", "<html", "<head", "<body", "<div", "<span", "<script", "<style"],
+    ),
+    (
+        "css",
+        ["{", "}", "color:", "background:", "margin:", "padding:", "@media", ".class"],
+    ),
     ("json", ['{"', '"}', '": ', "[]"]),
     ("shell", ["#!/bin/", "echo ", "export ", "if [", "fi", "done", "source "]),
     ("sql", ["SELECT ", "FROM ", "WHERE ", "INSERT INTO", "UPDATE ", "DELETE FROM"]),
@@ -68,12 +134,16 @@ LANGUAGE_CONTENT_SIGNATURES: list[tuple[str, list[str]]] = [
 
 # ─── 文件摘要结构 ─────────────────────────────────────────────────────────────
 
+
 @dataclass
 class FileSummary:
     """文件提炼摘要 - 包含关键结构信息，不含完整代码"""
+
     path: str
     language: str
-    purpose: str = "unknown"  # test/config/model/api/service/util/main/component/middleware
+    purpose: str = (
+        "unknown"  # test/config/model/api/service/util/main/component/middleware
+    )
     lines: int = 0
     classes: list[str] = field(default_factory=list)
     functions: list[str] = field(default_factory=list)
@@ -83,6 +153,7 @@ class FileSummary:
 
 
 # ─── 工具函数 ────────────────────────────────────────────────────────────────
+
 
 def get_extension_language(path: str) -> str:
     """根据文件扩展名返回语言名称。"""
@@ -147,13 +218,13 @@ def extract_from_vue(content: str) -> tuple[str, list[str], list[str]]:
     Returns:
         (script_content, imports, functions)
     """
-    vue_script_re = re.compile(r'<script[^>]*>(.*?)</script>', re.S)
+    vue_script_re = re.compile(r"<script[^>]*>(.*?)</script>", re.S)
     script_match = vue_script_re.search(content)
     script_content = script_match.group(1) if script_match else ""
 
     imports, functions = [], []
 
-    for line in script_content.split('\n'):
+    for line in script_content.split("\n"):
         line = line.strip()
 
         # import 语句
@@ -167,7 +238,7 @@ def extract_from_vue(content: str) -> tuple[str, list[str], list[str]]:
 
         # export default { ... } 形式
         if line.startswith("export default {"):
-            for sub in script_content.split('\n'):
+            for sub in script_content.split("\n"):
                 sub = sub.strip()
                 if "methods:" in sub or "data()" in sub:
                     break
@@ -178,7 +249,7 @@ def extract_from_vue(content: str) -> tuple[str, list[str], list[str]]:
         # methods: { ... } 形式
         elif "methods:" in line or line.startswith("methods = {"):
             brace_count = 0
-            for sub in script_content.split('\n'):
+            for sub in script_content.split("\n"):
                 sub = sub.strip()
                 if "}" in sub:
                     brace_count -= 1
@@ -196,10 +267,43 @@ def extract_from_vue(content: str) -> tuple[str, list[str], list[str]]:
 def infer_file_purpose(content: str, is_vue: bool, language: str) -> str:
     """推断文件用途。"""
     purpose_indicators = {
-        "test": ["test_", "_test.py", "test(", ".test.", "describe(", "it(", "@test", ".spec."],
-        "config": ["config", "settings", ".env", "settings.py", "config.py", "application.yml", "vue.config"],
-        "model": ["model", "schema", "entity", "class Model", "class Entity", "interface State"],
-        "api": ["route", "/api", "endpoint", "router", "@app.", "app.get", "app.post", "routes"],
+        "test": [
+            "test_",
+            "_test.py",
+            "test(",
+            ".test.",
+            "describe(",
+            "it(",
+            "@test",
+            ".spec.",
+        ],
+        "config": [
+            "config",
+            "settings",
+            ".env",
+            "settings.py",
+            "config.py",
+            "application.yml",
+            "vue.config",
+        ],
+        "model": [
+            "model",
+            "schema",
+            "entity",
+            "class Model",
+            "class Entity",
+            "interface State",
+        ],
+        "api": [
+            "route",
+            "/api",
+            "endpoint",
+            "router",
+            "@app.",
+            "app.get",
+            "app.post",
+            "routes",
+        ],
         "service": ["service", "Service", "business", "usecase"],
         "util": ["util", "helper", "tool", "common", "utils", "compose"],
         "main": ["def main(", "if __name__", "app =", "create_app", "new Vue("],
@@ -255,7 +359,9 @@ def extract_code_entities(
         script_start = content.find("<script")
         scan_start = len(content[:script_start].split("\n"))
 
-    for line in lines[scan_start:scan_start + 150] if scan_start < len(lines) else lines[:150]:
+    for line in (
+        lines[scan_start : scan_start + 150] if scan_start < len(lines) else lines[:150]
+    ):
         for kw in func_kws:
             if line.strip().startswith(kw):
                 m = re.search(r"(?:async\s+)?(?:def|function|fn|func)\s+(\w+)", line)
@@ -274,7 +380,9 @@ def extract_code_entities(
     }
     kw_list = import_kws.get(language, ["import "])
 
-    for line in lines[scan_start:scan_start + 80] if scan_start < len(lines) else lines[:80]:
+    for line in (
+        lines[scan_start : scan_start + 80] if scan_start < len(lines) else lines[:80]
+    ):
         for kw in kw_list:
             if line.strip().startswith(kw) and len(imports) < 20:
                 if language == "python":
@@ -306,13 +414,19 @@ def build_key_insight(classes: list, functions: list, imports: list) -> str:
         insight = f"包含 {len(functions)} 个方法: {', '.join(functions[:5])}"
 
     if imports:
-        external = [i for i in imports if not i.startswith('.') and not i.startswith('@/')]
+        external = [
+            i for i in imports if not i.startswith(".") and not i.startswith("@/")
+        ]
         if external:
             suffix = f"，依赖: {', '.join(external[:5])}"
-            insight = (insight + suffix) if insight else f"依赖: {', '.join(external[:5])}"
+            insight = (
+                (insight + suffix) if insight else f"依赖: {', '.join(external[:5])}"
+            )
         elif imports:
             suffix = f"，引入: {', '.join(imports[:3])}"
-            insight = (insight + suffix) if insight else f"引入: {', '.join(imports[:3])}"
+            insight = (
+                (insight + suffix) if insight else f"引入: {', '.join(imports[:3])}"
+            )
 
     return insight
 
@@ -359,4 +473,6 @@ def summarize_file(path: str, content: str) -> FileSummary:
 
 def summarize_files(loaded_files: dict[str, str]) -> dict[str, FileSummary]:
     """批量提炼多个文件的结构化摘要。"""
-    return {path: summarize_file(path, content) for path, content in loaded_files.items()}
+    return {
+        path: summarize_file(path, content) for path, content in loaded_files.items()
+    }

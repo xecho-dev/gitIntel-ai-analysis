@@ -1,6 +1,7 @@
 """
 路由汇总
 """
+
 from .analysis import router as analysis_router
 from .history import router as history_router
 from .user import router as user_router

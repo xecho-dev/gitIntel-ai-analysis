@@ -2,6 +2,7 @@
 Chat 相关路由 (/api/chat)
 标准 RAG Pipeline（SSE 流式）
 """
+
 import json
 import logging
 from typing import AsyncGenerator
@@ -35,7 +36,9 @@ async def api_create_chat_session(body: CreateSessionRequest, request: Request):
 
     user_uuid = get_user_uuid(sb, auth_user_id)
     if not user_uuid:
-        raise HTTPException(status_code=400, detail="用户未完善 GitHub 资料，请先访问账户页")
+        raise HTTPException(
+            status_code=400, detail="用户未完善 GitHub 资料，请先访问账户页"
+        )
 
     session = create_chat_session(sb, str(user_uuid), body.title)
     return {
@@ -58,7 +61,12 @@ async def api_list_chat_sessions(request: Request):
     sessions = get_chat_sessions(sb, str(user_uuid))
     return {
         "items": [
-            {"id": s.id, "title": s.title, "created_at": s.created_at, "updated_at": s.updated_at}
+            {
+                "id": s.id,
+                "title": s.title,
+                "created_at": s.created_at,
+                "updated_at": s.updated_at,
+            }
             for s in sessions
         ],
         "total": len(sessions),
@@ -128,7 +136,7 @@ async def api_send_message(body: SendMessageRequest, request: Request):
     async def event_stream() -> AsyncGenerator[str, None]:
         nonlocal collected_answer, collected_sources, collected_intent, assistant_msg_id
 
-        yield "data: {\"type\": \"connected\", \"message\": \"正在连接...\", \"percent\": 0}\n\n"
+        yield 'data: {"type": "connected", "message": "正在连接...", "percent": 0}\n\n'
 
         try:
             async for event in pipeline.chat(body.content):
@@ -148,7 +156,9 @@ async def api_send_message(body: SendMessageRequest, request: Request):
                         data = json.loads(raw)
                         t = data.get("type", "")
                         if t == "done":
-                            collected_answer = data.get("answer") or data.get("full_text") or ""
+                            collected_answer = (
+                                data.get("answer") or data.get("full_text") or ""
+                            )
                             collected_sources = data.get("sources", [])
                             collected_intent = data.get("intent", "")
                         elif t == "token":
@@ -161,30 +171,48 @@ async def api_send_message(body: SendMessageRequest, request: Request):
         except Exception as exc:
             logger.error(f"[/api/chat/send] RAG Pipeline 流异常: {exc}")
             import traceback
+
             logger.error(traceback.format_exc())
-            yield "data: " + json.dumps({
-                "type": "error",
-                "message": f"处理异常: {str(exc)}",
-            }, ensure_ascii=False) + "\n\n"
+            yield (
+                "data: "
+                + json.dumps(
+                    {
+                        "type": "error",
+                        "message": f"处理异常: {str(exc)}",
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n\n"
+            )
 
         # 保存 Assistant 消息
         if collected_answer:
             try:
                 assistant_msg = save_chat_message(
-                    sb, body.session_id, "assistant", collected_answer,
+                    sb,
+                    body.session_id,
+                    "assistant",
+                    collected_answer,
                     rag_context=collected_sources,
                 )
                 assistant_msg_id = str(assistant_msg.id)
             except Exception as save_err:
                 logger.error(f"[/api/chat/send] 保存消息失败: {save_err}")
 
-        yield "data: " + json.dumps({
-            "type": "done",
-            "message_id": assistant_msg_id,
-            "answer": collected_answer,
-            "sources": collected_sources,
-            "intent": collected_intent,
-        }, ensure_ascii=False) + "\n\n"
+        yield (
+            "data: "
+            + json.dumps(
+                {
+                    "type": "done",
+                    "message_id": assistant_msg_id,
+                    "answer": collected_answer,
+                    "sources": collected_sources,
+                    "intent": collected_intent,
+                },
+                ensure_ascii=False,
+            )
+            + "\n\n"
+        )
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(

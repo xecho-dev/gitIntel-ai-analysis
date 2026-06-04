@@ -12,7 +12,7 @@ import logging
 from typing import AsyncGenerator, Optional, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from memory.multi_memory import MultiLayerMemory
+    pass
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -32,7 +32,6 @@ SYSTEM_PROMPTS: dict[str, str] = {
 3. 引用时标注【1】【2】等来源编号
 4. 保持客观、准确、简洁
 5. 使用 markdown 格式化回答""",
-
     "analytical": """你是 GitIntel 的技术分析助手，专门帮助用户深入分析代码仓库的架构、质量和优化方向。
 
 你的职责是结合参考资料，提供深入的技术洞见和分析。
@@ -43,7 +42,6 @@ SYSTEM_PROMPTS: dict[str, str] = {
 3. 指出潜在问题和建议
 4. 结构化输出，使用标题和列表
 5. 适当引用参考资料【1】【2】等""",
-
     "conversational": """你是 GitIntel 的友好 AI 助手。你具有多轮对话记忆能力。
 
 你的职责是结合【多层记忆上下文】中的对话历史和参考资料，自然地回答用户问题，让交互更加友好和高效。
@@ -55,7 +53,6 @@ SYSTEM_PROMPTS: dict[str, str] = {
 4. 如果记忆中没有相关信息，再结合参考资料或通用知识
 5. 引导用户深入提问
 6. 保持简洁有趣""",
-
     "conversational_fast": """你是 GitIntel 的友好 AI 助手，支持多轮对话。
 
 你的职责是用口语化、友好的方式快速回答用户问题。
@@ -67,7 +64,6 @@ SYSTEM_PROMPTS: dict[str, str] = {
 4. 如果涉及 GitIntel 功能使用，简明扼要指引用户
 5. 不要啰嗦，控制回答长度
 6. 不需要引用参考资料，直接回答即可""",
-
     "code_related": """你是 GitIntel 的代码分析助手，专门帮助用户分析、理解和优化代码。
 
 你的职责是分析用户关于代码的问题，提供专业的代码级建议。
@@ -163,6 +159,7 @@ def _format_fast_path_memory(
 
 # ─── Generator ──────────────────────────────────────────────────────────
 
+
 class RAGGenerator:
     """
     RAG 生成器，使用 MultiLayerMemory 提供多轮对话记忆。
@@ -199,7 +196,9 @@ class RAGGenerator:
 
         if fast_path:
             # 快速路径：使用精简的 prompt，memory 格式化为自然对话风格
-            system_prompt = SYSTEM_PROMPTS.get("conversational_fast", SYSTEM_PROMPTS["conversational"])
+            system_prompt = SYSTEM_PROMPTS.get(
+                "conversational_fast", SYSTEM_PROMPTS["conversational"]
+            )
             messages.append(SystemMessage(content=system_prompt))
 
             # 格式化为自然对话风格后再注入
@@ -210,7 +209,11 @@ class RAGGenerator:
                     profile=memory_layers.get("profile", ""),
                 )
                 if memory_text:
-                    messages.append(HumanMessage(content=f"【以下是我们之前的对话记忆，请参考】\n{memory_text}\n\n用户问题：{query}"))
+                    messages.append(
+                        HumanMessage(
+                            content=f"【以下是我们之前的对话记忆，请参考】\n{memory_text}\n\n用户问题：{query}"
+                        )
+                    )
                 else:
                     messages.append(HumanMessage(content=query))
             else:
@@ -263,7 +266,9 @@ class RAGGenerator:
         from utils.llm_factory import get_llm_with_tracking
 
         # 快速路径使用更高温度，获得更自然的对话风格
-        effective_temperature = temperature if temperature is not None else self.temperature
+        effective_temperature = (
+            temperature if temperature is not None else self.temperature
+        )
         if fast_path:
             effective_temperature = 0.5
 
@@ -294,7 +299,9 @@ class RAGGenerator:
                     full_text += token
                     yield (token, full_text)
 
-            estimated_output = len(full_text) * (2 if full_text and ord(full_text[0]) > 127 else 0.25)
+            estimated_output = len(full_text) * (
+                2 if full_text and ord(full_text[0]) > 127 else 0.25
+            )
             _logger.info(
                 f"[Generator] 生成完成，output_chars={len(full_text)}, "
                 f"est_tokens≈{int(estimated_output)}"

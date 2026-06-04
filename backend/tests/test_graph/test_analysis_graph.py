@@ -1,7 +1,6 @@
 """Tests for analysis_graph — LangGraph workflow and SSE streaming (ReAct 纯模式)."""
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 from graph.analysis_graph import (
     build_initial_state,
@@ -18,24 +17,30 @@ from graph.state import SharedState
 class TestParseUrl:
     """Tests for the parse_repo_url helper function."""
 
-    @pytest.mark.parametrize("url,expected", [
-        ("https://github.com/owner/repo", ("owner", "repo")),
-        ("https://github.com/owner/repo.git", ("owner", "repo")),
-        ("git@github.com:owner/repo.git", ("owner", "repo")),
-        ("git@github.com:owner/repo", ("owner", "repo")),
-        ("owner/repo", ("owner", "repo")),
-        ("https://github.com/org-name/project-name", ("org-name", "project-name")),
-    ])
+    @pytest.mark.parametrize(
+        "url,expected",
+        [
+            ("https://github.com/owner/repo", ("owner", "repo")),
+            ("https://github.com/owner/repo.git", ("owner", "repo")),
+            ("git@github.com:owner/repo.git", ("owner", "repo")),
+            ("git@github.com:owner/repo", ("owner", "repo")),
+            ("owner/repo", ("owner", "repo")),
+            ("https://github.com/org-name/project-name", ("org-name", "project-name")),
+        ],
+    )
     def test_parse_url_valid(self, url, expected):
         assert parse_repo_url(url) == expected
 
-    @pytest.mark.parametrize("url", [
-        "",
-        "not-a-url",
-        "https://gitlab.com/owner/repo",
-        "https://github.com/",
-        "https://github.com/owner",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "",
+            "not-a-url",
+            "https://gitlab.com/owner/repo",
+            "https://github.com/",
+            "https://github.com/owner",
+        ],
+    )
     def test_parse_url_invalid(self, url):
         assert parse_repo_url(url) is None
 
@@ -122,6 +127,7 @@ class TestBuildGraph:
     def test_build_graph_compiles_without_error(self):
         """The module-level _workflow should compile successfully."""
         from graph.analysis_graph import _workflow
+
         assert _workflow is not None
 
     def test_build_graph_has_expected_nodes(self):

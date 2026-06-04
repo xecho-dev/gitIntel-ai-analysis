@@ -16,8 +16,8 @@ ErrorLoopDetector — 错误循环检测 Mixin，防止 Agent 在同一错误上
         #     if self._stop_due_to_loop:
         #         self._propagate_interrupt()
 """
+
 import logging
-from typing import Any
 
 logger = logging.getLogger("gitintel")
 
@@ -80,7 +80,10 @@ class ErrorLoopDetector:
             pattern = output[:50].strip()
             if pattern == self._last_error_pattern:
                 self._consecutive_same_error_count += 1
-                if self._consecutive_same_error_count >= self.MAX_CONSECUTIVE_SAME_ERRORS:
+                if (
+                    self._consecutive_same_error_count
+                    >= self.MAX_CONSECUTIVE_SAME_ERRORS
+                ):
                     logger.warning(
                         f"[ErrorLoopDetector] 检测到错误循环: "
                         f"连续 {self._consecutive_same_error_count} 次相同错误 "

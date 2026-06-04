@@ -13,6 +13,7 @@
     if stats:
         print(stats.total_tokens, stats.total_cost_usd)
 """
+
 import os
 import json
 import logging
@@ -124,6 +125,7 @@ def _parse_run(run, base_url: str, project_name: str) -> Optional[LangSmithRun]:
         if start and end:
             try:
                 from datetime import datetime as dt
+
                 if isinstance(start, str):
                     start = dt.fromisoformat(start.replace("Z", "+00:00"))
                 if isinstance(end, str):
@@ -158,6 +160,7 @@ def _get_client():
         return None
     try:
         from langsmith import Client
+
         endpoint = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
         return Client(api_key=api_key, api_url=endpoint)
     except ImportError:
@@ -195,7 +198,9 @@ def get_langsmith_stats(
         return None
 
     project_name = os.getenv("LANGSMITH_PROJECT", "default")
-    base_url = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com").rstrip("/")
+    base_url = os.getenv(
+        "LANGSMITH_ENDPOINT", "https://api.smith.langchain.com"
+    ).rstrip("/")
 
     runs = []
     run_ids_seen = set()
@@ -204,12 +209,18 @@ def get_langsmith_stats(
     if trace_id:
         try:
             filter_str = f'{{"trace_id": "{trace_id}"}}'
-            candidate_runs = list(client.list_runs(
-                project_name=project_name,
-                filter=filter_str,
-                limit=200,
-            ))
-            runs = [r for r in candidate_runs if r.id not in run_ids_seen and not run_ids_seen.add(r.id)]
+            candidate_runs = list(
+                client.list_runs(
+                    project_name=project_name,
+                    filter=filter_str,
+                    limit=200,
+                )
+            )
+            runs = [
+                r
+                for r in candidate_runs
+                if r.id not in run_ids_seen and not run_ids_seen.add(r.id)
+            ]
             _logger.info(f"[LangSmith] trace_id={trace_id} 找到 {len(runs)} 个 runs")
         except Exception as e:
             _logger.warning(f"[LangSmith] trace_id 查询失败: {e}")
@@ -218,12 +229,18 @@ def get_langsmith_stats(
     if not runs and thread_id:
         try:
             filter_str = f'{{"thread_id": "{thread_id}"}}'
-            candidate_runs = list(client.list_runs(
-                project_name=project_name,
-                filter=filter_str,
-                limit=200,
-            ))
-            runs = [r for r in candidate_runs if r.id not in run_ids_seen and not run_ids_seen.add(r.id)]
+            candidate_runs = list(
+                client.list_runs(
+                    project_name=project_name,
+                    filter=filter_str,
+                    limit=200,
+                )
+            )
+            runs = [
+                r
+                for r in candidate_runs
+                if r.id not in run_ids_seen and not run_ids_seen.add(r.id)
+            ]
             _logger.info(f"[LangSmith] thread_id={thread_id} 找到 {len(runs)} 个 runs")
         except Exception as e:
             _logger.warning(f"[LangSmith] thread_id 查询失败: {e}")
@@ -232,18 +249,25 @@ def get_langsmith_stats(
     if not runs and created_at:
         try:
             from datetime import datetime as dt, timedelta
+
             created_dt = dt.fromisoformat(created_at.replace("Z", "+00:00"))
             start_window = (created_dt - timedelta(minutes=15)).isoformat()
             end_window = (created_dt + timedelta(minutes=15)).isoformat()
-            filter_str = json.dumps({
-                "start_time": {"$gte": start_window, "$lte": end_window}
-            })
-            candidate_runs = list(client.list_runs(
-                project_name=project_name,
-                filter=filter_str,
-                limit=300,
-            ))
-            runs = [r for r in candidate_runs if r.id not in run_ids_seen and not run_ids_seen.add(r.id)]
+            filter_str = json.dumps(
+                {"start_time": {"$gte": start_window, "$lte": end_window}}
+            )
+            candidate_runs = list(
+                client.list_runs(
+                    project_name=project_name,
+                    filter=filter_str,
+                    limit=300,
+                )
+            )
+            runs = [
+                r
+                for r in candidate_runs
+                if r.id not in run_ids_seen and not run_ids_seen.add(r.id)
+            ]
             _logger.info(f"[LangSmith] 时间窗口查到 {len(runs)} 个 runs")
         except Exception as e:
             _logger.warning(f"[LangSmith] 时间窗口查询失败: {e}")

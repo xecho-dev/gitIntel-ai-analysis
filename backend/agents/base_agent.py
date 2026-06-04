@@ -7,13 +7,14 @@ BaseAgent — 所有 Agent 的基类，定义统一接口和事件规范。
   - _make_event() 辅助函数用于构造标准 AgentEvent TypedDict
   - _calc_complexity / _calc_maintainability 是通用评分工具，供子类复用
 """
+
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, TypedDict
 
 
 class AgentEvent(TypedDict):
-    type: str       # "status" | "progress" | "result" | "error"
-    agent: str      # agent name
+    type: str  # "status" | "progress" | "result" | "error"
+    agent: str  # agent name
     message: str | None
     percent: int | None
     data: dict | None
@@ -62,7 +63,9 @@ class BaseAgent(ABC):
         子类可以传递任意额外参数（会被转发给 stream()）。
         """
         result = None
-        async for event in self.stream(repo_path, branch, file_contents=file_contents, **kwargs):
+        async for event in self.stream(
+            repo_path, branch, file_contents=file_contents, **kwargs
+        ):
             if event["type"] == "result":
                 result = event["data"]
         return result or {}

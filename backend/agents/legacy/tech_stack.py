@@ -1,9 +1,9 @@
 """TechStackAgent — 深度识别项目技术栈，解析 package.json / requirements.txt 等配置文件。"""
+
 import asyncio
 import json
 import os
 import re
-from pathlib import Path
 from typing import AsyncGenerator
 
 from .base_agent import AgentEvent, BaseAgent, _make_event
@@ -112,8 +112,11 @@ class TechStackAgent(BaseAgent):
             return
 
         yield _make_event(
-            self.name, "progress",
-            f"发现 {len(configs)} 个配置文件，开始解析…", 40, None
+            self.name,
+            "progress",
+            f"发现 {len(configs)} 个配置文件，开始解析…",
+            40,
+            None,
         )
 
         try:
@@ -122,27 +125,54 @@ class TechStackAgent(BaseAgent):
             yield _make_event(self.name, "error", f"配置解析失败: {exc}", 0, None)
             return
 
-        yield _make_event(self.name, "progress", "技术栈分析完成，正在生成报告…", 80, None)
+        yield _make_event(
+            self.name, "progress", "技术栈分析完成，正在生成报告…", 80, None
+        )
 
         yield _make_event(self.name, "result", "技术栈识别完成", 100, analysis)
 
     # ─── 内部实现 ───────────────────────────────────────────────
 
     @staticmethod
-    async def _collect_configs_from_memory(file_contents: dict[str, str]) -> dict[str, dict]:
+    async def _collect_configs_from_memory(
+        file_contents: dict[str, str],
+    ) -> dict[str, dict]:
         """从内存字典中收集配置文件（GitHub API 模式）。"""
-        CONFIG_FILES = frozenset({
-            "package.json", "package-lock.json", "pnpm-lock.yaml",
-            "requirements.txt", "requirements-dev.txt", "Pipfile", "pyproject.toml",
-            "Cargo.toml", "go.mod", "Gemfile", "composer.json",
-            "pom.xml", "build.gradle", "build.gradle.kts",
-            "docker-compose.yml", "docker-compose.yaml",
-            "Dockerfile", "Makefile", "tox.ini", "setup.cfg",
-            "tsconfig.json", "vite.config.ts", "vite.config.js",
-            "next.config.js", "next.config.ts", ".eslintrc",
-            ".prettierrc", "tailwind.config.ts", "tailwind.config.js",
-            "vercel.json", "netlify.toml",
-        })
+        CONFIG_FILES = frozenset(
+            {
+                "package.json",
+                "package-lock.json",
+                "pnpm-lock.yaml",
+                "requirements.txt",
+                "requirements-dev.txt",
+                "Pipfile",
+                "pyproject.toml",
+                "Cargo.toml",
+                "go.mod",
+                "Gemfile",
+                "composer.json",
+                "pom.xml",
+                "build.gradle",
+                "build.gradle.kts",
+                "docker-compose.yml",
+                "docker-compose.yaml",
+                "Dockerfile",
+                "Makefile",
+                "tox.ini",
+                "setup.cfg",
+                "tsconfig.json",
+                "vite.config.ts",
+                "vite.config.js",
+                "next.config.js",
+                "next.config.ts",
+                ".eslintrc",
+                ".prettierrc",
+                "tailwind.config.ts",
+                "tailwind.config.js",
+                "vercel.json",
+                "netlify.toml",
+            }
+        )
         return {
             fname: {"path": fname, "content": content}
             for fname, content in file_contents.items()
@@ -154,25 +184,58 @@ class TechStackAgent(BaseAgent):
     async def _collect_configs(root: str) -> dict[str, dict]:
         """收集所有配置文件内容。"""
         CONFIG_FILES = [
-            "package.json", "package-lock.json", "pnpm-lock.yaml",
-            "requirements.txt", "requirements-dev.txt", "Pipfile", "pyproject.toml",
-            "Cargo.toml", "go.mod", "Gemfile", "composer.json",
-            "pom.xml", "build.gradle", "build.gradle.kts",
-            "docker-compose.yml", "docker-compose.yaml",
-            "Dockerfile", "Makefile", "tox.ini", "setup.cfg",
-            "tsconfig.json", "vite.config.ts", "vite.config.js",
-            "next.config.js", "next.config.ts", ".eslintrc*",
-            ".prettierrc*", "tailwind.config.ts", "tailwind.config.js",
-            "vercel.json", "netlify.toml",
+            "package.json",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "requirements.txt",
+            "requirements-dev.txt",
+            "Pipfile",
+            "pyproject.toml",
+            "Cargo.toml",
+            "go.mod",
+            "Gemfile",
+            "composer.json",
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts",
+            "docker-compose.yml",
+            "docker-compose.yaml",
+            "Dockerfile",
+            "Makefile",
+            "tox.ini",
+            "setup.cfg",
+            "tsconfig.json",
+            "vite.config.ts",
+            "vite.config.js",
+            "next.config.js",
+            "next.config.ts",
+            ".eslintrc*",
+            ".prettierrc*",
+            "tailwind.config.ts",
+            "tailwind.config.js",
+            "vercel.json",
+            "netlify.toml",
         ]
 
         def _do() -> dict[str, dict]:
             results: dict[str, dict] = {}
             for dirpath, dirs, files in os.walk(root):
-                dirs[:] = [d for d in dirs if d not in {
-                    "node_modules", ".git", "__pycache__", ".venv", "venv",
-                    "dist", "build", ".next", ".nuxt",
-                }]
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if d
+                    not in {
+                        "node_modules",
+                        ".git",
+                        "__pycache__",
+                        ".venv",
+                        "venv",
+                        "dist",
+                        "build",
+                        ".next",
+                        ".nuxt",
+                    }
+                ]
                 for fname in files:
                     if fname in CONFIG_FILES:
                         fpath = os.path.join(dirpath, fname)
@@ -200,6 +263,7 @@ class TechStackAgent(BaseAgent):
     @staticmethod
     async def _analyze_configs(configs: dict[str, dict], repo_path: str) -> dict:
         """解析收集到的配置文件，输出结构化技术栈信息。"""
+
         def _do() -> dict:
             frameworks: list[str] = []
             languages: list[str] = []
@@ -312,7 +376,9 @@ class TechStackAgent(BaseAgent):
                         languages.append("PHP")
                     try:
                         data = json.loads(content)
-                        for dep in list(data.get("require", {})) + list(data.get("require-dev", {})):
+                        for dep in list(data.get("require", {})) + list(
+                            data.get("require-dev", {})
+                        ):
                             for framework, keywords in _FRAMEWORKS.items():
                                 if any(kw in dep for kw in keywords):
                                     if framework not in frameworks:
@@ -321,7 +387,11 @@ class TechStackAgent(BaseAgent):
                         pass
 
                 # ── Docker ─────────────────────────────────────
-                elif base in ("docker-compose.yml", "docker-compose.yaml", "Dockerfile"):
+                elif base in (
+                    "docker-compose.yml",
+                    "docker-compose.yaml",
+                    "Dockerfile",
+                ):
                     if "Docker" not in infrastructure:
                         infrastructure.append("Docker")
 
@@ -351,7 +421,15 @@ class TechStackAgent(BaseAgent):
             if os.path.isfile(readme_path):
                 try:
                     readme = TechStackAgent._read_config(readme_path)[:2000]
-                    for kw in ["LLM", "AI", "GPT", "Claude", "OpenAI", "LangChain", "LangGraph"]:
+                    for kw in [
+                        "LLM",
+                        "AI",
+                        "GPT",
+                        "Claude",
+                        "OpenAI",
+                        "LangChain",
+                        "LangGraph",
+                    ]:
                         if kw in readme and kw not in frameworks:
                             frameworks.append(kw)
                 except Exception:
@@ -360,7 +438,15 @@ class TechStackAgent(BaseAgent):
             for fname, info in configs.items():
                 if os.path.basename(fname).lower().startswith("readme"):
                     readme_content = info["content"][:2000]
-                    for kw in ["LLM", "AI", "GPT", "Claude", "OpenAI", "LangChain", "LangGraph"]:
+                    for kw in [
+                        "LLM",
+                        "AI",
+                        "GPT",
+                        "Claude",
+                        "OpenAI",
+                        "LangChain",
+                        "LangGraph",
+                    ]:
                         if kw in readme_content and kw not in frameworks:
                             frameworks.append(kw)
                     break  # 只处理第一个 README

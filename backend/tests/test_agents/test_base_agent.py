@@ -59,19 +59,22 @@ class TestCalcComplexity:
 class TestCalcMaintainability:
     """Tests for _calc_maintainability helper."""
 
-    @pytest.mark.parametrize("score,expected", [
-        (95, "A+"),
-        (85, "A"),
-        (75, "A"),
-        (74.9, "B+"),
-        (65, "B+"),
-        (64.9, "B"),
-        (55, "B"),
-        (54.9, "C"),
-        (40, "C"),
-        (39.9, "C-"),
-        (0, "C-"),
-    ])
+    @pytest.mark.parametrize(
+        "score,expected",
+        [
+            (95, "A+"),
+            (85, "A"),
+            (75, "A"),
+            (74.9, "B+"),
+            (65, "B+"),
+            (64.9, "B"),
+            (55, "B"),
+            (54.9, "C"),
+            (40, "C"),
+            (39.9, "C-"),
+            (0, "C-"),
+        ],
+    )
     def test_maintainability_grades(self, score, expected):
         assert BaseAgent._calc_maintainability(score) == expected
 
@@ -93,7 +96,9 @@ class TestWalkFiles:
     @pytest.mark.asyncio
     async def test_walk_files_filtered_by_extension(self, temp_repo):
         py_files = await BaseAgent._walk_files(str(temp_repo), extensions=[".py"])
-        ts_files = await BaseAgent._walk_files(str(temp_repo), extensions=[".ts", ".tsx"])
+        ts_files = await BaseAgent._walk_files(
+            str(temp_repo), extensions=[".ts", ".tsx"]
+        )
 
         py_paths = [f.replace("\\", "/") for f in py_files]
         ts_paths = [f.replace("\\", "/") for f in ts_files]

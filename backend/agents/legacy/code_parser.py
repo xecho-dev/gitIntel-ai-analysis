@@ -1,4 +1,5 @@
 """CodeParserAgent — 使用 tree-sitter 对仓库进行 AST 分析，提取结构化代码信息。"""
+
 import asyncio
 import os
 import tree_sitter
@@ -34,56 +35,113 @@ _EXT_TO_LANG: dict[str, str] = {
 }
 
 # 明确忽略的非源码扩展名（文件存在但不是有效源码）
-_IGNORE_EXT: frozenset[str] = frozenset({
-    ".ipynb",  # Jupyter Notebook — JSON 结构，tree-sitter 会无效遍历
-    ".md", ".mdx",
-    ".txt", ".rst",
-    ".json", ".jsonc",
-    ".yml", ".yaml", ".toml",
-    ".xml", ".html", ".css", ".scss", ".sass", ".less",
-    ".svg", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".bmp",
-    ".pdf", ".zip", ".tar", ".gz", ".rar",
-    ".lock",  # package-lock.json, yarn.lock 等锁文件
-    ".sh", ".bash", ".zsh",  # shell 脚本（可选，排除避免噪音）
-    ".env", ".gitignore", ".dockerignore", ".editorconfig",
-    ".gitmodules", ".gitattributes",
-    ".csv", ".tsv",
-    ".ico",
-})
+_IGNORE_EXT: frozenset[str] = frozenset(
+    {
+        ".ipynb",  # Jupyter Notebook — JSON 结构，tree-sitter 会无效遍历
+        ".md",
+        ".mdx",
+        ".txt",
+        ".rst",
+        ".json",
+        ".jsonc",
+        ".yml",
+        ".yaml",
+        ".toml",
+        ".xml",
+        ".html",
+        ".css",
+        ".scss",
+        ".sass",
+        ".less",
+        ".svg",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".ico",
+        ".webp",
+        ".bmp",
+        ".pdf",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".rar",
+        ".lock",  # package-lock.json, yarn.lock 等锁文件
+        ".sh",
+        ".bash",
+        ".zsh",  # shell 脚本（可选，排除避免噪音）
+        ".env",
+        ".gitignore",
+        ".dockerignore",
+        ".editorconfig",
+        ".gitmodules",
+        ".gitattributes",
+        ".csv",
+        ".tsv",
+        ".ico",
+    }
+)
 
 
 def _is_parseable_source(path: str) -> bool:
     """判断文件路径是否对应可解析的源码（排除常见非源码文件）。"""
     import os
+
     ext = os.path.splitext(path)[1].lower()
     if ext in _IGNORE_EXT:
         return False
     return True
 
+
 # ── 跨语言的语义边界节点类型 ─────────────────────────────────────────
 STRUCTURE_TYPES = {
-    "function_declaration", "function_definition", "function",
-    "method_declaration", "method_definition", "method",
-    "class_declaration", "class_definition", "class",
-    "struct_declaration", "struct", "interface_declaration", "interface",
-    "module", "namespace",
-    "arrow_function", "lambda_expression",
+    "function_declaration",
+    "function_definition",
+    "function",
+    "method_declaration",
+    "method_definition",
+    "method",
+    "class_declaration",
+    "class_definition",
+    "class",
+    "struct_declaration",
+    "struct",
+    "interface_declaration",
+    "interface",
+    "module",
+    "namespace",
+    "arrow_function",
+    "lambda_expression",
     "generator_function_declaration",
 }
 
 # ── 通用函数/类/导入节点类型（用于统计） ──────────────────────────────
 FUNC_TYPES = {
-    "function_declaration", "function_definition", "function",
-    "method_declaration", "method_definition", "method",
-    "arrow_function", "lambda_expression", "generator_function_declaration",
+    "function_declaration",
+    "function_definition",
+    "function",
+    "method_declaration",
+    "method_definition",
+    "method",
+    "arrow_function",
+    "lambda_expression",
+    "generator_function_declaration",
 }
 CLASS_TYPES = {
-    "class_declaration", "class_definition", "class",
-    "struct_declaration", "struct", "interface_declaration", "interface",
+    "class_declaration",
+    "class_definition",
+    "class",
+    "struct_declaration",
+    "struct",
+    "interface_declaration",
+    "interface",
 }
 IMPORT_TYPES = {
-    "import_statement", "import_from_statement",
-    "import_declaration", "import", "require_call",
+    "import_statement",
+    "import_from_statement",
+    "import_declaration",
+    "import",
+    "require_call",
 }
 
 
@@ -165,24 +223,39 @@ class CodeParserAgent(BaseAgent):
             yield _make_event(self.name, "status", "无文件内容待解析", 100, None)
             return
 
-        files = [{"path": path, "content": content} for path, content in file_contents.items()]
-        yield _make_event(self.name, "status", f"正在解析 {len(files)} 个文件...", 20, None)
-        result = await self._analyze_inmemory_files(files)
+        files = [
+            {"path": path, "content": content}
+            for path, content in file_contents.items()
+        ]
         yield _make_event(
-            self.name, "result", "代码解析完成",
-            100, result
+            self.name, "status", f"正在解析 {len(files)} 个文件...", 20, None
         )
+        result = await self._analyze_inmemory_files(files)
+        yield _make_event(self.name, "result", "代码解析完成", 100, result)
 
     # ─── 内部实现 ───────────────────────────────────────────────
 
     @staticmethod
     async def _walk_source_files(root: str) -> list[str]:
         """返回所有可进行 AST 分析的源文件路径。"""
-        IGNORE = frozenset({
-            "node_modules", ".git", "__pycache__", ".venv", "venv",
-            "dist", "build", ".next", ".nuxt", "target", ".pytest_cache",
-            ".mypy_cache", ".ruff_cache", "site-packages",
-        })
+        IGNORE = frozenset(
+            {
+                "node_modules",
+                ".git",
+                "__pycache__",
+                ".venv",
+                "venv",
+                "dist",
+                "build",
+                ".next",
+                ".nuxt",
+                "target",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".ruff_cache",
+                "site-packages",
+            }
+        )
 
         def _do() -> list[str]:
             files: list[str] = []
@@ -197,7 +270,9 @@ class CodeParserAgent(BaseAgent):
         return await asyncio.to_thread(_do)
 
     @staticmethod
-    async def _analyze_inmemory_files(files: list[dict], max_chunk_lines: int = 200) -> dict:
+    async def _analyze_inmemory_files(
+        files: list[dict], max_chunk_lines: int = 200
+    ) -> dict:
         """批量分析内存中的文件内容，提取结构化指标 + 语义分块（GitHub API 模式）。
 
         Args:
@@ -205,13 +280,19 @@ class CodeParserAgent(BaseAgent):
             max_chunk_lines: 语义分块的最大行数限制
         """
         import logging
+
         _logger = logging.getLogger("gitintel")
 
         def _do() -> dict:
-            lang_stats: dict[str, dict] = defaultdict(lambda: {
-                "files": 0, "functions": 0, "classes": 0,
-                "imports": 0, "total_lines": 0,
-            })
+            lang_stats: dict[str, dict] = defaultdict(
+                lambda: {
+                    "files": 0,
+                    "functions": 0,
+                    "classes": 0,
+                    "imports": 0,
+                    "total_lines": 0,
+                }
+            )
             total_functions = 0
             total_classes = 0
             largest_files: list[dict] = []
@@ -250,16 +331,20 @@ class CodeParserAgent(BaseAgent):
                 lang_stats[lang]["total_lines"] += lines
 
                 if lines > 50:
-                    largest_files.append({
-                        "path": fpath.replace("\\", "/"),
-                        "lines": lines,
-                        "functions": functions,
-                        "language": lang,
-                    })
+                    largest_files.append(
+                        {
+                            "path": fpath.replace("\\", "/"),
+                            "lines": lines,
+                            "functions": functions,
+                            "language": lang,
+                        }
+                    )
 
                 # 语义分块
                 if content and content.strip() and lines > 10:
-                    chunks = CodeParserAgent._semantic_chunk_file(source, lang, max_chunk_lines)
+                    chunks = CodeParserAgent._semantic_chunk_file(
+                        source, lang, max_chunk_lines
+                    )
                     if chunks:
                         chunked_files[fpath.replace("\\", "/")] = chunks
 
@@ -296,13 +381,19 @@ class CodeParserAgent(BaseAgent):
             max_chunk_lines: 语义分块的最大行数限制
         """
         import logging
+
         _logger = logging.getLogger("gitintel")
 
         def _do() -> dict:
-            lang_stats: dict[str, dict] = defaultdict(lambda: {
-                "files": 0, "functions": 0, "classes": 0,
-                "imports": 0, "total_lines": 0,
-            })
+            lang_stats: dict[str, dict] = defaultdict(
+                lambda: {
+                    "files": 0,
+                    "functions": 0,
+                    "classes": 0,
+                    "imports": 0,
+                    "total_lines": 0,
+                }
+            )
             total_functions = 0
             total_classes = 0
             largest_files: list[dict] = []
@@ -343,16 +434,20 @@ class CodeParserAgent(BaseAgent):
                 lang_stats[lang]["total_lines"] += lines
 
                 if lines > 50:
-                    largest_files.append({
-                        "path": fpath.replace("\\", "/"),
-                        "lines": lines,
-                        "functions": functions,
-                        "language": lang,
-                    })
+                    largest_files.append(
+                        {
+                            "path": fpath.replace("\\", "/"),
+                            "lines": lines,
+                            "functions": functions,
+                            "language": lang,
+                        }
+                    )
 
                 # 语义分块
                 if lines > 10:
-                    chunks = CodeParserAgent._semantic_chunk_file(source, lang, max_chunk_lines)
+                    chunks = CodeParserAgent._semantic_chunk_file(
+                        source, lang, max_chunk_lines
+                    )
                     if chunks:
                         chunked_files[fpath.replace("\\", "/")] = chunks
 
@@ -384,7 +479,9 @@ class CodeParserAgent(BaseAgent):
     # ─── 语义分块（基于 AST 结构边界） ─────────────────────────────────
 
     @staticmethod
-    def _semantic_chunk_file(source: bytes, lang: str, max_lines: int = 200) -> list[dict]:
+    def _semantic_chunk_file(
+        source: bytes, lang: str, max_lines: int = 200
+    ) -> list[dict]:
         """基于 AST 结构在语义边界拆分代码，保持函数/类完整。
 
         策略：
@@ -433,15 +530,17 @@ class CodeParserAgent(BaseAgent):
         if not boundaries:
             # 无结构定义，整个文件作为单个块
             content = b"\n".join(source_lines).decode("utf-8", errors="replace")
-            return [{
-                "chunk_id": 0,
-                "start_line": 1,
-                "end_line": total_lines,
-                "content": content,
-                "function_name": None,
-                "node_type": "file",
-                "total_chunks": 1,
-            }]
+            return [
+                {
+                    "chunk_id": 0,
+                    "start_line": 1,
+                    "end_line": total_lines,
+                    "content": content,
+                    "function_name": None,
+                    "node_type": "file",
+                    "total_chunks": 1,
+                }
+            ]
 
         # 构建块：在相邻边界之间划分
         current_start = 1
@@ -451,35 +550,39 @@ class CodeParserAgent(BaseAgent):
                 # 块之间有未归属的内容（import、顶域变量等），归入前一个块
                 pass
 
-            chunk_lines = source_lines[current_start - 1: end]
+            chunk_lines = source_lines[current_start - 1 : end]
             content = b"\n".join(chunk_lines).decode("utf-8", errors="replace")
 
             # 获取函数/类名称
             func_name = CodeParserAgent._extract_node_name(tree.root_node, start, end)
 
-            chunks.append({
-                "chunk_id": chunk_id,
-                "start_line": current_start,
-                "end_line": end,
-                "content": content,
-                "function_name": func_name,
-                "node_type": node_type,
-            })
+            chunks.append(
+                {
+                    "chunk_id": chunk_id,
+                    "start_line": current_start,
+                    "end_line": end,
+                    "content": content,
+                    "function_name": func_name,
+                    "node_type": node_type,
+                }
+            )
             chunk_id += 1
             current_start = end + 1
 
         # 处理末尾未归属的内容
         if current_start <= total_lines:
-            chunk_lines = source_lines[current_start - 1:]
+            chunk_lines = source_lines[current_start - 1 :]
             content = b"\n".join(chunk_lines).decode("utf-8", errors="replace")
-            chunks.append({
-                "chunk_id": chunk_id,
-                "start_line": current_start,
-                "end_line": total_lines,
-                "content": content,
-                "function_name": None,
-                "node_type": "tail",
-            })
+            chunks.append(
+                {
+                    "chunk_id": chunk_id,
+                    "start_line": current_start,
+                    "end_line": total_lines,
+                    "content": content,
+                    "function_name": None,
+                    "node_type": "tail",
+                }
+            )
             chunk_id += 1
 
         # 处理超大块：递归拆分超过 max_lines 的块
@@ -536,14 +639,16 @@ class CodeParserAgent(BaseAgent):
             sub_lines = lines[i:chunk_end_line]
             sub_content = "\n".join(sub_lines)
 
-            sub_chunks.append({
-                "chunk_id": chunk_id,
-                "start_line": start_line + i,
-                "end_line": start_line + chunk_end_line - 1,
-                "content": sub_content,
-                "function_name": None,
-                "node_type": "split",
-            })
+            sub_chunks.append(
+                {
+                    "chunk_id": chunk_id,
+                    "start_line": start_line + i,
+                    "end_line": start_line + chunk_end_line - 1,
+                    "content": sub_content,
+                    "function_name": None,
+                    "node_type": "split",
+                }
+            )
             chunk_id += 1
             i = chunk_end_line
 
@@ -562,7 +667,18 @@ class CodeParserAgent(BaseAgent):
                 if start == target_start:
                     # 查找函数/类名（通常是第一个子节点的 text）
                     for child in node.children:
-                        if child.type not in ("def", "class", "function", "async", "await", "export", "public", "private", "static", "("):
+                        if child.type not in (
+                            "def",
+                            "class",
+                            "function",
+                            "async",
+                            "await",
+                            "export",
+                            "public",
+                            "private",
+                            "static",
+                            "(",
+                        ):
                             try:
                                 name_bytes = child.text
                                 return name_bytes.decode("utf-8", errors="replace")

@@ -3,9 +3,8 @@ import os
 import json
 import struct
 from typing import Optional
-from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 from fastapi import HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from jose import jwt, JWTError
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -36,7 +35,9 @@ def _jwe_dir_aes_cbc_hs512_decrypt(jwe_token: str, secret: str) -> bytes:
 
         # A256CBC-HS512: 256-bit key for AES-CBC, 512-bit key for HMAC-SHA-512
         # Total derived key = 256/8 + 512/8 = 32 + 64 = 96 bytes
-        derived_key = _hkdf_sha256(secret.encode(), b"", 96, info=b"NextAuth.js-v5-JWE-Encryption")
+        derived_key = _hkdf_sha256(
+            secret.encode(), b"", 96, info=b"NextAuth.js-v5-JWE-Encryption"
+        )
         mac_key = derived_key[:32]
         enc_key = derived_key[32:64]
 
@@ -50,6 +51,7 @@ def _jwe_dir_aes_cbc_hs512_decrypt(jwe_token: str, secret: str) -> bytes:
         # Decrypt: AES-256-CBC with PKCS7 padding
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
         from cryptography.hazmat.primitives import padding as sym_padding
+
         cipher = Cipher(algorithms.AES(enc_key), modes.CBC(iv))
         decryptor = cipher.decryptor()
         padded = decryptor.update(ciphertext) + decryptor.finalize()
@@ -72,18 +74,23 @@ def base64url_decode(data: str | bytes) -> bytes:
 
 
 def hmac_sha512(key: bytes, data: bytes) -> bytes:
-    import hmac, hashlib
+    import hmac
+    import hashlib
+
     return hmac.new(key, data, hashlib.sha512).digest()
 
 
 def hmac_verify(tag: bytes, expected: bytes) -> bool:
     import hmac
+
     return hmac.compare_digest(tag, expected)
 
 
 def _hkdf_sha256(ikm: bytes, salt: bytes, length: int, info: bytes = b"") -> bytes:
     """Simple HKDF-SHA256"""
-    import hashlib, hmac as _hmac
+    import hashlib
+    import hmac as _hmac
+
     prk = _hmac.new(salt or b"\x00" * 32, ikm, hashlib.sha256).digest()
     t = b""
     okm = b""
@@ -108,7 +115,9 @@ def decode_jwt_token(token: str) -> Optional[dict]:
     # 尝试 1: 直接用 HS256 解码（适用于旧版 NextAuth 或某些配置）
     try:
         payload = jwt.decode(
-            token, secret, algorithms=["HS256"],
+            token,
+            secret,
+            algorithms=["HS256"],
             options={"verify_aud": False, "verify_exp": True},
         )
         return payload
@@ -125,10 +134,14 @@ def decode_jwt_token(token: str) -> Optional[dict]:
         print(f"[DEBUG decode_jwt] JWE inner JWT length={len(inner_str)}")
         # 内层仍然是 JWS
         payload = jwt.decode(
-            inner_str, secret, algorithms=["HS256"],
+            inner_str,
+            secret,
+            algorithms=["HS256"],
             options={"verify_aud": False, "verify_exp": True},
         )
-        print(f"[DEBUG decode_jwt] Successfully decoded JWE token, keys={list(payload.keys())}")
+        print(
+            f"[DEBUG decode_jwt] Successfully decoded JWE token, keys={list(payload.keys())}"
+        )
         return payload
     except Exception as e:
         print(f"[DEBUG decode_jwt] JWE decode failed: {type(e).__name__}: {e}")
@@ -182,7 +195,9 @@ def require_auth(request: Request) -> dict:
                 # 提取用户的 GitHub OAuth Token（用于 PR 创建）
                 if jwt_payload.get("accessToken"):
                     result["accessToken"] = jwt_payload["accessToken"]
-                print(f"[DEBUG require_auth] Extracted GitHub token from JWT: {bool(result.get('accessToken'))}")
+                print(
+                    f"[DEBUG require_auth] Extracted GitHub token from JWT: {bool(result.get('accessToken'))}"
+                )
         return result
 
     # 优先级 2：标准 Bearer token
@@ -192,13 +207,18 @@ def require_auth(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="未登录，请先使用 GitHub 账号登录")
 
     secret = os.getenv("AUTH_SECRET") or os.getenv("JWT_SECRET")
-    print(f"[DEBUG require_auth] Token prefix: '{token[:30]}...', secret present: {bool(secret)}, token header start: '{token[:10]}'")
+    print(
+        f"[DEBUG require_auth] Token prefix: '{token[:30]}...', secret present: {bool(secret)}, token header start: '{token[:10]}'"
+    )
 
     payload = decode_jwt_token(token)
     if not payload:
         import traceback
+
         traceback.print_exc()
-        print("[DEBUG require_auth] JWT decode failed - possible secret mismatch or invalid token")
+        print(
+            "[DEBUG require_auth] JWT decode failed - possible secret mismatch or invalid token"
+        )
         raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
 
     print(f"[DEBUG require_auth] Successfully decoded payload: {payload}")

@@ -13,6 +13,7 @@ logger = logging.getLogger("image_generation")
 try:
     import dashscope
     from dashscope import ImageSynthesis
+
     DASHSCOPE_AVAILABLE = True
 except ImportError:
     DASHSCOPE_AVAILABLE = False
@@ -73,11 +74,11 @@ def _get_prompt_for_dependency(risk_level: str) -> str:
 
 def _get_prompt_for_optimization() -> str:
     return (
-        f"A clean optimization and performance improvement illustration. "
-        f"Showing before/after comparison, speed meters, efficiency charts. "
-        f"Illustration: gear icons, rocket ship, performance graphs trending up. "
-        f"Style: modern flat design, purple and orange accent colors. "
-        f"No text, no people."
+        "A clean optimization and performance improvement illustration. "
+        "Showing before/after comparison, speed meters, efficiency charts. "
+        "Illustration: gear icons, rocket ship, performance graphs trending up. "
+        "Style: modern flat design, purple and orange accent colors. "
+        "No text, no people."
     )
 
 
@@ -85,6 +86,7 @@ def _download_image_sync(url: str) -> Optional[bytes]:
     """同步下载图片到内存"""
     try:
         import httpx
+
         with httpx.Client(timeout=30.0) as client:
             response = client.get(url)
             if response.status_code == 200:
@@ -115,6 +117,7 @@ def generate_image_sync(
 
     try:
         import time
+
         dashscope.api_key = api_key
 
         response = ImageSynthesis.call(

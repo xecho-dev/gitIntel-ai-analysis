@@ -6,6 +6,7 @@
     llm = get_llm()
     response = await llm.ainvoke([HumanMessage(content="...")])
 """
+
 import logging
 import os
 from functools import lru_cache
@@ -74,17 +75,13 @@ class TokenTrackingCallback:
         except Exception as e:
             _logger.debug(f"[TokenTracker] 提取 usage 失败: {e}")
 
-    def on_chain_start(
-        self, serialized: Any, inputs: Any, **kwargs: Any
-    ) -> None:
+    def on_chain_start(self, serialized: Any, inputs: Any, **kwargs: Any) -> None:
         """LangChain chain 生命周期回调。"""
 
     def on_chain_end(self, outputs: Any, **kwargs: Any) -> None:
         """LangChain chain 生命周期回调。"""
 
-    def on_chain_error(
-        self, error: Exception, **kwargs: Any
-    ) -> None:
+    def on_chain_error(self, error: Exception, **kwargs: Any) -> None:
         """LangChain chain 错误回调，防止错误被静默吞噬。"""
         _logger.warning(f"[TokenTracker][{self.agent_name}] Chain 执行错误: {error}")
 
@@ -94,7 +91,9 @@ class TokenTrackingCallback:
     def on_llm_error(self, error: Exception, **kwargs: Any) -> None:
         model = os.getenv("OPENAI_MODEL", "")
         model_str = f" ({model})" if model else ""
-        _logger.warning(f"[TokenTracker][{self.agent_name}]{model_str} LLM 调用失败: {error}")
+        _logger.warning(
+            f"[TokenTracker][{self.agent_name}]{model_str} LLM 调用失败: {error}"
+        )
 
 
 def get_token_stats() -> dict:
@@ -123,12 +122,19 @@ def _configure_langsmith_env():
     if not tracing_enabled or not api_key:
         return
 
-    os.environ.setdefault("LANGSMITH_ENDPOINT", os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com"))
-    os.environ.setdefault("LANGSMITH_PROJECT", os.getenv("LANGSMITH_PROJECT", "default"))
+    os.environ.setdefault(
+        "LANGSMITH_ENDPOINT",
+        os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com"),
+    )
+    os.environ.setdefault(
+        "LANGSMITH_PROJECT", os.getenv("LANGSMITH_PROJECT", "default")
+    )
     os.environ.setdefault("LANGSMITH_API_KEY", api_key)
     os.environ.setdefault("LANGSMITH_TRACING", "true")
 
-    _logger.info(f"[LLMFactory] LangSmith 追踪已配置，项目: {os.getenv('LANGSMITH_PROJECT')}")
+    _logger.info(
+        f"[LLMFactory] LangSmith 追踪已配置，项目: {os.getenv('LANGSMITH_PROJECT')}"
+    )
 
 
 def _make_chatopenai(
@@ -145,7 +151,8 @@ def _make_chatopenai(
         model=model or os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"),
         temperature=temperature,
         openai_api_key=api_key,
-        base_url=base_url or os.getenv(
+        base_url=base_url
+        or os.getenv(
             "OPENAI_BASE_URL",
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         ),
@@ -301,8 +308,12 @@ def get_llm_with_tracking(
     )
 
 
-def get_llm_with_callback(callback_handler, model: str | None = None,
-                            temperature: float = 0.0, max_tokens: int | None = None):
+def get_llm_with_callback(
+    callback_handler,
+    model: str | None = None,
+    temperature: float = 0.0,
+    max_tokens: int | None = None,
+):
     """创建带自定义 callback 的 LLM 实例。"""
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:

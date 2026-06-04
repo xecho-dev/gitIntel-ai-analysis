@@ -10,6 +10,7 @@
   - SUSPICIOUS_PATTERNS：可疑代码模式（exec、system、subprocess...）
   - 未锁定版本、file: 协议依赖、远程 URL 依赖均标记为 medium 风险
 """
+
 import asyncio
 import json
 import logging
@@ -45,14 +46,23 @@ class DependencyAgent(BaseAgent):
 
         if file_contents is not None and len(file_contents) > 0:
             dep_files = [
-                {"name": os.path.basename(p), "path": p, "type": self._detect_dep_type(p), "content": c}
+                {
+                    "name": os.path.basename(p),
+                    "path": p,
+                    "type": self._detect_dep_type(p),
+                    "content": c,
+                }
                 for p, c in file_contents.items()
                 if self._is_dep_file(p)
             ]
             dep_names = [os.path.basename(p) for p in file_contents]
-            _logger.info(f"[DependencyAgent] 内存模式: {len(file_contents)} 个文件传入，已过滤到 {len(dep_files)} 个依赖文件")
+            _logger.info(
+                f"[DependencyAgent] 内存模式: {len(file_contents)} 个文件传入，已过滤到 {len(dep_files)} 个依赖文件"
+            )
             _logger.debug(f"[DependencyAgent] 所有文件 basename: {dep_names}")
-            _logger.debug(f"[DependencyAgent] 通过 _is_dep_file 的文件: {[d['name'] for d in dep_files]}")
+            _logger.debug(
+                f"[DependencyAgent] 通过 _is_dep_file 的文件: {[d['name'] for d in dep_files]}"
+            )
         else:
             # GitHub API 模式：尝试获取依赖配置文件
             # 解析 "owner/repo" 格式的 repo_path
@@ -67,27 +77,41 @@ class DependencyAgent(BaseAgent):
 
         if not dep_files:
             yield _make_event(
-                self.name, "result", "未找到依赖文件",
-                100, {"total": 0, "scanned": 0, "high": 0, "medium": 0, "low": 0, "deps": []}
+                self.name,
+                "result",
+                "未找到依赖文件",
+                100,
+                {
+                    "total": 0,
+                    "scanned": 0,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0,
+                    "deps": [],
+                },
             )
             return
 
         yield _make_event(
-            self.name, "progress",
-            f"发现 {len(dep_files)} 个依赖文件，开始解析…", 30, None
+            self.name,
+            "progress",
+            f"发现 {len(dep_files)} 个依赖文件，开始解析…",
+            30,
+            None,
         )
 
         all_deps = await self._parse_all_deps(dep_files)
         _logger.info(f"[DependencyAgent] 解析完成: {len(all_deps)} 个依赖项")
         yield _make_event(
-            self.name, "progress",
-            f"共解析 {len(all_deps)} 个依赖，正在评估风险…", 60, None
+            self.name,
+            "progress",
+            f"共解析 {len(all_deps)} 个依赖，正在评估风险…",
+            60,
+            None,
         )
 
         risk_assessment = self._assess_risk(all_deps)
-        yield _make_event(
-            self.name, "progress", "风险评估完成…", 85, None
-        )
+        yield _make_event(self.name, "progress", "风险评估完成…", 85, None)
 
         result = {
             "total": risk_assessment.get("total", len(all_deps)),
@@ -101,10 +125,7 @@ class DependencyAgent(BaseAgent):
             "deps": risk_assessment.get("deps", []),
         }
 
-        yield _make_event(
-            self.name, "result", "依赖风险扫描完成",
-            100, result
-        )
+        yield _make_event(self.name, "result", "依赖风险扫描完成", 100, result)
 
     # ─── 内部实现 ───────────────────────────────────────────────
 
@@ -113,14 +134,23 @@ class DependencyAgent(BaseAgent):
         """根据文件路径判断包管理器类型。"""
         name = os.path.basename(path)
         types = {
-            "package.json": "npm", "package-lock.json": "npm",
-            "pnpm-lock.yaml": "npm", "yarn.lock": "npm",
-            "requirements.txt": "pip", "requirements-dev.txt": "pip",
-            "Pipfile": "pipenv", "pyproject.toml": "poetry",
-            "poetry.lock": "poetry", "go.mod": "go", "go.sum": "go",
-            "Cargo.toml": "cargo", "Gemfile": "bundler",
-            "composer.json": "composer", "pom.xml": "maven",
-            "build.gradle": "gradle", "bun.lockb": "bun",
+            "package.json": "npm",
+            "package-lock.json": "npm",
+            "pnpm-lock.yaml": "npm",
+            "yarn.lock": "npm",
+            "requirements.txt": "pip",
+            "requirements-dev.txt": "pip",
+            "Pipfile": "pipenv",
+            "pyproject.toml": "poetry",
+            "poetry.lock": "poetry",
+            "go.mod": "go",
+            "go.sum": "go",
+            "Cargo.toml": "cargo",
+            "Gemfile": "bundler",
+            "composer.json": "composer",
+            "pom.xml": "maven",
+            "build.gradle": "gradle",
+            "bun.lockb": "bun",
         }
         return types.get(name, "unknown")
 
@@ -130,17 +160,26 @@ class DependencyAgent(BaseAgent):
         name = os.path.basename(path)
         # lock 文件不解析（太大），只解析 manifest 文件
         if name in {
-            "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
-            "poetry.lock", "go.sum", "bun.lockb",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "yarn.lock",
+            "poetry.lock",
+            "go.sum",
+            "bun.lockb",
         }:
             return False
         return name in {
             "package.json",
-            "requirements.txt", "requirements-dev.txt",
-            "Pipfile", "pyproject.toml",
-            "go.mod", "Cargo.toml",
-            "Gemfile", "composer.json",
-            "pom.xml", "build.gradle",
+            "requirements.txt",
+            "requirements-dev.txt",
+            "Pipfile",
+            "pyproject.toml",
+            "go.mod",
+            "Cargo.toml",
+            "Gemfile",
+            "composer.json",
+            "pom.xml",
+            "build.gradle",
         }
 
     @staticmethod
@@ -169,23 +208,40 @@ class DependencyAgent(BaseAgent):
         def _do() -> list[dict]:
             results = []
             for dirpath, dirs, files in os.walk(root):
-                dirs[:] = [d for d in dirs if d not in {
-                    "node_modules", ".git", "__pycache__", ".venv", "venv",
-                    "dist", "build", ".next", ".nuxt", "target",
-                }]
+                dirs[:] = [
+                    d
+                    for d in dirs
+                    if d
+                    not in {
+                        "node_modules",
+                        ".git",
+                        "__pycache__",
+                        ".venv",
+                        "venv",
+                        "dist",
+                        "build",
+                        ".next",
+                        ".nuxt",
+                        "target",
+                    }
+                ]
                 for fname in files:
                     if fname in DEP_FILES:
-                        results.append({
-                            "name": fname,
-                            "path": os.path.join(dirpath, fname),
-                            "type": DEP_FILES[fname],
-                        })
+                        results.append(
+                            {
+                                "name": fname,
+                                "path": os.path.join(dirpath, fname),
+                                "type": DEP_FILES[fname],
+                            }
+                        )
             return results
 
         return await asyncio.to_thread(_do)
 
     @staticmethod
-    async def _fetch_dep_files_from_github(owner: str, repo: str, branch: str) -> list[dict]:
+    async def _fetch_dep_files_from_github(
+        owner: str, repo: str, branch: str
+    ) -> list[dict]:
         """从 GitHub API 获取依赖配置文件内容。
 
         尝试获取常见的依赖配置文件，支持 npm/pip/go 等生态系统。
@@ -213,20 +269,24 @@ class DependencyAgent(BaseAgent):
                 try:
                     content = await _read_file_content_impl(owner, repo, fname, branch)
                     if content and not content.startswith("[文件不存在]"):
-                        results.append({
-                            "name": fname,
-                            "path": fname,
-                            "type": dep_type,
-                            "content": content,
-                        })
+                        results.append(
+                            {
+                                "name": fname,
+                                "path": fname,
+                                "type": dep_type,
+                                "content": content,
+                            }
+                        )
                         _logger.info(f"[DependencyAgent] GitHub 获取 {fname} 成功")
                 except Exception as e:
                     _logger.debug(f"[DependencyAgent] GitHub 获取 {fname} 失败: {e}")
 
             if results:
-                _logger.info(f"[DependencyAgent] GitHub 模式: 获取到 {len(results)} 个依赖文件")
+                _logger.info(
+                    f"[DependencyAgent] GitHub 模式: 获取到 {len(results)} 个依赖文件"
+                )
             else:
-                _logger.info(f"[DependencyAgent] GitHub 模式: 未找到依赖文件")
+                _logger.info("[DependencyAgent] GitHub 模式: 未找到依赖文件")
 
         except Exception as e:
             _logger.warning(f"[DependencyAgent] GitHub 模式异常: {e}")
@@ -246,7 +306,9 @@ class DependencyAgent(BaseAgent):
                     info.get("name", os.path.basename(info.get("path", ""))),
                 )
                 all_deps.extend(deps)
-                _logger.debug(f"[DependencyAgent] 解析 {info.get('name')}: 获得 {len(deps)} 个依赖")
+                _logger.debug(
+                    f"[DependencyAgent] 解析 {info.get('name')}: 获得 {len(deps)} 个依赖"
+                )
             except Exception as e:
                 _logger.warning(f"[DependencyAgent] 解析 {info.get('name')} 失败: {e}")
 
@@ -265,10 +327,14 @@ class DependencyAgent(BaseAgent):
                 data = json.loads(content)
                 for section in ["dependencies", "devDependencies", "peerDependencies"]:
                     for name, ver in data.get(section, {}).items():
-                        deps.append({
-                            "name": name, "version": ver,
-                            "type": section, "manager": "npm",
-                        })
+                        deps.append(
+                            {
+                                "name": name,
+                                "version": ver,
+                                "type": section,
+                                "manager": "npm",
+                            }
+                        )
             except (json.JSONDecodeError, KeyError):
                 pass
 
@@ -278,11 +344,20 @@ class DependencyAgent(BaseAgent):
                 if not line or line.startswith("#") or line.startswith("-"):
                     continue
                 # 支持 pkg==1.2.3, pkg>=1.2, pkg~=1.0 等格式
-                m = re.match(r"^([a-zA-Z0-9_\-\.]+)(?:\[.*?\])?(?:==|>=|<=|~=|!=|>|<).*$", line)
+                m = re.match(
+                    r"^([a-zA-Z0-9_\-\.]+)(?:\[.*?\])?(?:==|>=|<=|~=|!=|>|<).*$", line
+                )
                 if m:
                     name = m.group(1)
                     ver = re.split(r"[=<>!~]", line)[-1].strip()
-                    deps.append({"name": name, "version": ver, "type": "dependencies", "manager": "pip"})
+                    deps.append(
+                        {
+                            "name": name,
+                            "version": ver,
+                            "type": "dependencies",
+                            "manager": "pip",
+                        }
+                    )
 
         elif dep_type == "poetry":
             try:
@@ -290,17 +365,41 @@ class DependencyAgent(BaseAgent):
                 for section in ["dependencies", "dev-dependencies"]:
                     raw = data.get("tool", {}).get("poetry", {}).get(section, {})
                     for name, spec in raw.items():
-                        ver = spec if isinstance(spec, str) else (spec.get("version", "*") if isinstance(spec, dict) else "*")
-                        deps.append({"name": name, "version": ver, "type": section, "manager": "poetry"})
+                        ver = (
+                            spec
+                            if isinstance(spec, str)
+                            else (
+                                spec.get("version", "*")
+                                if isinstance(spec, dict)
+                                else "*"
+                            )
+                        )
+                        deps.append(
+                            {
+                                "name": name,
+                                "version": ver,
+                                "type": section,
+                                "manager": "poetry",
+                            }
+                        )
             except (json.JSONDecodeError, KeyError, TypeError):
                 # TOML 格式兜底
                 for line in content.splitlines():
                     line = line.strip()
                     if line.startswith("[") and "dependencies" in line.lower():
                         continue
-                    m = re.match(r"^([a-zA-Z0-9_\-\.]+)\s*=\s*[\"\']([^\"\']+)[\"\']", line)
+                    m = re.match(
+                        r"^([a-zA-Z0-9_\-\.]+)\s*=\s*[\"\']([^\"\']+)[\"\']", line
+                    )
                     if m:
-                        deps.append({"name": m.group(1), "version": m.group(2), "type": "dependencies", "manager": "poetry"})
+                        deps.append(
+                            {
+                                "name": m.group(1),
+                                "version": m.group(2),
+                                "type": "dependencies",
+                                "manager": "poetry",
+                            }
+                        )
         elif dep_type == "pipenv":
             section = ""
             for line in content.splitlines():
@@ -310,7 +409,14 @@ class DependencyAgent(BaseAgent):
                     continue
                 if section in ("packages", "dev-packages") and "=" in line:
                     name, ver = line.split("=", 1)
-                    deps.append({"name": name.strip(), "version": ver.strip(), "type": section, "manager": "pipenv"})
+                    deps.append(
+                        {
+                            "name": name.strip(),
+                            "version": ver.strip(),
+                            "type": section,
+                            "manager": "pipenv",
+                        }
+                    )
 
         elif dep_type == "go":
             for line in content.splitlines():
@@ -319,43 +425,75 @@ class DependencyAgent(BaseAgent):
                     continue
                 m = re.match(r"^\s*([a-zA-Z0-9_\-\./]+)\s+v?([0-9]", line)
                 if m:
-                    deps.append({"name": m.group(1), "version": m.group(2), "type": "require", "manager": "go"})
+                    deps.append(
+                        {
+                            "name": m.group(1),
+                            "version": m.group(2),
+                            "type": "require",
+                            "manager": "go",
+                        }
+                    )
 
         elif dep_type == "cargo":
             in_deps = False
             for line in content.splitlines():
                 line_stripped = line.strip()
-                if line_stripped == "[dependencies]" or line_stripped.startswith("[dependencies."):
+                if line_stripped == "[dependencies]" or line_stripped.startswith(
+                    "[dependencies."
+                ):
                     in_deps = True
                     continue
                 if line_stripped.startswith("["):
                     in_deps = False
                 if in_deps:
-                    m = re.match(r"^([a-zA-Z0-9_\-\.]+)\s*=\s*[\"']?(.+?)[\"']?\s*(?:,)?$", line_stripped)
+                    m = re.match(
+                        r"^([a-zA-Z0-9_\-\.]+)\s*=\s*[\"']?(.+?)[\"']?\s*(?:,)?$",
+                        line_stripped,
+                    )
                     if m:
-                        deps.append({"name": m.group(1), "version": m.group(2), "type": "dependencies", "manager": "cargo"})
+                        deps.append(
+                            {
+                                "name": m.group(1),
+                                "version": m.group(2),
+                                "type": "dependencies",
+                                "manager": "cargo",
+                            }
+                        )
 
         elif dep_type == "composer":
             try:
                 data = json.loads(content)
                 for section in ["require", "require-dev"]:
                     for name, ver in data.get(section, {}).items():
-                        deps.append({"name": name, "version": ver, "type": section, "manager": "composer"})
+                        deps.append(
+                            {
+                                "name": name,
+                                "version": ver,
+                                "type": section,
+                                "manager": "composer",
+                            }
+                        )
             except (json.JSONDecodeError, KeyError):
                 pass
 
         elif dep_type in ("maven", "gradle"):
             # 简化解析：提取 group:artifact:version 格式
             for line in content.splitlines():
-                m = re.search(r"<groupId>(.+?)</groupId>.*?<artifactId>(.+?)</artifactId>.*?<version>(.+?)</version>", line + content, re.DOTALL)
+                m = re.search(
+                    r"<groupId>(.+?)</groupId>.*?<artifactId>(.+?)</artifactId>.*?<version>(.+?)</version>",
+                    line + content,
+                    re.DOTALL,
+                )
                 if m:
-                    deps.append({
-                        "name": f"{m.group(2)}",
-                        "version": m.group(3),
-                        "group": m.group(1),
-                        "type": "dependencies",
-                        "manager": dep_type,
-                    })
+                    deps.append(
+                        {
+                            "name": f"{m.group(2)}",
+                            "version": m.group(3),
+                            "group": m.group(1),
+                            "type": "dependencies",
+                            "manager": dep_type,
+                        }
+                    )
 
         return deps
 
@@ -456,14 +594,20 @@ class DependencyAgent(BaseAgent):
                     no_version_deps.append(name)
 
             if risk == "low" and dep.get("manager") == "npm":
-                if version and (version.startswith("file:") or version.startswith("link:")):
+                if version and (
+                    version.startswith("file:") or version.startswith("link:")
+                ):
                     risk = "medium"
-                    risk_reason = f"本地路径依赖 '{version}' 在 CI/CD 或他人环境中可能失效"
+                    risk_reason = (
+                        f"本地路径依赖 '{version}' 在 CI/CD 或他人环境中可能失效"
+                    )
 
             if risk == "low" and dep.get("manager") == "pip":
-                if version and ("git+" in version or "http://" in version or "https://" in version):
+                if version and (
+                    "git+" in version or "http://" in version or "https://" in version
+                ):
                     risk = "medium"
-                    risk_reason = f"直接从远程 URL 安装依赖可能引入安全风险"
+                    risk_reason = "直接从远程 URL 安装依赖可能引入安全风险"
 
             if risk == "low":
                 for kw, reason in OUTDATED_WARN.items():
@@ -474,10 +618,14 @@ class DependencyAgent(BaseAgent):
 
             if risk == "high":
                 high += 1
-                high_deps.append({**dep, "risk_level": "high", "risk_reason": risk_reason})
+                high_deps.append(
+                    {**dep, "risk_level": "high", "risk_reason": risk_reason}
+                )
             elif risk == "medium":
                 medium += 1
-                medium_deps.append({**dep, "risk_level": "medium", "risk_reason": risk_reason})
+                medium_deps.append(
+                    {**dep, "risk_level": "medium", "risk_reason": risk_reason}
+                )
             else:
                 low += 1
 
@@ -506,7 +654,9 @@ class DependencyAgent(BaseAgent):
             summary.extend(outdated_specific[:3])
 
         if no_version_deps:
-            summary.append(f"⚡ {len(no_version_deps)} 个依赖未指定版本，建议锁定版本范围")
+            summary.append(
+                f"⚡ {len(no_version_deps)} 个依赖未指定版本，建议锁定版本范围"
+            )
 
         all_risky = high_deps[:5] + medium_deps[:5]
 
@@ -521,4 +671,3 @@ class DependencyAgent(BaseAgent):
             "total": total,
             "scanned": total,
         }
-

@@ -27,6 +27,7 @@ def _get_rag_store() -> Any:
     if _rag_store is None:
         try:
             from memory.chromadb_store import ChromaStore
+
             _rag_store = ChromaStore(collection_type="knowledge")
         except ImportError:
             _rag_store = None
@@ -58,7 +59,9 @@ def rag_search_knowledge_base(
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         enhanced_query = query
@@ -88,7 +91,9 @@ def rag_search_knowledge_base(
             }
             for r in results
         ]
-        logger.info(f"[chat_tools] rag_search_knowledge_base('{query}') -> {len(items)} results")
+        logger.info(
+            f"[chat_tools] rag_search_knowledge_base('{query}') -> {len(items)} results"
+        )
         return json.dumps({"results": items, "total": len(items)}, ensure_ascii=False)
     except Exception as e:
         logger.warning(f"[chat_tools] 知识库检索失败: {e}")
@@ -130,7 +135,9 @@ def rag_search_by_category(
     Returns:
         JSON 对象：{results: [...], total: int}
     """
-    return rag_search_knowledge_base.invoke({"query": category, "top_k": top_k, "category": category})
+    return rag_search_knowledge_base.invoke(
+        {"query": category, "top_k": top_k, "category": category}
+    )
 
 
 # ─── 仓库分析结果查询工具 ───────────────────────────────────────────────────
@@ -151,6 +158,7 @@ def lookup_repo_analysis(repo_url: str) -> str:
     try:
         # 尝试从内存缓存获取
         from services.analysis_cache import get_cached_result
+
         result = get_cached_result(repo_url)
         if result:
             return json.dumps({"found": True, "data": result}, ensure_ascii=False)
@@ -160,6 +168,7 @@ def lookup_repo_analysis(repo_url: str) -> str:
     # 尝试从数据库获取最新分析记录
     try:
         from services.database import get_latest_analysis_result
+
         result = get_latest_analysis_result(repo_url)
         if result:
             return json.dumps({"found": True, "data": result}, ensure_ascii=False)
@@ -201,10 +210,14 @@ def analyze_code(content: str, language: str = "python") -> str:
         )
 
         summary = summarize_code_file.invoke({"content": content, "language": language})
-        complexity = calculate_complexity.invoke({"content": content, "language": language})
+        complexity = calculate_complexity.invoke(
+            {"content": content, "language": language}
+        )
         smells = detect_code_smells.invoke({"content": content, "language": language})
         imports = detect_imports.invoke({"content": content, "language": language})
-        dependencies = detect_dependencies.invoke({"content": content, "language": language})
+        dependencies = detect_dependencies.invoke(
+            {"content": content, "language": language}
+        )
 
         # 解析 JSON 字符串
         def parse_json(raw):
@@ -215,13 +228,16 @@ def analyze_code(content: str, language: str = "python") -> str:
                     return {"raw": raw[:200]}
             return raw
 
-        return json.dumps({
-            "summary": summary if isinstance(summary, str) else str(summary),
-            "complexity": parse_json(complexity),
-            "smells": parse_json(smells),
-            "imports": parse_json(imports),
-            "dependencies": parse_json(dependencies),
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "summary": summary if isinstance(summary, str) else str(summary),
+                "complexity": parse_json(complexity),
+                "smells": parse_json(smells),
+                "imports": parse_json(imports),
+                "dependencies": parse_json(dependencies),
+            },
+            ensure_ascii=False,
+        )
     except Exception as e:
         logger.warning(f"[chat_tools] analyze_code 失败: {e}")
         return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -242,10 +258,33 @@ def detect_code_language(content: str) -> str:
     content_lower = content.lower().strip()
 
     signals = {
-        "python": ["def ", "import ", "from ", "if __name__", "print(", "elif ", "async def"],
-        "javascript": ["const ", "let ", "function ", "=> {", "console.log", "require(", "export "],
-        "typescript": ["interface ", ": string", ": number", ": boolean", "type ", "as "],
-        "go": ["func ", "package ", "import (", 'fmt.', ":= ", "go func"],
+        "python": [
+            "def ",
+            "import ",
+            "from ",
+            "if __name__",
+            "print(",
+            "elif ",
+            "async def",
+        ],
+        "javascript": [
+            "const ",
+            "let ",
+            "function ",
+            "=> {",
+            "console.log",
+            "require(",
+            "export ",
+        ],
+        "typescript": [
+            "interface ",
+            ": string",
+            ": number",
+            ": boolean",
+            "type ",
+            "as ",
+        ],
+        "go": ["func ", "package ", "import (", "fmt.", ":= ", "go func"],
         "rust": ["fn ", "let mut", "impl ", "pub fn", "use ", "-> ", "println!"],
         "java": ["public class", "private ", "System.out.", "void ", "import java."],
         "cpp": ["#include", "std::", "int main(", "cout <<", "nullptr", "namespace "],
@@ -322,7 +361,9 @@ def _store_suggestion_impl(
     """rag_store_suggestion 的底层实现（同步）。"""
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False)
+        return json.dumps(
+            {"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False
+        )
 
     try:
         code_fix_obj = {}
@@ -332,18 +373,26 @@ def _store_suggestion_impl(
             except json.JSONDecodeError:
                 pass
 
-        tech_stack_list = [t.strip() for t in tech_stack.split(",") if t.strip()] if tech_stack else []
-        languages_list = [l.strip() for l in languages.split(",") if l.strip()] if languages else []
+        tech_stack_list = (
+            [t.strip() for t in tech_stack.split(",") if t.strip()]
+            if tech_stack
+            else []
+        )
+        languages_list = (
+            [l.strip() for l in languages.split(",") if l.strip()] if languages else []
+        )
 
-        suggestions = [{
-            "title": title,
-            "content": content,
-            "category": category,
-            "priority": priority,
-            "code_fix": code_fix_obj,
-            "verified": verified,
-            "type": issue_type,
-        }]
+        suggestions = [
+            {
+                "title": title,
+                "content": content,
+                "category": category,
+                "priority": priority,
+                "code_fix": code_fix_obj,
+                "verified": verified,
+                "type": issue_type,
+            }
+        ]
         count = store.store_suggestions(
             repo_url=repo_url or "general",
             suggestions=suggestions,
@@ -353,7 +402,10 @@ def _store_suggestion_impl(
             project_scale=project_scale,
         )
         logger.info(f"[chat_tools] store_suggestion('{title}') -> 成功, count={count}")
-        return json.dumps({"success": True, "message": "建议已存储", "count": count}, ensure_ascii=False)
+        return json.dumps(
+            {"success": True, "message": "建议已存储", "count": count},
+            ensure_ascii=False,
+        )
     except Exception as e:
         logger.warning(f"[chat_tools] 存储建议失败: {e}")
         return json.dumps({"success": False, "message": str(e)}, ensure_ascii=False)

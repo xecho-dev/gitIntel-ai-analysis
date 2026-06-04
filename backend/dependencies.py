@@ -2,6 +2,7 @@
 共享依赖（Dependencies）
 所有路由共用的认证和数据库连接依赖
 """
+
 from fastapi import Request, HTTPException
 from supabase_client import get_supabase_admin
 from middleware.auth import require_auth
@@ -14,6 +15,7 @@ def get_current_admin(request: Request) -> dict:
     成功时返回管理员信息 dict: {id, username, nickname, avatar, role}
     """
     from middleware.admin_auth import require_admin_auth
+
     return require_admin_auth(request)
 
 
@@ -46,6 +48,7 @@ def require_user_profile(sb: "Client", auth_user_id: str) -> str:
     返回 user_uuid，失败时抛出 HTTPException。
     """
     from services.database import get_user_uuid
+
     user_uuid = get_user_uuid(sb, auth_user_id)
     if not user_uuid:
         raise HTTPException(

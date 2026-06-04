@@ -27,21 +27,21 @@ ReActReflectionAgent — 基于 ReAct 模式的自我反思 Agent。
     ):
         print(event)
 """
-import asyncio
+
 import json
 import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Annotated, Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator
 
 from langchain.agents import create_agent, AgentState
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, AIMessage, BaseMessage, trim_messages
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, trim_messages
 
 from agents.react.error_loop_detector import ErrorLoopDetector
-from agents.react.tool_wrapper import ToolLoopInterrupt,inject_context
+from agents.react.tool_wrapper import ToolLoopInterrupt, inject_context
 from tools.github_tools import batch_search_code
 from tools.code_tools import parse_file_ast, detect_code_smells
 
@@ -189,9 +189,11 @@ REFLECTION_SYSTEM_PROMPT = """## 角色
 
 # ─── 数据结构 ────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ReflectionResult:
     """反思结果"""
+
     analysis_type: str
     overall_confidence: float
     confidence_level: str  # high / medium / low
@@ -222,6 +224,7 @@ class ReflectionResult:
 
 
 # ─── LangChain Callback Handler（带上下文压缩）──────────────────────────────────
+
 
 class ReflectionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
     """通过 LangChain Agent callbacks 自动收集工具调用记录，并自动压缩上下文。
@@ -260,25 +263,34 @@ class ReflectionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
         # 代码搜索：压缩为匹配数
         if tool_name == "batch_search_code":
             import json
+
             try:
                 data = json.loads(raw_result)
                 total = sum(len(r.get("results", [])) for r in data)
                 return f"[批量搜索] {len(data)} 个查询, ~{total} 处匹配"
             except Exception:
                 pass
-            return f"[批量搜索] ~? 处匹配"
+            return "[批量搜索] ~? 处匹配"
 
         # AST 解析：只保留关键统计
         if tool_name in ("parse_file_ast", "detect_code_smells"):
-            func_count = len(re.findall(r'def\s+\w+', raw_result))
-            class_count = len(re.findall(r'class\s+\w+', raw_result))
+            func_count = len(re.findall(r"def\s+\w+", raw_result))
+            class_count = len(re.findall(r"class\s+\w+", raw_result))
             return f"[分析] {func_count} 函数, {class_count} 类"
 
         # 默认截断
-        return raw_result[:self._compressed_chars] + ("..." if len(raw_result) > self._compressed_chars else "")
+        return raw_result[: self._compressed_chars] + (
+            "..." if len(raw_result) > self._compressed_chars else ""
+        )
 
     async def on_tool_start(
-        self, serialized: dict, input: Any = "", *, run_id: str, parent_run_id: str | None = None, **kwargs
+        self,
+        serialized: dict,
+        input: Any = "",
+        *,
+        run_id: str,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         name = serialized.get("name", "unknown")
         self._current_tool_name = name
@@ -290,25 +302,35 @@ class ReflectionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
     ):
         if self._in_tool:
             # 提取原始结果
-            raw_result = str(output.content)[:_TOOL_RESULT_TRUNCATE] if hasattr(output, "content") else str(output)[:_TOOL_RESULT_TRUNCATE]
+            raw_result = (
+                str(output.content)[:_TOOL_RESULT_TRUNCATE]
+                if hasattr(output, "content")
+                else str(output)[:_TOOL_RESULT_TRUNCATE]
+            )
             tool_call_count = len(self.tool_calls) + 1
 
             # 保存原始记录（用于审计）
-            self._raw_tool_calls.append({
-                "iteration": tool_call_count,
-                "tool": self._current_tool_name,
-                "args": dict(self._current_inputs),
-                "raw_result": raw_result,
-            })
+            self._raw_tool_calls.append(
+                {
+                    "iteration": tool_call_count,
+                    "tool": self._current_tool_name,
+                    "args": dict(self._current_inputs),
+                    "raw_result": raw_result,
+                }
+            )
 
             # 压缩结果用于上下文
-            compressed_result = self._compress_tool_result(raw_result, self._current_tool_name)
-            self.tool_calls.append({
-                "iteration": tool_call_count,
-                "tool": self._current_tool_name,
-                "args": dict(self._current_inputs),
-                "result": compressed_result,
-            })
+            compressed_result = self._compress_tool_result(
+                raw_result, self._current_tool_name
+            )
+            self.tool_calls.append(
+                {
+                    "iteration": tool_call_count,
+                    "tool": self._current_tool_name,
+                    "args": dict(self._current_inputs),
+                    "result": compressed_result,
+                }
+            )
 
             # 周期性压缩工具调用历史
             if len(self.tool_calls) > self._max_results:
@@ -317,52 +339,73 @@ class ReflectionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
             self._check_error_pattern(compressed_result, self._current_tool_name)
 
             # 累积进度事件
-            self.progress_events.append({
-                "type": "progress",
-                "agent": "reflection",
-                "message": f"[反思验证] {self._current_tool_name}: {compressed_result[:80]}",
-                "percent": min(15 + tool_call_count * 10, 60),
-                "data": {"tool": self._current_tool_name, "finding": compressed_result[:150], "iteration": tool_call_count},
-            })
+            self.progress_events.append(
+                {
+                    "type": "progress",
+                    "agent": "reflection",
+                    "message": f"[反思验证] {self._current_tool_name}: {compressed_result[:80]}",
+                    "percent": min(15 + tool_call_count * 10, 60),
+                    "data": {
+                        "tool": self._current_tool_name,
+                        "finding": compressed_result[:150],
+                        "iteration": tool_call_count,
+                    },
+                }
+            )
 
         self._in_tool = False
 
     def _trim_tool_calls(self):
         """压缩工具调用历史，只保留最近的调用。"""
         if len(self.tool_calls) > self._max_results:
-            logger.debug(f"压缩反思工具调用历史: {len(self.tool_calls)} -> {self._max_results}")
-            self.tool_calls = self.tool_calls[-self._max_results:]
+            logger.debug(
+                f"压缩反思工具调用历史: {len(self.tool_calls)} -> {self._max_results}"
+            )
+            self.tool_calls = self.tool_calls[-self._max_results :]
 
     async def on_tool_error(
-        self, error: Exception | str, *, run_id: str, parent_run_id: str | None = None, **kwargs
+        self,
+        error: Exception | str,
+        *,
+        run_id: str,
+        parent_run_id: str | None = None,
+        **kwargs,
     ):
         if self._in_tool:
             error_str = str(error)[:200]
             tool_call_count = len(self.tool_calls) + 1
-            self.tool_calls.append({
-                "iteration": tool_call_count,
-                "tool": self._current_tool_name,
-                "args": dict(self._current_inputs),
-                "error": error_str,
-                "result": "",
-            })
+            self.tool_calls.append(
+                {
+                    "iteration": tool_call_count,
+                    "tool": self._current_tool_name,
+                    "args": dict(self._current_inputs),
+                    "error": error_str,
+                    "result": "",
+                }
+            )
             self._check_error_pattern(error_str, self._current_tool_name)
 
             # 累积错误进度事件
-            self.progress_events.append({
-                "type": "progress",
-                "agent": "reflection",
-                "message": f"[反思错误] {self._current_tool_name}: {error_str}",
-                "percent": min(15 + tool_call_count * 10, 60),
-                "data": {"tool": self._current_tool_name, "error": error_str, "iteration": tool_call_count},
-            })
+            self.progress_events.append(
+                {
+                    "type": "progress",
+                    "agent": "reflection",
+                    "message": f"[反思错误] {self._current_tool_name}: {error_str}",
+                    "percent": min(15 + tool_call_count * 10, 60),
+                    "data": {
+                        "tool": self._current_tool_name,
+                        "error": error_str,
+                        "iteration": tool_call_count,
+                    },
+                }
+            )
 
         self._in_tool = False
 
     async def on_chat_model_end(self, output, **kwargs):
         """在 LLM 输出后自动压缩消息历史。"""
         try:
-            content = output.content if hasattr(output, 'content') else str(output)
+            content = output.content if hasattr(output, "content") else str(output)
             self.messages.append(AIMessage(content=content))
 
             # 使用 LangChain 的 trim_messages 压缩消息历史
@@ -384,16 +427,19 @@ class ReflectionCallbackHandler(ErrorLoopDetector, AsyncCallbackHandler):
 
     def _get_token_counter(self):
         """获取 token 计数器（使用简单的字符估算）。"""
+
         def simple_token_counter(messages: list[BaseMessage]) -> int:
             total = 0
             for msg in messages:
                 content = getattr(msg, "content", "") or ""
                 total += len(content) // 2
             return total
+
         return simple_token_counter
 
 
 # ─── 核心 Agent ──────────────────────────────────────────────────────────────
+
 
 class ReActReflectionAgent:
     """基于 ReAct 模式的自我反思 Agent。
@@ -416,7 +462,9 @@ class ReActReflectionAgent:
             print(event)
     """
 
-    MAX_TOOL_CALLS = _REFLECTION_MAX_ITERATIONS  # 重命名：正确表达限制的是 tool_call 次数
+    MAX_TOOL_CALLS = (
+        _REFLECTION_MAX_ITERATIONS  # 重命名：正确表达限制的是 tool_call 次数
+    )
 
     def __init__(self):
         self._llm: BaseChatModel | None = self._get_llm()
@@ -426,7 +474,10 @@ class ReActReflectionAgent:
     def _get_llm() -> BaseChatModel | None:
         try:
             from utils.llm_factory import get_llm_with_tracking
-            return get_llm_with_tracking(agent_name="反思审查", max_tokens=_MAX_OUTPUT_TOKENS)
+
+            return get_llm_with_tracking(
+                agent_name="反思审查", max_tokens=_MAX_OUTPUT_TOKENS
+            )
         except ImportError:
             logger.warning("[ReActReflection] 无法导入 llm_factory")
             return None
@@ -480,8 +531,11 @@ class ReActReflectionAgent:
 
         # ── Step 3: 构建反思上下文 ─────────────────────────────────────
         reflection_context = self._build_reflection_context(
-            analysis_type, analysis_result, context,
-            repo_info=repo_info, file_tree=file_tree,
+            analysis_type,
+            analysis_result,
+            context,
+            repo_info=repo_info,
+            file_tree=file_tree,
         )
 
         yield {
@@ -539,8 +593,7 @@ class ReActReflectionAgent:
             all_tool_calls = handler.tool_calls
 
             logger.info(
-                f"[ReActReflection] create_agent 完成: "
-                f"{len(all_tool_calls)} 次工具调用"
+                f"[ReActReflection] create_agent 完成: {len(all_tool_calls)} 次工具调用"
             )
 
             # ── 统一 yield 所有进度事件 ─────────────────────────────────────────
@@ -570,7 +623,10 @@ class ReActReflectionAgent:
                     "agent": "reflection",
                     "message": f"因错误循环提前终止，已完成 {len(all_tool_calls)} 次工具调用",
                     "percent": 65,
-                    "data": {"stopped_due_to_loop": True, "tool_call_count": len(all_tool_calls)},
+                    "data": {
+                        "stopped_due_to_loop": True,
+                        "tool_call_count": len(all_tool_calls),
+                    },
                 }
 
         except ToolLoopInterrupt as e:
@@ -583,7 +639,10 @@ class ReActReflectionAgent:
                 "agent": "reflection",
                 "message": f"Agent 循环被打断（{e.tool_name} ×{e.count}），已完成 {len(handler.tool_calls)} 次工具调用",
                 "percent": 75,
-                "data": {"stopped_due_to_loop": True, "tool_call_count": len(handler.tool_calls)},
+                "data": {
+                    "stopped_due_to_loop": True,
+                    "tool_call_count": len(handler.tool_calls),
+                },
             }
             final_messages = []
             verification_log = [
@@ -636,7 +695,9 @@ class ReActReflectionAgent:
 
         except Exception as e:
             logger.error(f"[ReActReflection] 最终反思生成失败: {e}")
-            reflection_data = self._generate_fallback_reflection(analysis_type, analysis_result)
+            reflection_data = self._generate_fallback_reflection(
+                analysis_type, analysis_result
+            )
 
         # ── Step 6: 评估是否需要重试 ────────────────────────────────
         needs_retry = reflection_data.get("needs_retry", False)
@@ -674,7 +735,9 @@ class ReActReflectionAgent:
                 "actionability": reflection_data.get("actionability", {}),
                 "risk_assessment": reflection_data.get("risk_assessment", {}),
                 "reflection_summary": reflection_data.get("reflection_summary", ""),
-                "improvement_suggestions": reflection_data.get("improvement_suggestions", []),
+                "improvement_suggestions": reflection_data.get(
+                    "improvement_suggestions", []
+                ),
                 "verification_log": verification_log,
                 "needs_retry": needs_retry,
                 "retry_reason": retry_reason,
@@ -702,7 +765,12 @@ class ReActReflectionAgent:
                 parts.append(f"- 描述: {ri['description']}\n")
             if ri.get("languages"):
                 langs = ri["languages"]
-                lang_str = ", ".join(f"{k} ({v})" for k, v in sorted(langs.items(), key=lambda x: x[1], reverse=True)[:5])
+                lang_str = ", ".join(
+                    f"{k} ({v})"
+                    for k, v in sorted(langs.items(), key=lambda x: x[1], reverse=True)[
+                        :5
+                    ]
+                )
                 parts.append(f"- 语言统计: {lang_str}\n")
             if ri.get("stars"):
                 parts.append(f"- Stars: {ri['stars']}, Forks: {ri.get('forks', 0)}\n")
@@ -712,14 +780,22 @@ class ReActReflectionAgent:
         if file_tree:
             parts.append("\n## 目录结构\n")
             # 只展示关键目录和文件
-            dirs = sorted(set(item["path"].rsplit("/", 1)[0] for item in file_tree[:200] if "/" in item["path"]))
-            files = [item["path"] for item in file_tree[:200] if "/" not in item["path"]]
+            dirs = sorted(
+                set(
+                    item["path"].rsplit("/", 1)[0]
+                    for item in file_tree[:200]
+                    if "/" in item["path"]
+                )
+            )
+            files = [
+                item["path"] for item in file_tree[:200] if "/" not in item["path"]
+            ]
             if dirs:
                 parts.append(f"- 顶层目录 ({len(dirs)} 个):\n")
                 for d in sorted(dirs)[:20]:
                     parts.append(f"  - {d}/\n")
             if files:
-                parts.append(f"- 根目录文件:\n")
+                parts.append("- 根目录文件:\n")
                 for f in sorted(files)[:30]:
                     parts.append(f"  - {f}\n")
             if len(file_tree) > 200:
@@ -749,24 +825,36 @@ class ReActReflectionAgent:
                 parts.append(f"- 已加载文件内容数: {len(files)}\n")
                 parts.append("- 可用于验证的文件内容:\n")
                 for p in list(files.keys())[:15]:
-                    preview = files[p][:500].replace("\n", " ").strip() if files.get(p) else ""
+                    preview = (
+                        files[p][:500].replace("\n", " ").strip()
+                        if files.get(p)
+                        else ""
+                    )
                     parts.append(f"  - {p}: {preview}...\n")
 
             if "tech_stack_result" in context:
                 ts = context["tech_stack_result"]
                 parts.append("\n## 技术栈信息\n")
-                parts.append(f"```json\n{json.dumps(ts, ensure_ascii=False, indent=2)[:2000]}\n```\n")
+                parts.append(
+                    f"```json\n{json.dumps(ts, ensure_ascii=False, indent=2)[:2000]}\n```\n"
+                )
 
-        parts.append("\n请开始反思审查，基于以上仓库信息、目录结构和文件内容验证分析结论的准确性和完整性。")
+        parts.append(
+            "\n请开始反思审查，基于以上仓库信息、目录结构和文件内容验证分析结论的准确性和完整性。"
+        )
         return "".join(parts)
 
-    def _build_final_prompt(self, analysis_type: str, verification_log: list[dict]) -> str:
+    def _build_final_prompt(
+        self, analysis_type: str, verification_log: list[dict]
+    ) -> str:
         """构建最终反思 prompt。"""
         parts = ["\n## 验证日志\n"]
 
         if verification_log:
             for log in verification_log[-5:]:
-                parts.append(f"- [{log['tool']}] {log['args']}: {log['finding'][:100]}\n")
+                parts.append(
+                    f"- [{log['tool']}] {log['args']}: {log['finding'][:100]}\n"
+                )
         else:
             parts.append("- 暂无验证记录\n")
 
@@ -818,7 +906,9 @@ class ReActReflectionAgent:
 
         return self._generate_fallback_reflection("", {})
 
-    def _generate_fallback_reflection(self, analysis_type: str, analysis_result: dict) -> dict:
+    def _generate_fallback_reflection(
+        self, analysis_type: str, analysis_result: dict
+    ) -> dict:
         """生成兜底反思结果。"""
         # 简单规则判断置信度
         confidence = 0.7
@@ -839,7 +929,9 @@ class ReActReflectionAgent:
         return {
             "analysis_type": analysis_type,
             "overall_confidence": confidence,
-            "confidence_level": "high" if confidence > 0.8 else ("medium" if confidence > 0.5 else "low"),
+            "confidence_level": "high"
+            if confidence > 0.8
+            else ("medium" if confidence > 0.5 else "low"),
             "completeness": {
                 "score": confidence,
                 "issues": [] if confidence > 0.5 else ["分析结果过于简略"],
@@ -862,9 +954,11 @@ class ReActReflectionAgent:
                 "risks": [],
                 "is_safe": True,
             },
-            "reflection_summary": f"反思完成，置信度 {confidence * 100:.0f}%。" +
-                                ("分析质量良好。" if confidence > 0.5 else "建议重新执行以提高质量。"),
-            "improvement_suggestions": [] if confidence > 0.5 else [
+            "reflection_summary": f"反思完成，置信度 {confidence * 100:.0f}%。"
+            + ("分析质量良好。" if confidence > 0.5 else "建议重新执行以提高质量。"),
+            "improvement_suggestions": []
+            if confidence > 0.5
+            else [
                 {
                     "area": "completeness",
                     "issue": "分析结果不够完整",
@@ -879,6 +973,7 @@ class ReActReflectionAgent:
 
 # ─── 快速评估函数 ────────────────────────────────────────────────────────────
 # 不需要完整 ReAct 循环的轻量级评估
+
 
 def quick_confidence_check(analysis_type: str, analysis_result: dict) -> dict:
     """快速评估分析结果的置信度（无需 LLM）。
@@ -910,11 +1005,13 @@ def quick_confidence_check(analysis_type: str, analysis_result: dict) -> dict:
             result["quick_score"] = 0.8
 
     elif analysis_type == "explorer":
-        has_findings = any([
-            analysis_result.get("findings"),
-            analysis_result.get("tech_stack_result"),
-            analysis_result.get("quality_result"),
-        ])
+        has_findings = any(
+            [
+                analysis_result.get("findings"),
+                analysis_result.get("tech_stack_result"),
+                analysis_result.get("quality_result"),
+            ]
+        )
         if not has_findings:
             result["quick_score"] = 0.2
             result["flags"].append("no_findings")
@@ -925,7 +1022,9 @@ def quick_confidence_check(analysis_type: str, analysis_result: dict) -> dict:
 
     elif analysis_type == "architecture":
         arch_result = analysis_result or {}
-        has_components = bool(arch_result.get("components") or arch_result.get("layers"))
+        has_components = bool(
+            arch_result.get("components") or arch_result.get("layers")
+        )
         has_style = bool(arch_result.get("architecture_style"))
         if has_components and has_style:
             result["quick_score"] = 0.8

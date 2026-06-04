@@ -1,9 +1,9 @@
-from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
 
 # ─── Chat Sessions ───────────────────────────────────────────────────────────
+
 
 class ChatSession(BaseModel):
     id: str
@@ -24,6 +24,7 @@ class CreateSessionResponse(BaseModel):
 
 
 # ─── Chat Messages ──────────────────────────────────────────────────────────
+
 
 class RAGSource(BaseModel):
     repo_url: str
@@ -57,6 +58,7 @@ class SendMessageResponse(BaseModel):
 
 
 # ─── Session List ───────────────────────────────────────────────────────────
+
 
 class SessionListResponse(BaseModel):
     items: list[ChatSession]

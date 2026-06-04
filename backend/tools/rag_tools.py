@@ -10,6 +10,7 @@ RAG 工具集 — 封装向量检索操作，供 Agent 调用以获取历史分�
 
 这些工具让 Agent 在生成建议时能够主动检索历史经验。
 """
+
 import json
 import logging
 from typing import Any
@@ -25,8 +26,11 @@ def _get_rag_store() -> Any:
     if _rag_store is None:
         try:
             from memory.chromadb_store import ChromaStore
+
             _rag_store = ChromaStore(collection_type="knowledge")
-            logger.info(f"[rag_tools] RAG Store 初始化完成，可用: {_rag_store.is_available}")
+            logger.info(
+                f"[rag_tools] RAG Store 初始化完成，可用: {_rag_store.is_available}"
+            )
         except ImportError:
             logger.warning("[rag_tools] ChromaStore 未安装，RAG 工具将不可用")
             _rag_store = None
@@ -40,7 +44,9 @@ def _rag_search_similar_impl(query: str, top_k: int = 5) -> str:
     """rag_search_similar 的底层实现（同步，供 run_in_executor 使用）。"""
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         results = store.retrieve_similar(query, top_k=min(top_k, 20))
@@ -83,18 +89,22 @@ def _rag_store_suggestion_impl(
     """rag_store_suggestion 的底层实现（同步，供 run_in_executor 使用）。"""
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False)
+        return json.dumps(
+            {"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False
+        )
 
     try:
-        suggestions = [{
-            "title": title,
-            "content": content,
-            "category": category,
-            "priority": priority,
-            "code_fix": code_fix or {},
-            "verified": verified,
-            "type": issue_type,
-        }]
+        suggestions = [
+            {
+                "title": title,
+                "content": content,
+                "category": category,
+                "priority": priority,
+                "code_fix": code_fix or {},
+                "verified": verified,
+                "type": issue_type,
+            }
+        ]
         store.store_suggestions(
             repo_url=repo_url,
             suggestions=suggestions,
@@ -103,7 +113,9 @@ def _rag_store_suggestion_impl(
             languages=languages or [],
             project_scale=project_scale,
         )
-        return json.dumps({"success": True, "message": "建议已存储", "count": 1}, ensure_ascii=False)
+        return json.dumps(
+            {"success": True, "message": "建议已存储", "count": 1}, ensure_ascii=False
+        )
     except Exception as e:
         return json.dumps({"success": False, "message": str(e)}, ensure_ascii=False)
 
@@ -112,10 +124,14 @@ def _rag_store_analysis_impl(repo_url: str, analysis_result: dict) -> str:
     """存储完整分析结果（多维度批量存储）。"""
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False)
+        return json.dumps(
+            {"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False
+        )
 
     try:
-        result = store.store_analysis_result(repo_url=repo_url, analysis_result=analysis_result)
+        result = store.store_analysis_result(
+            repo_url=repo_url, analysis_result=analysis_result
+        )
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:
         _logger.error(f"[rag_tools] 综合存储失败: {e}")
@@ -139,7 +155,9 @@ def rag_search_similar(query: str, top_k: int = 5) -> str:
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         results = store.retrieve_similar(query, top_k=min(top_k, 20))
@@ -160,7 +178,9 @@ def rag_search_similar(query: str, top_k: int = 5) -> str:
             }
             for r in results
         ]
-        logger.info(f"[rag_tools] rag_search_similar('{query}') -> {len(items)} results")
+        logger.info(
+            f"[rag_tools] rag_search_similar('{query}') -> {len(items)} results"
+        )
         return json.dumps({"results": items, "total": len(items)}, ensure_ascii=False)
     except Exception as e:
         logger.warning(f"[rag_tools] RAG 搜索失败: {e}")
@@ -184,7 +204,9 @@ def rag_search_by_repo(repo_url: str, top_k: int = 5) -> str:
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         results = store.retrieve_by_repo(repo_url, top_k=min(top_k, 20))
@@ -203,7 +225,9 @@ def rag_search_by_repo(repo_url: str, top_k: int = 5) -> str:
             }
             for r in results
         ]
-        logger.info(f"[rag_tools] rag_search_by_repo('{repo_url}') -> {len(items)} results")
+        logger.info(
+            f"[rag_tools] rag_search_by_repo('{repo_url}') -> {len(items)} results"
+        )
         return json.dumps({"results": items, "total": len(items)}, ensure_ascii=False)
     except Exception as e:
         logger.warning(f"[rag_tools] RAG 按仓库搜索失败: {e}")
@@ -228,7 +252,9 @@ def rag_search_by_category(category: str, top_k: int = 5) -> str:
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         # 通过相似搜索实现（用类别关键词作为 query）
@@ -250,7 +276,9 @@ def rag_search_by_category(category: str, top_k: int = 5) -> str:
             for r in results
             if r.category == category
         ]
-        logger.info(f"[rag_tools] rag_search_by_category('{category}') -> {len(items)} results")
+        logger.info(
+            f"[rag_tools] rag_search_by_category('{category}') -> {len(items)} results"
+        )
         return json.dumps({"results": items, "total": len(items)}, ensure_ascii=False)
     except Exception as e:
         logger.warning(f"[rag_tools] RAG 类别搜索失败: {e}")
@@ -274,7 +302,9 @@ def rag_search_code_pattern(code_pattern: str, top_k: int = 3) -> str:
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         results = store.retrieve_similar(code_pattern, top_k=min(top_k, 10))
@@ -334,7 +364,9 @@ def rag_store_suggestion(
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False)
+        return json.dumps(
+            {"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False
+        )
 
     try:
         # 解析 code_fix
@@ -346,18 +378,26 @@ def rag_store_suggestion(
                 pass
 
         # 解析技术栈
-        tech_stack_list = [t.strip() for t in tech_stack.split(",") if t.strip()] if tech_stack else []
-        languages_list = [l.strip() for l in languages.split(",") if l.strip()] if languages else []
+        tech_stack_list = (
+            [t.strip() for t in tech_stack.split(",") if t.strip()]
+            if tech_stack
+            else []
+        )
+        languages_list = (
+            [l.strip() for l in languages.split(",") if l.strip()] if languages else []
+        )
 
-        suggestions = [{
-            "title": title,
-            "content": content,
-            "category": category,
-            "priority": priority,
-            "code_fix": code_fix_obj,
-            "verified": verified,
-            "type": issue_type,
-        }]
+        suggestions = [
+            {
+                "title": title,
+                "content": content,
+                "category": category,
+                "priority": priority,
+                "code_fix": code_fix_obj,
+                "verified": verified,
+                "type": issue_type,
+            }
+        ]
         count = store.store_suggestions(
             repo_url=repo_url,
             suggestions=suggestions,
@@ -366,8 +406,13 @@ def rag_store_suggestion(
             languages=languages_list,
             project_scale=project_scale,
         )
-        logger.info(f"[rag_tools] rag_store_suggestion('{title}') -> 成功, count={count}")
-        return json.dumps({"success": True, "message": "建议已存储", "count": count}, ensure_ascii=False)
+        logger.info(
+            f"[rag_tools] rag_store_suggestion('{title}') -> 成功, count={count}"
+        )
+        return json.dumps(
+            {"success": True, "message": "建议已存储", "count": count},
+            ensure_ascii=False,
+        )
     except Exception as e:
         logger.warning(f"[rag_tools] RAG 存储失败: {e}")
         return json.dumps({"success": False, "message": str(e)}, ensure_ascii=False)
@@ -392,16 +437,22 @@ def rag_store_analysis(
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False)
+        return json.dumps(
+            {"success": False, "message": "RAG Store 不可用"}, ensure_ascii=False
+        )
 
     try:
         result = json.loads(analysis_result)
         output = store.store_analysis_result(repo_url=repo_url, analysis_result=result)
-        logger.info(f"[rag_tools] rag_store_analysis('{repo_url}') -> 成功, total={output.get('total', 0)}")
+        logger.info(
+            f"[rag_tools] rag_store_analysis('{repo_url}') -> 成功, total={output.get('total', 0)}"
+        )
         return json.dumps(output, ensure_ascii=False)
     except json.JSONDecodeError as e:
         logger.warning(f"[rag_tools] analysis_result JSON 解析失败: {e}")
-        return json.dumps({"success": False, "message": f"JSON 解析失败: {e}"}, ensure_ascii=False)
+        return json.dumps(
+            {"success": False, "message": f"JSON 解析失败: {e}"}, ensure_ascii=False
+        )
     except Exception as e:
         logger.warning(f"[rag_tools] 综合存储失败: {e}")
         return json.dumps({"success": False, "message": str(e)}, ensure_ascii=False)
@@ -430,7 +481,9 @@ def rag_search_knowledge_base(
     """
     store = _get_rag_store()
     if store is None or not store.is_available:
-        return json.dumps({"error": "RAG Store 不可用", "results": []}, ensure_ascii=False)
+        return json.dumps(
+            {"error": "RAG Store 不可用", "results": []}, ensure_ascii=False
+        )
 
     try:
         # 构建增强 query
@@ -461,7 +514,9 @@ def rag_search_knowledge_base(
             }
             for r in results
         ]
-        logger.info(f"[rag_tools] rag_search_knowledge_base('{query}') -> {len(items)} results")
+        logger.info(
+            f"[rag_tools] rag_search_knowledge_base('{query}') -> {len(items)} results"
+        )
         return json.dumps({"results": items, "total": len(items)}, ensure_ascii=False)
     except Exception as e:
         logger.warning(f"[rag_tools] 知识库检索失败: {e}")

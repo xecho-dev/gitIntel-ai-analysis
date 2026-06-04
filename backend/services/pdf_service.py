@@ -9,7 +9,6 @@ Helvetica-Bold」独立样式，禁止嵌在 STSong 的 mini-HTML 里，否则�
 """
 
 import io
-import os
 from datetime import datetime
 from typing import Any
 from xml.sax.saxutils import escape
@@ -45,6 +44,7 @@ try:
         _get_prompt_for_dependency,
         _get_prompt_for_optimization,
     )
+
     AI_IMAGE_AVAILABLE = True
 except ImportError:
     AI_IMAGE_AVAILABLE = False
@@ -52,21 +52,21 @@ except ImportError:
 
 # ── 颜色与排版常量（低饱和、统一在 slate / indigo 系）────────────────
 
-ACCENT_ARCH    = colors.HexColor("#4f46e5")
+ACCENT_ARCH = colors.HexColor("#4f46e5")
 ACCENT_QUALITY = colors.HexColor("#0d9488")
-ACCENT_DEP     = colors.HexColor("#e11d48")
-ACCENT_OPT     = colors.HexColor("#7c3aed")
-BRAND          = colors.HexColor("#4f46e5")
+ACCENT_DEP = colors.HexColor("#e11d48")
+ACCENT_OPT = colors.HexColor("#7c3aed")
+BRAND = colors.HexColor("#4f46e5")
 
-WHITE       = colors.white
-PAGE_BG     = colors.HexColor("#ffffff")
-SECTION_BG  = colors.HexColor("#fafafa")
-HEADER_ROW  = colors.HexColor("#f1f5f9")
-BORDER      = colors.HexColor("#e2e8f0")
-BORDER_STR  = colors.HexColor("#cbd5e1")
-TEXT        = colors.HexColor("#0f172a")
-TEXT_SEC    = colors.HexColor("#334155")
-MUTED       = colors.HexColor("#64748b")
+WHITE = colors.white
+PAGE_BG = colors.HexColor("#ffffff")
+SECTION_BG = colors.HexColor("#fafafa")
+HEADER_ROW = colors.HexColor("#f1f5f9")
+BORDER = colors.HexColor("#e2e8f0")
+BORDER_STR = colors.HexColor("#cbd5e1")
+TEXT = colors.HexColor("#0f172a")
+TEXT_SEC = colors.HexColor("#334155")
+MUTED = colors.HexColor("#64748b")
 
 RISK_H = colors.HexColor("#be123c")
 RISK_M = colors.HexColor("#b45309")
@@ -101,18 +101,47 @@ def _ensure_pdf_cjk_font() -> str:
 
 # ── 样式 ─────────────────────────────────────────────────────────
 
+
 def _make_styles() -> dict[str, ParagraphStyle]:
     fn = _ensure_pdf_cjk_font()
     s: dict[str, ParagraphStyle] = {}
 
-    s["logo"] = ParagraphStyle("logo", fontSize=24, textColor=BRAND,
-                                fontName=fn, alignment=1, spaceAfter=2, leading=28)
-    s["cover_title"] = ParagraphStyle("cover_title", fontSize=17, textColor=TEXT,
-                                      fontName=fn, alignment=1, spaceAfter=10, leading=22)
-    s["cover_meta"] = ParagraphStyle("cover_meta", fontSize=9, textColor=MUTED,
-                                     fontName=fn, alignment=1, spaceAfter=4, leading=12)
-    s["cover_url"] = ParagraphStyle("cover_url", fontSize=8.5, textColor=BRAND,
-                                    fontName=fn, alignment=1, spaceAfter=2, leading=11)
+    s["logo"] = ParagraphStyle(
+        "logo",
+        fontSize=24,
+        textColor=BRAND,
+        fontName=fn,
+        alignment=1,
+        spaceAfter=2,
+        leading=28,
+    )
+    s["cover_title"] = ParagraphStyle(
+        "cover_title",
+        fontSize=17,
+        textColor=TEXT,
+        fontName=fn,
+        alignment=1,
+        spaceAfter=10,
+        leading=22,
+    )
+    s["cover_meta"] = ParagraphStyle(
+        "cover_meta",
+        fontSize=9,
+        textColor=MUTED,
+        fontName=fn,
+        alignment=1,
+        spaceAfter=4,
+        leading=12,
+    )
+    s["cover_url"] = ParagraphStyle(
+        "cover_url",
+        fontSize=8.5,
+        textColor=BRAND,
+        fontName=fn,
+        alignment=1,
+        spaceAfter=2,
+        leading=11,
+    )
 
     s["sec_title_bar"] = ParagraphStyle(
         "sec_title_bar",
@@ -123,54 +152,107 @@ def _make_styles() -> dict[str, ParagraphStyle]:
         spaceAfter=0,
         alignment=TA_CENTER,
     )
-    s["sec_title_p"]  = ParagraphStyle("sec_title_p",  fontSize=13, textColor=WHITE,
-                                       fontName=fn, spaceAfter=2)
-    s["sec_title_c"]  = ParagraphStyle("sec_title_c",  fontSize=13, textColor=WHITE,
-                                       fontName=fn, spaceAfter=2)
-    s["sec_title_r"]  = ParagraphStyle("sec_title_r",  fontSize=13, textColor=WHITE,
-                                       fontName=fn, spaceAfter=2)
-    s["sec_title_u"]  = ParagraphStyle("sec_title_u",  fontSize=13, textColor=WHITE,
-                                       fontName=fn, spaceAfter=2)
+    s["sec_title_p"] = ParagraphStyle(
+        "sec_title_p", fontSize=13, textColor=WHITE, fontName=fn, spaceAfter=2
+    )
+    s["sec_title_c"] = ParagraphStyle(
+        "sec_title_c", fontSize=13, textColor=WHITE, fontName=fn, spaceAfter=2
+    )
+    s["sec_title_r"] = ParagraphStyle(
+        "sec_title_r", fontSize=13, textColor=WHITE, fontName=fn, spaceAfter=2
+    )
+    s["sec_title_u"] = ParagraphStyle(
+        "sec_title_u", fontSize=13, textColor=WHITE, fontName=fn, spaceAfter=2
+    )
 
-    s["kpi_label"] = ParagraphStyle("kpi_label", fontSize=8, textColor=MUTED,
-                                    fontName=fn, alignment=1, leading=11)
-    s["kpi_value"] = ParagraphStyle("kpi_value", fontSize=15, textColor=TEXT,
-                                    fontName=fn, alignment=1, leading=18)
-    s["kpi_val_h"] = ParagraphStyle("kpi_val_h", fontSize=15, textColor=RISK_H,
-                                     fontName=fn, alignment=1, leading=18)
-    s["kpi_val_m"] = ParagraphStyle("kpi_val_m", fontSize=15, textColor=RISK_M,
-                                     fontName=fn, alignment=1, leading=18)
-    s["kpi_val_l"] = ParagraphStyle("kpi_val_l", fontSize=15, textColor=RISK_L,
-                                     fontName=fn, alignment=1, leading=18)
+    s["kpi_label"] = ParagraphStyle(
+        "kpi_label", fontSize=8, textColor=MUTED, fontName=fn, alignment=1, leading=11
+    )
+    s["kpi_value"] = ParagraphStyle(
+        "kpi_value", fontSize=15, textColor=TEXT, fontName=fn, alignment=1, leading=18
+    )
+    s["kpi_val_h"] = ParagraphStyle(
+        "kpi_val_h", fontSize=15, textColor=RISK_H, fontName=fn, alignment=1, leading=18
+    )
+    s["kpi_val_m"] = ParagraphStyle(
+        "kpi_val_m", fontSize=15, textColor=RISK_M, fontName=fn, alignment=1, leading=18
+    )
+    s["kpi_val_l"] = ParagraphStyle(
+        "kpi_val_l", fontSize=15, textColor=RISK_L, fontName=fn, alignment=1, leading=18
+    )
 
-    s["tag"] = ParagraphStyle("tag", fontSize=8, textColor=BRAND,
-                              fontName=fn, spaceAfter=0)
+    s["tag"] = ParagraphStyle(
+        "tag", fontSize=8, textColor=BRAND, fontName=fn, spaceAfter=0
+    )
 
-    s["item_title_h"] = ParagraphStyle("item_title_h", fontSize=10, textColor=RISK_H,
-                                        fontName=fn, spaceAfter=2, leading=13)
-    s["item_title_m"] = ParagraphStyle("item_title_m", fontSize=10, textColor=RISK_M,
-                                        fontName=fn, spaceAfter=2, leading=13)
-    s["item_title_l"] = ParagraphStyle("item_title_l", fontSize=10, textColor=RISK_L,
-                                        fontName=fn, spaceAfter=2, leading=13)
-    s["item_title"]   = ParagraphStyle("item_title",   fontSize=10, textColor=TEXT,
-                                        fontName=fn, spaceAfter=1)
-    s["item_desc"] = ParagraphStyle("item_desc", fontSize=9, textColor=MUTED,
-                                    fontName=fn, spaceAfter=2)
-    s["badge_h"] = ParagraphStyle("badge_h", fontSize=7, textColor=RISK_H,
-                                   fontName=fn, alignment=1)
-    s["badge_m"] = ParagraphStyle("badge_m", fontSize=7, textColor=RISK_M,
-                                   fontName=fn, alignment=1)
-    s["badge_l"] = ParagraphStyle("badge_l", fontSize=7, textColor=RISK_L,
-                                   fontName=fn, alignment=1)
+    s["item_title_h"] = ParagraphStyle(
+        "item_title_h",
+        fontSize=10,
+        textColor=RISK_H,
+        fontName=fn,
+        spaceAfter=2,
+        leading=13,
+    )
+    s["item_title_m"] = ParagraphStyle(
+        "item_title_m",
+        fontSize=10,
+        textColor=RISK_M,
+        fontName=fn,
+        spaceAfter=2,
+        leading=13,
+    )
+    s["item_title_l"] = ParagraphStyle(
+        "item_title_l",
+        fontSize=10,
+        textColor=RISK_L,
+        fontName=fn,
+        spaceAfter=2,
+        leading=13,
+    )
+    s["item_title"] = ParagraphStyle(
+        "item_title", fontSize=10, textColor=TEXT, fontName=fn, spaceAfter=1
+    )
+    s["item_desc"] = ParagraphStyle(
+        "item_desc", fontSize=9, textColor=MUTED, fontName=fn, spaceAfter=2
+    )
+    s["badge_h"] = ParagraphStyle(
+        "badge_h", fontSize=7, textColor=RISK_H, fontName=fn, alignment=1
+    )
+    s["badge_m"] = ParagraphStyle(
+        "badge_m", fontSize=7, textColor=RISK_M, fontName=fn, alignment=1
+    )
+    s["badge_l"] = ParagraphStyle(
+        "badge_l", fontSize=7, textColor=RISK_L, fontName=fn, alignment=1
+    )
 
-    s["summary"] = ParagraphStyle("summary", fontSize=9.5, textColor=TEXT_SEC,
-                                  fontName=fn, leading=15, spaceAfter=2, alignment=TA_CENTER)
+    s["summary"] = ParagraphStyle(
+        "summary",
+        fontSize=9.5,
+        textColor=TEXT_SEC,
+        fontName=fn,
+        leading=15,
+        spaceAfter=2,
+        alignment=TA_CENTER,
+    )
 
-    s["footer"] = ParagraphStyle("footer", fontSize=7.5, textColor=MUTED,
-                                  fontName=fn, alignment=TA_CENTER, leading=11)
+    s["footer"] = ParagraphStyle(
+        "footer",
+        fontSize=7.5,
+        textColor=MUTED,
+        fontName=fn,
+        alignment=TA_CENTER,
+        leading=11,
+    )
 
-    s["hotspot"] = ParagraphStyle("hotspot", fontSize=9, textColor=RISK_H,
-                                  fontName=fn, spaceAfter=5, leading=13, alignment=TA_CENTER)
+    s["hotspot"] = ParagraphStyle(
+        "hotspot",
+        fontSize=9,
+        textColor=RISK_H,
+        fontName=fn,
+        spaceAfter=5,
+        leading=13,
+        alignment=TA_CENTER,
+    )
     s["hotspot_en"] = ParagraphStyle(
         "hotspot_en",
         fontName="Helvetica",
@@ -180,8 +262,14 @@ def _make_styles() -> dict[str, ParagraphStyle]:
         leading=13,
         alignment=TA_CENTER,
     )
-    s["insight"] = ParagraphStyle("insight", fontSize=9.5, textColor=TEXT_SEC,
-                                  fontName=fn, leading=14, alignment=TA_CENTER)
+    s["insight"] = ParagraphStyle(
+        "insight",
+        fontSize=9.5,
+        textColor=TEXT_SEC,
+        fontName=fn,
+        leading=14,
+        alignment=TA_CENTER,
+    )
     s["insight_en"] = ParagraphStyle(
         "insight_en",
         fontName="Helvetica",
@@ -191,9 +279,9 @@ def _make_styles() -> dict[str, ParagraphStyle]:
         alignment=TA_CENTER,
     )
     # 长名别名（兼容 .lower() 后的 lookup）
-    s["kpi_val_high"]   = s["kpi_val_h"]
+    s["kpi_val_high"] = s["kpi_val_h"]
     s["kpi_val_medium"] = s["kpi_val_m"]
-    s["kpi_val_low"]    = s["kpi_val_l"]
+    s["kpi_val_low"] = s["kpi_val_l"]
     return s
 
 
@@ -248,14 +336,15 @@ def _grade_style_key(grade_display: str) -> str:
 
 # ── 封面 ─────────────────────────────────────────────────────────
 
+
 def _build_cover(
     data: dict[str, Any],
     styles: dict[str, ParagraphStyle],
     cover_image: bytes | None = None,
 ) -> list:
     repo_url = data.get("repo_url", "Unknown")
-    branch   = data.get("branch", "main")
-    ts       = datetime.now().strftime("%Y-%m-%d %H:%M")
+    branch = data.get("branch", "main")
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     story: list = []
 
     # AI 生成封面图
@@ -267,10 +356,14 @@ def _build_cover(
                 [[img, Paragraph("GitIntel", styles["logo"])]],
                 colWidths=[60, 90],
             )
-            logo_table.setStyle(TableStyle([
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (1, 0), (1, 0), 10),
-            ]))
+            logo_table.setStyle(
+                TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("LEFTPADDING", (1, 0), (1, 0), 10),
+                    ]
+                )
+            )
             story.append(Spacer(1, 10 * mm))
             story.append(logo_table)
         except Exception:
@@ -282,11 +375,13 @@ def _build_cover(
 
     story.append(Paragraph("仓库智能分析报告", styles["cover_title"]))
     story.append(HRFlowable(width="100%", thickness=1, color=BORDER_STR, spaceAfter=10))
-    story.append(Paragraph(
-        f"分支 <font color='{HEX_MUTED}'> | </font> {escape(str(branch))}"
-        f"    生成时间 <font color='{HEX_MUTED}'> | </font> {escape(ts)}",
-        styles["cover_meta"],
-    ))
+    story.append(
+        Paragraph(
+            f"分支 <font color='{HEX_MUTED}'> | </font> {escape(str(branch))}"
+            f"    生成时间 <font color='{HEX_MUTED}'> | </font> {escape(ts)}",
+            styles["cover_meta"],
+        )
+    )
     story.append(Paragraph(escape(str(repo_url)), styles["cover_url"]))
     story.append(Spacer(1, 10 * mm))
     story.append(NextPageTemplate("normal"))
@@ -294,6 +389,7 @@ def _build_cover(
 
 
 # ── 工具函数 ─────────────────────────────────────────────────────
+
 
 def _kpi_table(rows: list[list[Any]], col_widths: list[float]) -> Table:
     """KPI 表：首行标签区与数值区分色，避免「多出一行空白」的错觉。"""
@@ -318,16 +414,21 @@ def _section_header(
     styles: dict[str, ParagraphStyle],
     content_w: float,
 ) -> Table:
-    t = Table([[Paragraph(escape(title), styles["sec_title_bar"])]],
-              colWidths=[content_w])
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), HEADER_ROW),
-        ("LINEBEFORE", (0, 0), (0, -1), 5, accent),
-        ("TOPPADDING", (0, 0), (-1, -1), 13),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 13),
-        ("LEFTPADDING", (0, 0), (-1, -1), 16),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 16),
-    ]))
+    t = Table(
+        [[Paragraph(escape(title), styles["sec_title_bar"])]], colWidths=[content_w]
+    )
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), HEADER_ROW),
+                ("LINEBEFORE", (0, 0), (0, -1), 5, accent),
+                ("TOPPADDING", (0, 0), (-1, -1), 13),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 13),
+                ("LEFTPADDING", (0, 0), (-1, -1), 16),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+            ]
+        )
+    )
     return t
 
 
@@ -381,26 +482,33 @@ def _item_row(title: str, desc: str, level: str, content_w: float) -> Table:
         "l": RISK_L,
     }.get(level.lower(), BORDER_STR)
 
-    row = [[
-        Paragraph(f"{escape(title)} <b>[{escape(badge_text)}]</b>", title_style),
-        Paragraph(escape(desc), styles["item_desc"]),
-    ]]
+    row = [
+        [
+            Paragraph(f"{escape(title)} <b>[{escape(badge_text)}]</b>", title_style),
+            Paragraph(escape(desc), styles["item_desc"]),
+        ]
+    ]
     w_left = content_w * 0.44
     w_right = content_w - w_left
     t = Table(row, colWidths=[w_left, w_right])
-    t.setStyle(TableStyle([
-        ("BACKGROUND",    (0, 0), (-1, -1), bg),
-        ("LINEBEFORE",   (0, 0), (0, -1), 3, border_color),
-        ("TOPPADDING",   (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-    ]))
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), bg),
+                ("LINEBEFORE", (0, 0), (0, -1), 3, border_color),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        )
+    )
     return t
 
 
 # ── 各模块渲染 ──────────────────────────────────────────────────
+
 
 def _add_ai_image(
     elements: list,
@@ -434,9 +542,7 @@ def _render_architecture(
     elements: list = []
 
     # AI 生成章节配图
-    elements = _add_ai_image(
-        elements, None, None, ai_image, width=content_w * 0.4
-    )
+    elements = _add_ai_image(elements, None, None, ai_image, width=content_w * 0.4)
 
     # 4 列 KPI：标签行 + 值行
     complexity_key = f"kpi_val_{arch.get('complexity', '').lower()}"
@@ -513,9 +619,7 @@ def _render_quality(
     elements: list = []
 
     # AI 生成章节配图
-    elements = _add_ai_image(
-        elements, None, None, ai_image, width=content_w * 0.4
-    )
+    elements = _add_ai_image(elements, None, None, ai_image, width=content_w * 0.4)
 
     score = quality.get("health_score", "—")
     raw_grade = quality.get("grade")
@@ -534,8 +638,10 @@ def _render_quality(
 
     half = content_w / 2.0
     kpi_data = [
-        [Paragraph("综合评分", styles["kpi_label"]),
-         Paragraph("评级", styles["kpi_label"])],
+        [
+            Paragraph("综合评分", styles["kpi_label"]),
+            Paragraph("评级", styles["kpi_label"]),
+        ],
         [score_para, grade_para],
     ]
     elements.append(_kpi_table(kpi_data, [half, half]))
@@ -544,7 +650,7 @@ def _render_quality(
     for iss in issues[:8]:
         level = iss.get("severity", "m")
         title = iss.get("title", "未知问题")
-        desc  = iss.get("description", "")
+        desc = iss.get("description", "")
         elements.append(_item_row(title, desc, level, content_w))
         elements.append(_spacer(3))
 
@@ -564,23 +670,23 @@ def _render_dependency(
     elements: list = []
 
     # AI 生成章节配图
-    elements = _add_ai_image(
-        elements, None, None, ai_image, width=content_w * 0.4
-    )
+    elements = _add_ai_image(elements, None, None, ai_image, width=content_w * 0.4)
 
-    total  = dep.get("total", 0)
-    high   = dep.get("high", 0)
+    total = dep.get("total", 0)
+    high = dep.get("high", 0)
     medium = dep.get("medium", 0)
-    low    = dep.get("low", 0)
+    low = dep.get("low", 0)
     summary = dep.get("summary") or []
 
     risk = "h" if high > 0 else "m" if medium > 0 else "l"
     col = content_w / 4.0
     kpi_data = [
-        [Paragraph("总依赖", styles["kpi_label"]),
-         Paragraph("高危", styles["kpi_label"]),
-         Paragraph("中危", styles["kpi_label"]),
-         Paragraph("低危", styles["kpi_label"])],
+        [
+            Paragraph("总依赖", styles["kpi_label"]),
+            Paragraph("高危", styles["kpi_label"]),
+            Paragraph("中危", styles["kpi_label"]),
+            Paragraph("低危", styles["kpi_label"]),
+        ],
         [
             _para_metric_value(total, HEX_TEXT),
             _para_metric_value(high, HEX_RISK_H),
@@ -596,7 +702,9 @@ def _render_dependency(
         elements.append(Paragraph(lines, styles["summary"]))
 
     risk_label = {"h": "高风险", "m": "中风险", "l": "低风险"}.get(risk, "")
-    header = _section_header(f"依赖分析  |  {risk_label}", ACCENT_DEP, styles, content_w)
+    header = _section_header(
+        f"依赖分析  |  {risk_label}", ACCENT_DEP, styles, content_w
+    )
     body, _ = _section_body(elements, content_w)
     return [header, *body, _spacer(10)]
 
@@ -612,20 +720,20 @@ def _render_optimization(
     elements: list = []
 
     # AI 生成章节配图
-    elements = _add_ai_image(
-        elements, None, None, ai_image, width=content_w * 0.4
-    )
+    elements = _add_ai_image(elements, None, None, ai_image, width=content_w * 0.4)
 
-    high_p   = opt.get("high_priority", 0)
+    high_p = opt.get("high_priority", 0)
     medium_p = opt.get("medium_priority", 0)
-    low_p    = opt.get("low_priority", 0)
+    low_p = opt.get("low_priority", 0)
     suggestions = opt.get("suggestions") or []
 
     col = content_w / 3.0
     kpi_data = [
-        [Paragraph("高优先级", styles["kpi_label"]),
-         Paragraph("中优先级", styles["kpi_label"]),
-         Paragraph("低优先级", styles["kpi_label"])],
+        [
+            Paragraph("高优先级", styles["kpi_label"]),
+            Paragraph("中优先级", styles["kpi_label"]),
+            Paragraph("低优先级", styles["kpi_label"]),
+        ],
         [
             _para_metric_value(high_p, HEX_RISK_H),
             _para_metric_value(medium_p, HEX_RISK_M),
@@ -638,7 +746,7 @@ def _render_optimization(
     for s in suggestions[:8]:
         priority = s.get("priority", "m")
         title = s.get("title", "建议")
-        desc  = s.get("description", "")
+        desc = s.get("description", "")
         stype = s.get("type", "优化")
         elements.append(_item_row(f"[{stype}] {title}", desc, priority, content_w))
         elements.append(_spacer(3))
@@ -649,6 +757,7 @@ def _render_optimization(
 
 
 # ── 主构建函数 ───────────────────────────────────────────────────
+
 
 def _pre_generate_ai_images(
     data: dict[str, Any],
@@ -696,7 +805,9 @@ def _pre_generate_ai_images(
 
         # 依赖分析图
         dep = data.get("dependency", {})
-        risk = "h" if dep.get("high", 0) > 0 else "m" if dep.get("medium", 0) > 0 else "l"
+        risk = (
+            "h" if dep.get("high", 0) > 0 else "m" if dep.get("medium", 0) > 0 else "l"
+        )
         images["dependency"] = get_cached_image_sync(
             f"dep_{risk}",
             _get_prompt_for_dependency(risk),
@@ -709,6 +820,7 @@ def _pre_generate_ai_images(
 
     except Exception as e:
         import logging
+
         logging.getLogger("pdf_service").warning(f"AI 图片生成失败: {e}")
 
     return images
@@ -775,15 +887,19 @@ def build_pdf_bytes(
         story.append(header)
         if body_parts:
             body_table = Table([[p] for p in body_parts], colWidths=[content_w])
-            body_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), SECTION_BG),
-                ("BOX", (0, 0), (-1, -1), 0.75, BORDER_STR),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ("LEFTPADDING", (0, 0), (-1, -1), 14),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]))
+            body_table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, -1), SECTION_BG),
+                        ("BOX", (0, 0), (-1, -1), 0.75, BORDER_STR),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 14),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ]
+                )
+            )
             story.append(body_table)
         story.append(end_spacer)
 
@@ -791,11 +907,13 @@ def build_pdf_bytes(
     story.append(_spacer(6))
     story.append(HRFlowable(width="100%", thickness=0.5, color=BORDER))
     story.append(_spacer(3))
-    story.append(Paragraph(
-        f"由 GitIntel AI 分析引擎生成 <font color='{HEX_MUTED}'>|</font> "
-        f"仅供参考，请以实际代码为准",
-        styles["footer"],
-    ))
+    story.append(
+        Paragraph(
+            f"由 GitIntel AI 分析引擎生成 <font color='{HEX_MUTED}'>|</font> "
+            f"仅供参考，请以实际代码为准",
+            styles["footer"],
+        )
+    )
 
     doc.build(story)
     buf.seek(0)
