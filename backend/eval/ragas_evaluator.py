@@ -189,7 +189,7 @@ class RAGASEvaluator:
                 "OPENAI_BASE_URL",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
-            model = self._eval_llm_model or os.getenv("EVAL_LLM_MODEL") or "qwen3.6-plus-2026-04-02"
+            model = self._eval_llm_model or os.getenv("EVAL_LLM_MODEL") or "qwen3.7-max-2026-05-17"
 
             self._eval_llm = ChatOpenAI(
                 model=model,

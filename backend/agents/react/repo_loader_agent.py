@@ -30,6 +30,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, Optional
@@ -38,7 +39,7 @@ from langchain.agents import create_agent, AgentState
 from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from agents.react.error_loop_detector import ErrorLoopDetector
 from agents.react.tool_wrapper import inject_context, ToolLoopInterrupt
@@ -100,14 +101,31 @@ REACT_TOOLS = [
 
 # ─── System Prompt ─────────────────────────────────────────────────────────────
 
-REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分析 GitHub 仓库生成报告。
+REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索规划 Agent，负责为系统生成“下一步探索计划”。
 
-你的探索质量直接影响最终分析的深度和准确性。
+你的职责不是直接执行工具，而是返回一个严格符合 schema 的 JSON 对象，供系统在下一步执行。
 
-【重要】初始上下文已包含完整的文件树（文件树概览），请直接从中选择文件加载，
-不要重复调用 get_file_tree。
+【最重要的协议要求】
+1. 你的输出必须是一个 JSON 对象，且必须同时包含以下 4 个顶层字段：
+   - thought: string
+   - action: object | null
+   - is_sufficient: boolean
+   - summary: string
+2. 即使你想调用工具，也不能只返回 {"name": ..., "args": ...}。
+3. 工具调用信息只能出现在顶层字段 action 内部，格式为：
+   {"name": "工具名", "args": {...}}
+4. 除这 4 个顶层字段外，不要输出任何额外顶层字段，不要输出 Markdown，不要输出代码块。
+5. summary 必须始终是纯文本字符串；当信息尚不足时，也要给出一句简短阶段性总结。
 
-工具（按需调用）：
+【错误示例】
+{"name": "get_file_blobs", "args": {"paths": ["main.py"]}}
+
+【正确示例】
+{"thought": "先读取入口文件和依赖配置，以确认技术栈与启动方式。", "action": {"name": "get_file_blobs", "args": {"paths": ["main.py", "package.json"]}}, "is_sufficient": false, "summary": "已确定下一步应优先检查入口文件和配置文件。"}
+
+【重要】初始上下文已包含完整的文件树（文件树概览），请直接从中选择文件加载，不要重复调用 get_file_tree。
+
+工具（按需调用）说明如下；若需要使用工具，请把工具名和参数放入 action 字段中，由系统执行：
   - get_repo_info(owner: str, repo: str): 仓库基本信息（通常只需调用一次）
   - get_file_tree(owner: str, repo: str, ref: str): 完整文件树（**已包含在初始上下文中**，通常无需重复调用）
   - get_file_blobs(owner: str, repo: str, paths: list[str], ref: str): **批量读取多个文件（优先使用）**，paths 必须是字符串列表，如 ["main.py", "package.json"]
@@ -124,8 +142,8 @@ REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分
   - 所有参数都不能为空
 
 **正确的工作流示例**：
-  1. 第一轮：直接调用 get_file_blobs 批量加载入口文件 + 配置文件
-  2. 第二轮：根据已加载的文件内容，调用 get_file_blobs 加载核心业务文件
+  1. 第一轮：通过 action 调用 get_file_blobs 批量加载入口文件 + 配置文件
+  2. 第二轮：根据已加载的文件内容，通过 action 调用 get_file_blobs 加载核心业务文件
   3. 第三轮：如有需要，补充加载路由/模型/中间件文件，然后输出 is_sufficient=true
 
 优先级（从高到低）：
@@ -146,13 +164,7 @@ REACT_SYSTEM_PROMPT = """你是 GitIntel 系统的代码仓库探索 Agent，分
   3. 迭代轮次达 8 次
   4. Agent 认为信息已足够
 
-**注意**：初始上下文已包含完整文件树，使用 get_file_blobs 直接批量加载，不要重复获取文件树。
-
-**重要**：你的输出必须严格遵循以下 JSON 格式，包含四个必填字段：
-- thought: 当前推理思考（string）
-- action: 工具调用（格式: {"name": "工具名", "args": {...}}），如已收集足够信息则填 null
-- is_sufficient: 是否已收集足够信息（boolean）
-- summary: 探索总结（**必须是纯文本 string**，如 "技术栈: Vue.js + Vuex，入口文件: main.js，主要模块: api/、components/、views/"）"""
+**注意**：初始上下文已包含完整文件树，使用 get_file_blobs 直接批量加载，不要重复获取文件树。"""
 
 
 # ─── 推理记录结构 ────────────────────────────────────────────────────────────
@@ -345,7 +357,10 @@ class ReActRepoLoaderAgent:
             agent = None
 
         callback_handler = RepoLoaderCallbackHandler()
-        llm_with_output = self._llm.with_structured_output(ExplorationOutput)
+        llm_with_output = self._llm.with_structured_output(
+            ExplorationOutput,
+            method="json_schema",
+        )
 
         conversation_messages: list = [
             HumanMessage(content=initial_context),
@@ -482,19 +497,115 @@ class ReActRepoLoaderAgent:
           3. 仍失败时返回 None（上层会生成兜底响应）
         """
         try:
-            ai_msg: Any = await llm_with_output.ainvoke(
+            self._last_ai_msg = await llm_with_output.ainvoke(
                 messages,
                 config={"callbacks": [callback_handler]},
             )
+            ai_msg = self._last_ai_msg
             return getattr(ai_msg, "parsed", ai_msg)
         except ToolLoopInterrupt:
             # 工具层检测到错误循环，直接打断 agent
             raise
+        except ValidationError as ve:
+            # with_structured_output 失败：LLM 返回了不符合 ExplorationOutput 格式的内容
+            # 从异常中提取 LLM 实际返回的数据
+            raw_input: Any = None
+            for err in ve.errors():
+                raw_input = err.get("input")
+                if raw_input is not None:
+                    break
+
+            # 场景 1：LLM 只返回了 action dict（如 {"name": "get_file_blobs", "args": {...}}）
+            # 这是最常见的错误格式，构造一个有效的 ExplorationOutput
+            # 遍历所有 validation errors，找到 input 为 dict 的那个（可能有多个字段缺失）
+            action_dict_input: dict | None = None
+            first_dict_input: dict | None = None
+            for err in ve.errors():
+                inp = err.get("input")
+                if isinstance(inp, dict):
+                    if first_dict_input is None:
+                        first_dict_input = inp
+                    if "name" in inp and "args" in inp:
+                        action_dict_input = inp
+                        break
+            # 优先用包含 name/args 的 dict，其次用第一个 dict input
+            target_input: dict | None = action_dict_input or first_dict_input
+            if target_input is not None:
+                logger.warning(
+                    f"[ReActRepoLoader] LLM 仅返回 action dict，"
+                    f"构造 ExplorationOutput（name={target_input.get('name')}）"
+                )
+                return ExplorationOutput(
+                    thought="解析失败，使用 LLM 原始 action 输出",
+                    action=ToolAction(
+                        name=str(target_input.get("name", "")),
+                        args=target_input.get("args", {}),
+                    ),
+                    is_sufficient=False,
+                    summary="LLM 返回格式不完整，已根据 action dict 继续执行",
+                )
+
+            # 场景 2：LLM 返回了部分字段（如缺少 thought/summary）
+            if isinstance(raw_input, dict) and ("is_sufficient" in raw_input or "summary" in raw_input):
+                action_obj = None
+                action_data = raw_input.get("action")
+                if isinstance(action_data, dict) and "name" in action_data:
+                    action_obj = ToolAction(
+                        name=action_data["name"],
+                        args=action_data.get("args", {}),
+                    )
+                logger.warning(
+                    f"[ReActRepoLoader] LLM 返回部分字段，尝试降级：{list(raw_input.keys())}"
+                )
+                return ExplorationOutput(
+                    thought=raw_input.get("thought", "解析降级"),
+                    action=action_obj,
+                    is_sufficient=raw_input.get("is_sufficient", False),
+                    summary=raw_input.get(
+                        "summary", "LLM 返回了部分 ExplorationOutput 字段"
+                    ),
+                )
+
+            logger.warning(f"[ReActRepoLoader] ValidationError 无法恢复: {ve}")
+            return None
+        except ValidationError:
+            # ValidationError 已由内层 except 块处理，此处不会到达
+            # 保留此分支仅作为防御性编程
+            return None
         except Exception as first_err:
             # 降级：尝试从原始 content 中手动提取 JSON
             raw_content: str = ""
             try:
-                if hasattr(ai_msg, "content"):
+                ai_msg = None
+                if hasattr(self, "_last_ai_msg"):
+                    ai_msg = self._last_ai_msg
+                elif hasattr(llm_with_output, "_last_ai_msg"):
+                    ai_msg = llm_with_output._last_ai_msg
+                if ai_msg is None and hasattr(first_err, "args") and first_err.args:
+                    # 从 ValidationError 的 raw_response 中提取 content
+                    err_str = str(first_err.args[0])
+                    match = re.search(r"input_value=\{(.+)\}, input_type=dict", err_str, re.DOTALL)
+                    if match:
+                        inner = "{" + match.group(1) + "}"
+                        try:
+                            raw_dict = json.loads(inner)
+                            if isinstance(raw_dict, dict) and "name" in raw_dict:
+                                logger.warning(
+                                    f"[ReActRepoLoader] 从异常中提取到 action dict，"
+                                    f"构造 ExplorationOutput（name={raw_dict.get('name')}）"
+                                )
+                                return ExplorationOutput(
+                                    thought="解析失败，使用 LLM 异常信息中的 action 输出",
+                                    action=ToolAction(
+                                        name=str(raw_dict.get("name", "")),
+                                        args=raw_dict.get("args", {}),
+                                    ),
+                                    is_sufficient=False,
+                                    summary="LLM 返回格式不完整，已从异常中提取 action 继续执行",
+                                )
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+                if ai_msg is not None and hasattr(ai_msg, "content"):
                     raw_content = ai_msg.content or ""
             except Exception:
                 pass

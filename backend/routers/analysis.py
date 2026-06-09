@@ -140,42 +140,45 @@ async def analyze(req: AnalyzeRequest, request: Request):
             return
 
         # ─── Step 4: 保存结果到数据库 ──────────────────────────────
-        if not collected_events:
-            logger.warning(f"[/api/analyze] 无 result 事件，跳过保存")
-            return
-
-        result_data: dict = {}
-        for evt in collected_events:
-            agent = evt.get("agent", "")
-            data = evt.get("data")
-            if agent and data:
-                result_data[agent] = data
-
-        if not result_data:
-            logger.warning(f"[/api/analyze] result_data 为空，跳过保存")
-            return
-
-        react_loader_data = result_data.get("react_loader", {})
-        if react_loader_data.get("loaded_count", 0) == 0:
-            logger.warning(f"[/api/analyze] ReAct 未能加载文件（loaded_count=0），跳过保存")
-            return
-
-        logger.info(f"[/api/analyze] 分析完成，准备保存 history，agents={list(result_data.keys())}")
-
         try:
-            sb = get_supabase_admin()
-        except RuntimeError as e:
-            logger.error(f"[/api/analyze] Supabase 连接失败: {e}")
-            return
+            if not collected_events:
+                logger.warning(f"[/api/analyze] 无 result 事件，跳过保存")
+                return
 
-        if not get_sha_cached_analysis(sb, auth_user_id, "", "", ""):  # 简化检查
-            pass  # 已有 user_uuid 检查
+            result_data: dict = {}
+            for evt in collected_events:
+                agent = evt.get("agent", "")
+                data = evt.get("data")
+                if agent and data:
+                    result_data[agent] = data
 
-        try:
-            saved = save_analysis(sb, auth_user_id, req.repo_url, req.branch, result_data, thread_id=thread_id)
-            logger.info(f"[/api/analyze] 历史记录保存成功: id={saved.id}")
+            if not result_data:
+                logger.warning(f"[/api/analyze] result_data 为空，跳过保存")
+                return
+
+            react_loader_data = result_data.get("react_loader", {})
+            if react_loader_data.get("loaded_count", 0) == 0:
+                logger.warning(f"[/api/analyze] ReAct 未能加载文件（loaded_count=0），跳过保存")
+                return
+
+            logger.info(f"[/api/analyze] 分析完成，准备保存 history，agents={list(result_data.keys())}")
+
+            try:
+                sb = get_supabase_admin()
+            except RuntimeError as e:
+                logger.error(f"[/api/analyze] Supabase 连接失败: {e}")
+                return
+
+            try:
+                saved = save_analysis(sb, auth_user_id, req.repo_url, req.branch, result_data, thread_id=thread_id)
+                logger.info(f"[/api/analyze] 历史记录保存成功: id={saved.id}")
+            except Exception as e:
+                logger.error(f"[/api/analyze] 保存历史记录失败: {type(e).__name__}: {e}")
         except Exception as e:
-            logger.error(f"[/api/analyze] 保存历史记录失败: {type(e).__name__}: {e}")
+            logger.error(f"[/api/analyze] SSE 流结束后处理异常: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"[/api/analyze] 堆栈: {traceback.format_exc()}")
+            return
 
     return StreamingResponse(
         event_stream(),

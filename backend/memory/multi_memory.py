@@ -167,11 +167,11 @@ def _extract_facts_sync(task: ExtractionTask) -> list[ExtractedFact]:
             return []
 
     try:
-        llm = get_llm(model=os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"))
+        llm = get_llm(model=os.getenv("OPENAI_MODEL", "qwen3.7-max-2026-05-17"))
 
     except Exception:
         try:
-            llm = get_llm(model=os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"))
+            llm = get_llm(model=os.getenv("OPENAI_MODEL", "qwen3.7-max-2026-05-17"))
         except Exception as exc:
             _logger.warning(f"[Extraction] 无法获取 LLM，跳过抽取: {exc}")
             return []

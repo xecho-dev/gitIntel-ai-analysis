@@ -142,7 +142,7 @@ def _make_chatopenai(
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(
-        model=model or os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"),
+        model=model or os.getenv("OPENAI_MODEL", "qwen3.7-max-2026-05-17"),
         temperature=temperature,
         openai_api_key=api_key,
         base_url=base_url or os.getenv(
@@ -314,7 +314,7 @@ def get_llm_with_callback(callback_handler, model: str | None = None,
         from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
-            model=model or os.getenv("OPENAI_MODEL", "qwen3.6-plus-2026-04-02"),
+            model=model or os.getenv("OPENAI_MODEL", "qwen3.7-max-2026-05-17"),
             temperature=temperature,
             openai_api_key=api_key,
             base_url=os.getenv(

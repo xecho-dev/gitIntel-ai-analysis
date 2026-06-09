@@ -408,7 +408,7 @@ def calculate_complexity(content: str, language: str) -> str:
 
 
 @tool
-def detect_code_smells(content: str, language: str, file_path: str = "") -> str:
+def detect_code_smells(content: str, language: str = "", file_path: str = "") -> str:
     """检测代码异味（过长函数、深度嵌套、重复模式等，多语言支持）。
 
     用途：Agent 发现代码质量问题时使用。
@@ -416,7 +416,7 @@ def detect_code_smells(content: str, language: str, file_path: str = "") -> str:
 
     Args:
         content:   代码内容字符串
-        language:  编程语言
+        language:  编程语言（可选，未提供时会根据 file_path/content 推断）
         file_path: 文件路径（可选，用于更准确的检测）
 
     Returns:
@@ -425,6 +425,8 @@ def detect_code_smells(content: str, language: str, file_path: str = "") -> str:
         类型包括：long_function, deep_nesting, god_object,
                  magic_number, long_import, unused_code 等
     """
+    if not language or language == "auto":
+        language = _guess_language(file_path, content)
     result = _detect_smells_impl(content, language, file_path)
     return ToolSuccess(result).to_str()
 

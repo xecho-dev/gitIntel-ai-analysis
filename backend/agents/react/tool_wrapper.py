@@ -16,6 +16,7 @@
     )
     agent = create_agent(model=llm, tools=wrapped, ...)
 """
+import json
 import logging
 from typing import Any
 
@@ -67,6 +68,16 @@ _POSITIONAL_MAPPINGS: dict[str, list[str]] = {
     "get_pull_requests": ["owner", "repo", "ref"],
 }
 
+# 某些工具常被模型错误地包装成 {"args": [{...}]}，这里显式展开第 1 个对象元素
+_SINGLE_OBJECT_ARG_TOOLS = {
+    "parse_file_ast",
+    "calculate_complexity",
+    "detect_code_smells",
+    "summarize_code_file",
+    "detect_imports",
+    "detect_dependencies",
+}
+
 
 def _normalize_all(raw_args: dict) -> dict:
     """全局参数标准化：修正 LLM 常见的类型错误。"""
@@ -90,6 +101,49 @@ def _normalize_all(raw_args: dict) -> dict:
     return args
 
 
+def _extract_nested_args_payload(payload: Any) -> Any:
+    """递归解开 LangChain/LLM 常见的 args/input/kwargs 包装层。"""
+    current = payload
+    seen: set[int] = set()
+
+    while isinstance(current, dict):
+        marker = id(current)
+        if marker in seen:
+            break
+        seen.add(marker)
+
+        if "kwargs" in current and isinstance(current["kwargs"], dict):
+            current = current["kwargs"]
+            continue
+
+        if "input" in current:
+            inner = current["input"]
+            if isinstance(inner, dict):
+                current = inner
+                continue
+            if isinstance(inner, str):
+                try:
+                    parsed = json.loads(inner)
+                except json.JSONDecodeError:
+                    break
+                if isinstance(parsed, dict):
+                    current = parsed
+                    continue
+
+        break
+
+    if (
+        isinstance(current, dict)
+        and "args" in current
+        and isinstance(current["args"], list)
+        and len(current["args"]) == 1
+        and isinstance(current["args"][0], dict)
+    ):
+        return current["args"][0]
+
+    return current
+
+
 def _normalize_invocation_args(args: dict, tool_name: str) -> dict:
     """将各种调用格式规范化为具名参数 dict。
 
@@ -98,10 +152,60 @@ def _normalize_invocation_args(args: dict, tool_name: str) -> dict:
       2. {"input": {"args": [...], "config": {}}} → 同上，input 包装层
       3. {"kwargs": {"query": ...}}             → kwargs 提升到外层
       4. {"query": ...}                        → 直接返回
-      5. {"args": "query=\"...\", language=\"...\""} → 解析 Python 风格字符串
+      5. {"args": "query=\"...\", language=\"...\"} → 解析 Python 风格字符串
+      6. {"args": "{\"args\": [...], \"config\": {}}"} → 双层 JSON 字符串（LLM 幻觉产物）
     """
     if not isinstance(args, dict):
         return {}
+
+    nested_payload = _extract_nested_args_payload(args)
+    if nested_payload is not args:
+        normalized_nested = _normalize_invocation_args(nested_payload, tool_name)
+        if isinstance(normalized_nested, dict):
+            others = {
+                k: v
+                for k, v in args.items()
+                if k not in ("args", "config", "input", "kwargs")
+            }
+            return {**others, **normalized_nested}
+        return args
+
+    # 格式 6: {"args": "{\"args\": [...], \"config\": {}}"} — LLM 生成的嵌套 JSON 字符串
+    # 检测：args 是字符串，且内部包含 "args" 和 "config" 关键字（表明是双层封装）
+    if "args" in args and isinstance(args.get("args"), str):
+        raw_args_str = args["args"]
+        # 判断是否为双层 JSON 字符串（内层包含 "args" 关键字）
+        inner_candidate = raw_args_str.strip()
+        if '"args"' in inner_candidate or "'args'" in inner_candidate:
+            try:
+                inner_parsed = json.loads(inner_candidate)
+                if isinstance(inner_parsed, dict) and "args" in inner_parsed:
+                    # 解开双层封装，用内层的 args 和 config 替代
+                    inner_args = inner_parsed.get("args")
+                    inner_config = inner_parsed.get("config", {})
+                    others = {k: v for k, v in args.items() if k not in ("args", "config")}
+                    if isinstance(inner_args, list):
+                        if tool_name in _POSITIONAL_MAPPINGS:
+                            keys = _POSITIONAL_MAPPINGS[tool_name]
+                            mapped = {}
+                            for i, key in enumerate(keys):
+                                if i < len(inner_args):
+                                    mapped[key] = inner_args[i]
+                            return {**others, **mapped}
+                        if (
+                            tool_name in _SINGLE_OBJECT_ARG_TOOLS
+                            and len(inner_args) == 1
+                            and isinstance(inner_args[0], dict)
+                        ):
+                            return {**others, **inner_args[0]}
+                        return {**others, "args": inner_args, "config": inner_config}
+                    elif isinstance(inner_args, dict):
+                        return {**others, **inner_args}
+                    elif inner_args is not None:
+                        # 内层 args 是标量，直接透传
+                        return {**others, "args": inner_args}
+            except (json.JSONDecodeError, TypeError):
+                pass
 
     # 格式 5: {"args": "query=\"...\", language=\"...\""} - Python 风格字符串
     # 这种情况出现在 LLM 返回的 args 是字符串而非列表/字典
@@ -150,15 +254,24 @@ def _normalize_invocation_args(args: dict, tool_name: str) -> dict:
                 except (ValueError, SyntaxError, TypeError):
                     pass
 
-    if isinstance(raw_list, list) and tool_name in _POSITIONAL_MAPPINGS:
-        keys = _POSITIONAL_MAPPINGS[tool_name]
-        mapped = {}
-        for i, key in enumerate(keys):
-            if i < len(raw_list):
-                mapped[key] = raw_list[i]
-        # 保留非 args/config 的其他 key（如 tool_call_id）
-        others = {k: v for k, v in args.items() if k not in ("args", "config", "input")}
-        return {**others, **mapped}
+    if isinstance(raw_list, list):
+        if tool_name in _POSITIONAL_MAPPINGS:
+            keys = _POSITIONAL_MAPPINGS[tool_name]
+            mapped = {}
+            for i, key in enumerate(keys):
+                if i < len(raw_list):
+                    mapped[key] = raw_list[i]
+            # 保留非 args/config 的其他 key（如 tool_call_id）
+            others = {k: v for k, v in args.items() if k not in ("args", "config", "input")}
+            return {**others, **mapped}
+
+        if (
+            tool_name in _SINGLE_OBJECT_ARG_TOOLS
+            and len(raw_list) == 1
+            and isinstance(raw_list[0], dict)
+        ):
+            others = {k: v for k, v in args.items() if k not in ("args", "config", "input")}
+            return {**others, **raw_list[0]}
 
     return args
 
@@ -251,15 +364,6 @@ def inject_context(
             "  ✅ search_code(query='def authenticate', language='python')\n"
             "  ❌ search_code(owner='facebook', repo='react', query='useEffect')  ← 错误！\n"
             "如果你想搜索 React Hook 使用情况，应该这样调用：search_code(query='useEffect', language='javascript')"
-        ),
-        "batch_search_code": (
-            "[ERROR] queries 参数为空。batch_search_code 只需要一个参数：queries（查询列表）。\n"
-            "⚠️ 注意：owner 和 repo 由系统自动注入，【不要】在调用时传递它们！\n"
-            "queries 是 list[dict]，每个元素包含 query 和可选的 language。\n"
-            "正确调用示例：\n"
-            "  ✅ batch_search_code(queries=[{'query': 'useEffect', 'language': 'javascript'}, {'query': 'useState', 'language': 'javascript'}])\n"
-            "  ✅ batch_search_code(queries=[{'query': 'def auth'}, {'query': 'class User'}])\n"
-            "  ❌ batch_search_code(queries=[...], owner='facebook', repo='react')  ← 错误！"
         ),
     }
 
@@ -401,13 +505,32 @@ def inject_context(
                     "正确调用示例：batch_search_code(queries=[{'query': 'useEffect', 'language': 'javascript'}])\n"
                     "请重试，只传 queries 参数。"
                 )
-            elif not queries:
-                result = _EMPTY_ERRORS.get(name, "queries 参数为空")
             else:
                 result = _call_tool({
                     "owner": owner, "repo": repo,
                     "queries": queries,
                 })
+
+                # 检测"所有查询都返回空结果"（典型 GitHub 403 速率限制症状）
+                # 此时 agent 会陷入无限重试循环，需要主动打断
+                if ToolResult.is_success(result) and queries:
+                    try:
+                        import json as _json
+                        raw = result
+                        for _prefix in ("[OK] ",):
+                            if raw.startswith(_prefix):
+                                raw = raw[len(_prefix):]
+                                break
+                        items = _json.loads(raw)
+                        if items and all(item.get("results", []) == [] for item in items):
+                            result = (
+                                "[ERROR] GitHub 代码搜索全部失败（可能是速率限制），"
+                                "所有查询均返回空结果。跳过批量搜索，直接基于已有文件摘要进行分析。"
+                            )
+                            _error_count = 0
+                            _last_error = ""
+                    except Exception:
+                        pass
 
         elif name == "get_default_branch":
             result = _call_tool({"owner": owner, "repo": repo})
