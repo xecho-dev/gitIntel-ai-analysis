@@ -228,7 +228,7 @@ jobs:
       # --- 执行远程部署脚本 ---
       - name: Deploy to server
         run: |
-          cat > /tmp/gitintel_deploy.sh << 'SCRIPTEOF'
+          cat > /tmp/gitintel_deploy.sh << "SCRIPTEOF"
           #!/bin/bash
           set -e
 
