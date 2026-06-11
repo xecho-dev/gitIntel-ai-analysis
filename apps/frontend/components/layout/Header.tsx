@@ -8,9 +8,9 @@ import { LayoutDashboard, History, UserCircle, LogOut, Github } from 'lucide-rea
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: '/workspace', label: '工作台', icon: LayoutDashboard },
-  { href: '/history', label: '历史记录', icon: History },
-  { href: '/account', label: '账户中心', icon: UserCircle },
+  // { href: '/workspace', label: '工作台', icon: LayoutDashboard },
+  // { href: '/history', label: '历史记录', icon: History },
+  // { href: '/account', label: '账户中心', icon: UserCircle },
 ];
 
 export const Header = () => {
