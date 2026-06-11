@@ -228,41 +228,45 @@ jobs:
       # --- 执行远程部署脚本 ---
       - name: Deploy to server
         run: |
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          FRONTEND_IMAGE="${{ env.REGISTRY }}/${REPO_LOWER}/frontend:latest"
-          ADMIN_IMAGE="${{ env.REGISTRY }}/${REPO_LOWER}/admin:latest"
-          BACKEND_IMAGE="${{ env.REGISTRY }}/${REPO_LOWER}/backend:latest"
-          SERVER_USER="${{ secrets.SERVER_USER }}"
-          SERVER_HOST="${{ secrets.SERVER_HOST }}"
-          REGISTRY="${{ env.REGISTRY }}"
-          REGISTRY_USERNAME="${{ github.actor }}"
-          REGISTRY_TOKEN="${{ secrets.GHP_TOKEN }}"
-          export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-          export FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
-          export AUTH_GITHUB_ID="${{ secrets.AUTH_GITHUB_ID }}"
-          export AUTH_GITHUB_SECRET="${{ secrets.AUTH_GITHUB_SECRET }}"
-          export AUTH_SECRET="${{ secrets.AUTH_SECRET }}"
-          export AUTH_URL="${{ secrets.FRONTEND_URL }}"
-          export LANGSMITH_TRACING="${{ secrets.LANGSMITH_TRACING }}"
-          export LANGSMITH_ENDPOINT="${{ secrets.LANGSMITH_ENDPOINT }}"
-          export LANGSMITH_PROJECT="${{ secrets.LANGSMITH_PROJECT }}"
-          export LANGSMITH_API_KEY="${{ secrets.LANGSMITH_API_KEY }}"
-          export DASHVECTOR_API_KEY="${{ secrets.DASHVECTOR_API_KEY }}"
-          export DASHVECTOR_ENDPOINT="${{ secrets.DASHVECTOR_ENDPOINT }}"
-          export DASHVECTOR_COLLECTION="${{ secrets.DASHVECTOR_COLLECTION }}"
-          export DEPLOY_PATH="/opt/gitintel"
-          COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
-
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << 'ENDSSH'
+          cat > /tmp/gitintel_deploy.sh << 'SCRIPTEOF'
+          #!/bin/bash
           set -e
-          export POSTGRES_PASSWORD="$POSTGRES_PASSWORD"
+
+          DEPLOY_PATH="/opt/gitintel"
+          SERVER_USER="{{ secrets.SERVER_USER }}"
+          REGISTRY="{{ env.REGISTRY }}"
+          REPO_LOWER="{{ github.repository_owner }}/gitintel"
+          FRONTEND_IMAGE="$REGISTRY/$REPO_LOWER/frontend:latest"
+          ADMIN_IMAGE="$REGISTRY/$REPO_LOWER/admin:latest"
+          BACKEND_IMAGE="$REGISTRY/$REPO_LOWER/backend:latest"
+          REGISTRY_USERNAME="{{ github.actor }}"
+          REGISTRY_TOKEN="{{ secrets.GHP_TOKEN }}"
+          export DEPLOY_PATH SERVER_USER REGISTRY REPO_LOWER FRONTEND_IMAGE ADMIN_IMAGE BACKEND_IMAGE REGISTRY_USERNAME REGISTRY_TOKEN
+          export POSTGRES_PASSWORD="{{ secrets.POSTGRES_PASSWORD }}"
+          export OPENAI_API_KEY="{{ secrets.OPENAI_API_KEY }}"
+          export OPENAI_BASE_URL="{{ secrets.OPENAI_BASE_URL }}"
+          export GITHUB_TOKEN="{{ secrets.GHP_TOKEN }}"
+          export FRONTEND_URL="{{ secrets.FRONTEND_URL }}"
+          export AUTH_SECRET="{{ secrets.AUTH_SECRET }}"
+          export AUTH_URL="{{ secrets.FRONTEND_URL }}"
+          export AUTH_GITHUB_ID="{{ secrets.AUTH_GITHUB_ID }}"
+          export AUTH_GITHUB_SECRET="{{ secrets.AUTH_GITHUB_SECRET }}"
+          export LANGSMITH_TRACING="{{ secrets.LANGSMITH_TRACING }}"
+          export LANGSMITH_ENDPOINT="{{ secrets.LANGSMITH_ENDPOINT }}"
+          export LANGSMITH_PROJECT="{{ secrets.LANGSMITH_PROJECT }}"
+          export LANGSMITH_API_KEY="{{ secrets.LANGSMITH_API_KEY }}"
+          export DASHVECTOR_API_KEY="{{ secrets.DASHVECTOR_API_KEY }}"
+          export DASHVECTOR_ENDPOINT="{{ secrets.DASHVECTOR_ENDPOINT }}"
+          export DASHVECTOR_COLLECTION="{{ secrets.DASHVECTOR_COLLECTION }}"
+          COMMIT_SHORT="{{ needs.build.outputs.commit_short }}"
+
           echo "========== 开始部署 GitIntel =========="
           echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
           echo "Commit: $COMMIT_SHORT"
 
-          sudo mkdir -p $DEPLOY_PATH
-          sudo chown -R $SERVER_USER:$SERVER_USER $DEPLOY_PATH
-          cd $DEPLOY_PATH
+          sudo mkdir -p "$DEPLOY_PATH"
+          sudo chown -R "$SERVER_USER:$SERVER_USER" "$DEPLOY_PATH"
+          cd "$DEPLOY_PATH"
           mv /tmp/gitintel.env .env
 
           # ── PostgreSQL 服务 ─────────────────────────────────────────
@@ -291,9 +295,6 @@ jobs:
           PGCOMPOSE
 
           sed -i "s|POSTGRES_PASSWORD_PLACEHOLDER|$POSTGRES_PASSWORD|g" postgres-compose.yml
-
-          # 合并 docker-compose.yml（先写入 postgres 部分，再追加其余服务）
-          cat postgres-compose.yml docker-compose.yml > docker-compose.tmp && mv docker-compose.tmp docker-compose.yml
 
           # ── 其余服务 ───────────────────────────────────────────────
           cat > docker-compose.yml << 'DOCKERCOMPOSE'
@@ -417,29 +418,22 @@ jobs:
           sed -i "s|DASHVECTOR_ENDPOINT_PLACEHOLDER|$DASHVECTOR_ENDPOINT|g" docker-compose.yml
           sed -i "s|DASHVECTOR_COLLECTION_PLACEHOLDER|$DASHVECTOR_COLLECTION|g" docker-compose.yml
 
-          # ==================== 配置 Nginx 反向代理 ====================
           echo "正在配置 Nginx..."
-
-          # 备份并安装 Nginx 配置
           if [ -f /etc/nginx/conf.d/gitintel.conf ]; then
             sudo cp /etc/nginx/conf.d/gitintel.conf /etc/nginx/conf.d/gitintel.conf.bak
           fi
           sudo cp /tmp/gitintel.conf /etc/nginx/conf.d/gitintel.conf
 
-          # 测试并重载 Nginx
           sudo nginx -t && sudo nginx -s reload || { echo "Nginx 配置失败，已回滚"; sudo cp /etc/nginx/conf.d/gitintel.conf.bak /etc/nginx/conf.d/gitintel.conf 2>/dev/null || true; sudo nginx -t && sudo nginx -s reload; exit 1; }
           echo "Nginx 配置完成"
 
-          # 拉取镜像（公开仓库无需登录，私有仓库需要 token）
           echo "正在拉取镜像..."
-          # 先尝试拉取 frontend 测试是否需要登录
           if docker pull "$FRONTEND_IMAGE" &>/dev/null; then
             echo "公开镜像，无需登录即可拉取"
-            # 所有镜像都是同一个 registry，直接用 docker-compose pull 拉取所有
             docker-compose pull
           else
             echo "镜像拉取失败，尝试登录后再拉取..."
-            echo "$REGISTRY_TOKEN" | docker login $REGISTRY -u $REGISTRY_USERNAME --password-stdin || { echo "Docker login 失败，请检查 REGISTRY_TOKEN 是否有 ghcr.io 的 packages 权限"; exit 1; }
+            echo "$REGISTRY_TOKEN" | docker login "$REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin || { echo "Docker login 失败"; exit 1; }
             docker-compose pull
           fi
           echo "正在清理旧容器..."
@@ -467,15 +461,23 @@ jobs:
 
           if [ "$FRONTEND_HEALTH" = "healthy" ] && [ "$ADMIN_HEALTH" = "healthy" ] && [ "$BACKEND_HEALTH" = "healthy" ]; then
             echo ""
-            echo "✅ 部署成功！"
+            echo "部署成功！"
           else
             echo ""
-            echo "⚠️ 容器已启动，部分健康检查可能需要更长时间"
+            echo "容器已启动，部分健康检查可能需要更长时间"
           fi
 
           echo ""
           echo "========== 部署完成 =========="
-          ENDSSH
+          SCRIPTEOF
+
+          scp -o StrictHostKeyChecking=no \
+            /tmp/gitintel_deploy.sh \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/gitintel_deploy.sh"
+
+          ssh -o StrictHostKeyChecking=no \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+            "chmod +x /tmp/gitintel_deploy.sh && bash /tmp/gitintel_deploy.sh"
 
   # ==================== 健康检查 ====================
   # health-check:
