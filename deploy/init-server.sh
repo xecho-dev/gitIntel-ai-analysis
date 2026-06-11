@@ -216,10 +216,8 @@ EOF
 
 # 创建 .env 示例文件
 cat > $DEPLOY_PATH/.env.example << 'EOF'
-# Supabase 配置
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_JWT_SECRET=your-jwt-secret
+# PostgreSQL 配置
+DATABASE_URL=postgresql://gitintel:password@localhost:5432/gitintel
 
 # OpenAI 配置
 OPENAI_API_KEY=sk-your-openai-key
@@ -333,7 +331,7 @@ echo "   - SERVER_USER: root"
 echo "   - SERVER_SSH_KEY: 服务器 SSH 私钥"
 echo "   - FRONTEND_URL: http://\$HOSTNAME  (或你的域名)"
 echo "   - OPENAI_API_KEY: 你的 OpenAI API Key"
-echo "   - SUPABASE_* 相关配置"
+echo "   - DATABASE_URL: PostgreSQL 连接字符串"
 echo ""
 echo "3️⃣  推送代码到 main 分支，GitHub Actions 将自动部署"
 echo ""

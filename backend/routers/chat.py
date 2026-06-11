@@ -9,7 +9,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 
-from dependencies import get_auth_user_id, get_sb_client
+from dependencies import get_auth_user_id, get_db
 from schemas.chat import SendMessageRequest, CreateSessionRequest
 from rag import RAGPipeline
 from services.database import (
@@ -31,13 +31,13 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 async def api_create_chat_session(body: CreateSessionRequest, request: Request):
     """创建新的 Chat Session。"""
     auth_user_id = get_auth_user_id(request)
-    sb = get_sb_client()
+    pool = await get_db()
 
-    user_uuid = get_user_uuid(sb, auth_user_id)
+    user_uuid = await get_user_uuid(pool, auth_user_id)
     if not user_uuid:
         raise HTTPException(status_code=400, detail="用户未完善 GitHub 资料，请先访问账户页")
 
-    session = create_chat_session(sb, str(user_uuid), body.title)
+    session = await create_chat_session(pool, str(user_uuid), body.title)
     return {
         "id": session.id,
         "title": session.title,
@@ -49,13 +49,13 @@ async def api_create_chat_session(body: CreateSessionRequest, request: Request):
 async def api_list_chat_sessions(request: Request):
     """获取当前用户所有 Chat Sessions。"""
     auth_user_id = get_auth_user_id(request)
-    sb = get_sb_client()
+    pool = await get_db()
 
-    user_uuid = get_user_uuid(sb, auth_user_id)
+    user_uuid = await get_user_uuid(pool, auth_user_id)
     if not user_uuid:
         return {"items": [], "total": 0}
 
-    sessions = get_chat_sessions(sb, str(user_uuid))
+    sessions = await get_chat_sessions(pool, str(user_uuid))
     return {
         "items": [
             {"id": s.id, "title": s.title, "created_at": s.created_at, "updated_at": s.updated_at}
@@ -69,14 +69,14 @@ async def api_list_chat_sessions(request: Request):
 async def api_get_chat_messages(session_id: str, request: Request):
     """获取某个 Session 的所有消息。"""
     auth_user_id = get_auth_user_id(request)
-    sb = get_sb_client()
+    pool = await get_db()
 
-    owner = get_session_owner(sb, session_id)
-    user_uuid = get_user_uuid(sb, auth_user_id)
+    owner = await get_session_owner(pool, session_id)
+    user_uuid = await get_user_uuid(pool, auth_user_id)
     if not owner or str(owner) != str(user_uuid):
         raise HTTPException(status_code=403, detail="无权限访问此会话")
 
-    messages = get_chat_messages(sb, session_id)
+    messages = await get_chat_messages(pool, session_id)
     return {"items": [m.model_dump(mode="json") for m in messages]}
 
 
@@ -102,16 +102,16 @@ async def api_send_message(body: SendMessageRequest, request: Request):
       - error: 异常
     """
     auth_user_id = get_auth_user_id(request)
-    sb = get_sb_client()
+    pool = await get_db()
 
-    owner = get_session_owner(sb, body.session_id)
-    user_uuid = get_user_uuid(sb, auth_user_id)
+    owner = await get_session_owner(pool, body.session_id)
+    user_uuid = await get_user_uuid(pool, auth_user_id)
     if not owner or str(owner) != str(user_uuid):
         raise HTTPException(status_code=403, detail="无权限访问此会话")
 
-    save_chat_message(sb, body.session_id, "user", body.content)
+    await save_chat_message(pool, body.session_id, "user", body.content)
 
-    past_messages = get_chat_messages(sb, body.session_id)
+    past_messages = await get_chat_messages(pool, body.session_id)
 
     collected_answer = ""
     collected_sources: list = []
@@ -132,14 +132,11 @@ async def api_send_message(body: SendMessageRequest, request: Request):
 
         try:
             async for event in pipeline.chat(body.content):
-                # RAG Pipeline 已包含 "data: " 前缀
-                # 如果没有 data: 前缀就加上
                 if not event.startswith("data: "):
-                    yield event
+                    yield "data: " + event + "\n\n"
                 else:
                     yield event
 
-                # 解析收集数据
                 if event.startswith("data: "):
                     raw = event[6:].strip()
                     if raw == "[DONE]":
@@ -167,11 +164,10 @@ async def api_send_message(body: SendMessageRequest, request: Request):
                 "message": f"处理异常: {str(exc)}",
             }, ensure_ascii=False) + "\n\n"
 
-        # 保存 Assistant 消息
         if collected_answer:
             try:
-                assistant_msg = save_chat_message(
-                    sb, body.session_id, "assistant", collected_answer,
+                assistant_msg = await save_chat_message(
+                    pool, body.session_id, "assistant", collected_answer,
                     rag_context=collected_sources,
                 )
                 assistant_msg_id = str(assistant_msg.id)
@@ -202,13 +198,13 @@ async def api_send_message(body: SendMessageRequest, request: Request):
 async def api_delete_chat_session(session_id: str, request: Request):
     """删除一个 Chat Session。"""
     auth_user_id = get_auth_user_id(request)
-    sb = get_sb_client()
+    pool = await get_db()
 
-    user_uuid = get_user_uuid(sb, auth_user_id)
+    user_uuid = await get_user_uuid(pool, auth_user_id)
     if not user_uuid:
         raise HTTPException(status_code=400, detail="用户未完善 GitHub 资料")
 
-    ok = delete_chat_session(sb, session_id, str(user_uuid))
+    ok = await delete_chat_session(pool, session_id, str(user_uuid))
     if not ok:
         raise HTTPException(status_code=404, detail="会话不存在或无权限删除")
     return {"deleted": True}

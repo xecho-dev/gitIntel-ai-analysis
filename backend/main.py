@@ -6,11 +6,14 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
 load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from schemas.response import HealthResponse
+from postgres_client import get_pool, close_pool
 from routers import (
     analysis_router,
     history_router,
@@ -22,8 +25,8 @@ from routers import (
     auth_router,
     admin_management_router,
 )
+from routers.analysis import set_app_pool
 
-# 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -38,7 +41,15 @@ gitintel_logger.setLevel(logging.DEBUG)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("GitIntel Agent Layer started")
+    try:
+        pool = await get_pool()
+        set_app_pool(pool)
+        print("PostgreSQL connection pool initialized.")
+    except Exception as e:
+        print(f"WARNING: Failed to initialize DB pool on startup: {e}")
     yield
+    await close_pool()
+    print("PostgreSQL connection pool closed.")
     print("GitIntel Agent Layer stopped")
 
 
@@ -49,7 +60,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS 配置
 _allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -73,7 +83,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
 app.include_router(analysis_router)
 app.include_router(history_router)
 app.include_router(user_router)

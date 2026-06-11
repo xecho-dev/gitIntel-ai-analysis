@@ -60,8 +60,6 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key
 
   # ==================== Admin CI ====================
   admin-ci:
@@ -177,9 +175,7 @@ jobs:
             --target builder \
             --file Dockerfile.frontend \
             --tag gitintel-frontend:build-test \
-            --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 \
-            --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
-            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-key \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000
             .
 
       - name: Build admin Docker image

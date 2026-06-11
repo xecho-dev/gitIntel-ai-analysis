@@ -1,6 +1,32 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Any
+from pydantic import BaseModel, field_validator
+
+
+def _norm_str(v: Any) -> str:
+    if hasattr(v, "__str__") and not isinstance(v, str):
+        try:
+            from uuid import UUID
+            if isinstance(v, UUID):
+                return str(v)
+        except ImportError:
+            pass
+    return str(v) if v is not None else ""
+
+
+def _norm_int(v: Any) -> int:
+    if v is None:
+        return 0
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _norm_dt(v: Any) -> str:
+    if hasattr(v, "isoformat"):
+        return v.isoformat()
+    return str(v) if v else ""
 
 
 # --- 请求模型 ---
@@ -112,6 +138,21 @@ class AdminUserItem(BaseModel):
     created_at: str
     updated_at: str
 
+    @field_validator("id", "auth_user_id", mode="before")
+    @classmethod
+    def _str(cls, v):
+        return _norm_str(v)
+
+    @field_validator("public_repos", "followers", "following", mode="before")
+    @classmethod
+    def _int(cls, v):
+        return _norm_int(v)
+
+    @field_validator("created_at", "updated_at", mode="before")
+    @classmethod
+    def _dt(cls, v):
+        return _norm_dt(v)
+
 
 class AdminUserListResponse(BaseModel):
     items: list[AdminUserItem]
@@ -137,6 +178,16 @@ class AdminHistoryItem(BaseModel):
     langsmith_trace_id: Optional[str] = None
     thread_id: Optional[str] = None
     created_at: str
+
+    @field_validator("id", "user_id", "repo_sha", "langsmith_trace_id", "thread_id", mode="before")
+    @classmethod
+    def _str(cls, v):
+        return _norm_str(v)
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _dt(cls, v):
+        return _norm_dt(v)
 
 
 class AdminHistoryListResponse(BaseModel):

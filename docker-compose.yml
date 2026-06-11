@@ -3,22 +3,42 @@
 #
 # 用法：
 #   1. 复制 .env.example 为 .env，填入真实密钥
-#   2. 运行：docker compose up -d --build
-#   3. 访问：http://<服务器IP>:3000
+#   2. 首次运行：docker compose up -d postgres-init（执行数据库迁移）
+#   3. 完整启动：docker compose up -d --build
+#   4. 访问：http://<服务器IP>:3000
 # ============================================================
 
 services:
+  # ── PostgreSQL ─────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: gitintel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gitintel
+      POSTGRES_USER: gitintel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gitintel_dev_password}
+    volumes:
+      # 持久化数据
+      - postgres_data:/var/lib/postgresql/data
+      # 自动执行数据库初始化脚本（PostgreSQL 仅在首次启动时执行）
+      # 只挂载统一的初始化脚本，避免 Supabase 特有语法的旧迁移文件干扰
+      - ./db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+    networks:
+      - gitintel-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gitintel", "-d", "gitintel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ── Frontend — Next.js 15 ────────────────────────────────────
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      # 构建时注入的公开变量（BUILD TIME，必须在这里传）
-      # NEXT_PUBLIC_* 必须在构建时 bake 进客户端 bundle
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://backend:8000}
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_AUTH_URL: ${AUTH_URL:-http://localhost:3000}
     container_name: gitintel-frontend
     restart: unless-stopped
@@ -29,6 +49,10 @@ services:
     environment:
       NODE_ENV: production
       AUTH_TRUST_HOST: "true"
+    networks:
+      - gitintel-net
+    depends_on:
+      - backend
 
   # ── Admin — Umi.js ───────────────────────────────────────────
   admin:
@@ -41,6 +65,10 @@ services:
       - "3001:3001"
     environment:
       NODE_ENV: production
+    networks:
+      - gitintel-net
+    depends_on:
+      - backend
 
   # ── Backend — FastAPI Agent Layer ────────────────────────────
   backend:
@@ -51,24 +79,40 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    # 读取 backend/.env 中的变量（包含 API keys）
     env_file:
-      - ./backend/.env
+      - ./deploy.env
     environment:
-      # 运行时额外变量（可覆盖或补充 .env）
+      DATABASE_URL: postgresql://gitintel:${POSTGRES_PASSWORD:-gitintel_dev_password}@postgres:5432/gitintel
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      # GitHub 操作权限 Token
       GITHUB_TOKEN: ${GITHUB_TOKEN}
-      # OpenAI（Agent 层调用 LLM）
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      # DashVector（RAG 向量存储）
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen3.7-plus-2026-05-26}
       DASHVECTOR_API_KEY: ${DASHVECTOR_API_KEY}
       DASHVECTOR_ENDPOINT: ${DASHVECTOR_ENDPOINT:-dashvector.aliyuncs.com}
       DASHVECTOR_COLLECTION: ${DASHVECTOR_COLLECTION:-gitintel_knowledge}
+      DASHVECTOR_COLLECTION_KNOWLEDGE: ${DASHVECTOR_COLLECTION_KNOWLEDGE:-gitintel_knowledge}
+      DASHVECTOR_COLLECTION_MEMORY: ${DASHVECTOR_COLLECTION_MEMORY:-gitintel_memory}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      AUTH_SECRET: ${AUTH_SECRET}
     networks:
       - gitintel-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 networks:
   gitintel-net:
     driver: bridge
+
+volumes:
+  postgres_data:

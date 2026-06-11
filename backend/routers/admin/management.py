@@ -4,7 +4,7 @@ Admin 管理端相关路由 (/api/admin/*)
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 
-from dependencies import get_current_admin, get_sb_client
+from dependencies import get_current_admin, get_db
 from schemas.history import (
     AdminOverviewResponse,
     AdminUserListResponse,
@@ -30,10 +30,10 @@ router = APIRouter(prefix="/api/admin", tags=["admin-management"])
 @router.get("/overview", response_model=AdminOverviewResponse)
 async def api_admin_overview(admin: dict = Depends(get_current_admin)):
     """系统概览统计数据（需登录）。"""
-    sb = get_sb_client()
+    pool = await get_db()
 
     try:
-        stats = db_get_overview_stats(sb)
+        stats = await db_get_overview_stats(pool)
         return stats
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -47,8 +47,8 @@ async def api_admin_list_users(
     search: str | None = Query(None),
 ):
     """管理端：获取全部用户列表（分页）"""
-    sb = get_sb_client()
-    return db_get_all_users(sb, page, page_size, search)
+    pool = await get_db()
+    return await db_get_all_users(pool, page, page_size, search)
 
 
 @router.put("/users/{user_id}", response_model=dict)
@@ -58,9 +58,9 @@ async def api_admin_update_user(
     admin: dict = Depends(get_current_admin),
 ):
     """管理端：更新指定用户（如禁用/启用）"""
-    sb = get_sb_client()
+    pool = await get_db()
 
-    ok = db_update_user(sb, user_id, body)
+    ok = await db_update_user(pool, user_id, body)
     if not ok:
         raise HTTPException(status_code=404, detail="用户不存在")
     return {"success": True}
@@ -82,10 +82,10 @@ async def api_admin_list_history(
     branch: str | None = Query(None),
 ):
     """管理端：获取全站所有用户的分析历史（支持高级筛选分页）"""
-    sb = get_sb_client()
+    pool = await get_db()
 
-    return db_get_filtered_history(
-        sb,
+    return await db_get_filtered_history(
+        pool,
         page=page,
         page_size=page_size,
         user_id=user_id,
@@ -106,15 +106,14 @@ async def api_admin_history_detail(
     admin: dict = Depends(get_current_admin),
 ):
     """管理端：获取单条分析记录的完整详情"""
-    sb = get_sb_client()
+    pool = await get_db()
 
-    history = db_get_history_by_id(sb, record_id)
+    history = await db_get_history_by_id(pool, record_id)
     if not history:
         raise HTTPException(status_code=404, detail="记录不存在")
 
-    user = db_get_user_by_id(sb, history.user_id)
+    user = await db_get_user_by_id(pool, history.user_id)
 
-    # 调用 LangSmith API 获取真实追踪数据
     langsmith_info = None
     ls_stats = get_langsmith_stats(
         repo_name=history.repo_name,
@@ -152,11 +151,11 @@ async def api_admin_user_history(
     search: str | None = Query(None),
 ):
     """管理端：获取指定用户的分析历史（包含用户信息）"""
-    sb = get_sb_client()
+    pool = await get_db()
 
-    user = db_get_user_by_id(sb, user_id)
+    user = await db_get_user_by_id(pool, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    history = db_get_user_analysis_history(sb, user_id, page, page_size, search)
+    history = await db_get_user_analysis_history(pool, user_id, page, page_size, search)
     return AdminUserHistoryResponse(user=user, history=history).model_dump(mode="json")

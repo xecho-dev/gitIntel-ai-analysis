@@ -1,7 +1,15 @@
-"""GitIntel 数据库操作层（直接调用 Supabase Python SDK）。"""
-from datetime import datetime
+"""
+GitIntel 数据库操作层（asyncpg）
+替代原先依赖 Supabase Python SDK 的实现，使用原生 PostgreSQL 驱动。
+"""
+import json
+import uuid
+import logging
+from datetime import datetime, timezone
 from typing import Optional
-from supabase_client import Client
+
+import asyncpg
+
 from schemas.chat import (
     ChatSession,
     ChatMessage,
@@ -20,6 +28,8 @@ from schemas.history import (
     AdminHistoryItem,
     AdminHistoryListResponse,
 )
+
+logger = logging.getLogger("gitintel")
 
 
 def _derive_history_metrics(result_data: dict) -> dict:
@@ -87,29 +97,25 @@ def _extract_repo_sha(result_data: dict) -> Optional[str]:
     1. SSE 流保存时：result_data = {"final_result": {...}}，需先解包
     2. /api/history/save 手动保存时：result_data 直接包含 "repo_loader"
     """
-    import logging
-    logger2 = logging.getLogger("gitintel")
-
     data = result_data
 
-    # 如果 result_data["final_result"] 存在（来自 SSE 流保存路径），先解包
     if "final_result" in data:
-        logger2.info(f"[_extract_repo_sha] 解包 final_result，原始 keys={list(data.keys())}")
+        logger.info(f"[_extract_repo_sha] 解包 final_result，原始 keys={list(data.keys())}")
         data = data["final_result"]
-        logger2.info(f"[_extract_repo_sha] 解包后 keys={list(data.keys())}")
+        logger.info(f"[_extract_repo_sha] 解包后 keys={list(data.keys())}")
     else:
-        logger2.info(f"[_extract_repo_sha] 无 final_result，原始 keys={list(data.keys())}")
+        logger.info(f"[_extract_repo_sha] 无 final_result，原始 keys={list(data.keys())}")
 
     repo_loader = data.get("repo_loader", {})
     if isinstance(repo_loader, dict):
         sha = repo_loader.get("repo_sha")
         return sha
-    logger2.warning(f"[_extract_repo_sha] 未找到 repo_loader，data keys={list(data.keys())}")
+    logger.warning(f"[_extract_repo_sha] 未找到 repo_loader，data keys={list(data.keys())}")
     return None
 
 
-def save_analysis(
-    sb: Client,
+async def save_analysis(
+    pool: asyncpg.Pool,
     auth_user_id: str,
     repo_url: str,
     branch: str,
@@ -118,63 +124,47 @@ def save_analysis(
     thread_id: Optional[str] = None,
 ) -> SaveAnalysisResponse:
     """保存一次分析结果，返回新记录的 id。"""
-    # 先找 user uuid（users.id 是 UUID，而 analysis_history.user_id 需要 UUID）
-    user_row = (
-        sb.table("users")
-        .select("id")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    if user_row is None:
-        raise ValueError(f"User not found for auth_user_id: {auth_user_id}")
-    row = user_row.data
-    if not row or not row.get("id"):
-        raise ValueError(f"User not found for auth_user_id: {auth_user_id}")
-    user_uuid = row["id"]
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow(
+            "SELECT id FROM users WHERE auth_user_id = $1", auth_user_id
+        )
+        if user_row is None:
+            raise ValueError(f"User not found for auth_user_id: {auth_user_id}")
+        user_uuid = user_row["id"]
 
-    metrics = _derive_history_metrics(result_data)
-    repo_sha = _extract_repo_sha(result_data)
+        metrics = _derive_history_metrics(result_data)
+        repo_sha = _extract_repo_sha(result_data)
+        repo_name = repo_url.rstrip("/").split("/")[-1]
 
-    # 从 repo_url 提取 repo_name（"owner/repo"）
-    repo_name = repo_url.rstrip("/").split("/")[-1]
-
-    sb.table("analysis_history").insert(
-        {
-            "user_id": user_uuid,
-            "repo_url": repo_url,
-            "repo_name": repo_name,
-            "branch": branch,
-            "repo_sha": repo_sha,
-            "result_data": result_data,
-            "health_score": metrics["health_score"],
-            "quality_score": metrics["quality_score"],
-            "risk_level": metrics["risk_level"],
-            "risk_level_color": metrics["risk_level_color"],
-            "risk_level_bg": metrics["risk_level_bg"],
-            "border_color": metrics["border_color"],
-            "langsmith_trace_id": langsmith_trace_id,
-            "thread_id": thread_id,
-        }
-    ).execute()
-
-    fetched = (
-        sb.table("analysis_history")
-        .select("id, created_at")
-        .eq("user_id", user_uuid)
-        .order("created_at", desc=True)
-        .limit(1)
-        .maybe_single()
-        .execute()
-    )
-    r = fetched.data if hasattr(fetched, "data") else fetched
-    if not r:
-        raise RuntimeError("Save analysis failed: record not found after insert")
-    return SaveAnalysisResponse(id=r["id"], created_at=r["created_at"])
+        row = await conn.fetchrow(
+            """
+            INSERT INTO analysis_history
+                (user_id, repo_url, repo_name, branch, repo_sha, result_data,
+                 health_score, quality_score, risk_level, risk_level_color,
+                 risk_level_bg, border_color, langsmith_trace_id, thread_id)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+            RETURNING id, created_at
+            """,
+            user_uuid,
+            repo_url,
+            repo_name,
+            branch,
+            repo_sha,
+            result_data,
+            metrics["health_score"],
+            metrics["quality_score"],
+            metrics["risk_level"],
+            metrics["risk_level_color"],
+            metrics["risk_level_bg"],
+            metrics["border_color"],
+            langsmith_trace_id,
+            thread_id,
+        )
+        return SaveAnalysisResponse(id=str(row["id"]), created_at=row["created_at"].isoformat())
 
 
-def get_history(
-    sb: Client,
+async def get_history(
+    pool: asyncpg.Pool,
     auth_user_id: str,
     page: int = 1,
     page_size: int = 20,
@@ -183,69 +173,74 @@ def get_history(
     """分页查询用户的分析历史。"""
     offset = (page - 1) * page_size
 
-    # 先找 user uuid（users.id 是 UUID，而 analysis_history.user_id 需要 UUID）
-    user_row = (
-        sb.table("users")
-        .select("id")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    if user_row is None:
-        return HistoryListResponse(
-            items=[],
-            total=0,
-            page=page,
-            page_size=page_size,
-            stats=HistoryStats(total_scans=0, avg_health_score=0, high_risk_count=0, medium_risk_count=0),
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow(
+            "SELECT id FROM users WHERE auth_user_id = $1", auth_user_id
         )
-    row = user_row.data
-    if not row or not row.get("id"):
-        return HistoryListResponse(
-            items=[],
-            total=0,
-            page=page,
-            page_size=page_size,
-            stats=HistoryStats(total_scans=0, avg_health_score=0, high_risk_count=0, medium_risk_count=0),
+        if user_row is None:
+            return HistoryListResponse(
+                items=[],
+                total=0,
+                page=page,
+                page_size=page_size,
+                stats=HistoryStats(
+                    total_scans=0,
+                    avg_health_score=0,
+                    high_risk_count=0,
+                    medium_risk_count=0,
+                ),
+            )
+        user_uuid = user_row["id"]
+
+        if search:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM analysis_history
+                WHERE user_id = $1 AND repo_name ILIKE $2
+                ORDER BY created_at DESC
+                LIMIT $3 OFFSET $4
+                """,
+                user_uuid,
+                f"%{search}%",
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow(
+                """
+                SELECT COUNT(*) as cnt FROM analysis_history
+                WHERE user_id = $1 AND repo_name ILIKE $2
+                """,
+                user_uuid,
+                f"%{search}%",
+            )
+            total = count_row["cnt"]
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM analysis_history
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                """,
+                user_uuid,
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow(
+                "SELECT COUNT(*) as cnt FROM analysis_history WHERE user_id = $1",
+                user_uuid,
+            )
+            total = count_row["cnt"]
+
+        stats_rows = await conn.fetch(
+            "SELECT health_score, risk_level FROM analysis_history WHERE user_id = $1",
+            user_uuid,
         )
-    user_uuid = row["id"]
 
-    # 查询历史
-    query = (
-        sb.table("analysis_history")
-        .select("*")
-        .eq("user_id", user_uuid)
-        .order("created_at", desc=True)
-        .range(offset, offset + page_size - 1)
-    )
-    if search:
-        query = query.ilike("repo_name", f"%{search}%")
-
-    data = query.execute()
-
-    # 查询总数
-    count_query = (
-        sb.table("analysis_history")
-        .select("id", count="exact")
-        .eq("user_id", user_uuid)
-    )
-    if search:
-        count_query = count_query.ilike("repo_name", f"%{search}%")
-    count_data = count_query.execute()
-    total = count_data.count or 0
-
-    # 查询统计数据
-    stats_data = (
-        sb.table("analysis_history")
-        .select("health_score, risk_level")
-        .eq("user_id", user_uuid)
-        .execute()
-    )
-    rows = stats_data.data or []
-    scores = [r["health_score"] for r in rows if r.get("health_score") is not None]
+    scores = [r["health_score"] for r in stats_rows if r.get("health_score") is not None]
     avg_hs = round(sum(scores) / len(scores), 1) if scores else 0
-    high_count = sum(1 for r in rows if r.get("risk_level") == "高危")
-    med_count = sum(1 for r in rows if r.get("risk_level") == "中等")
+    high_count = sum(1 for r in stats_rows if r.get("risk_level") == "高危")
+    med_count = sum(1 for r in stats_rows if r.get("risk_level") == "中等")
 
     items = [
         HistoryItem(
@@ -261,9 +256,9 @@ def get_history(
             risk_level_bg=r.get("risk_level_bg"),
             border_color=r.get("border_color"),
             result_data=r.get("result_data"),
-            created_at=r["created_at"],
+            created_at=r["created_at"].isoformat(),
         )
-        for r in data.data
+        for r in rows
     ]
 
     return HistoryListResponse(
@@ -272,7 +267,7 @@ def get_history(
         page=page,
         page_size=page_size,
         stats=HistoryStats(
-            total_scans=len(rows),
+            total_scans=len(stats_rows),
             avg_health_score=avg_hs,
             high_risk_count=high_count,
             medium_risk_count=med_count,
@@ -280,256 +275,350 @@ def get_history(
     )
 
 
-def delete_analysis(sb: Client, auth_user_id: str, history_id: str) -> bool:
+async def delete_analysis(
+    pool: asyncpg.Pool,
+    auth_user_id: str,
+    history_id: str,
+) -> bool:
     """删除指定历史记录。"""
-    user_row = (
-        sb.table("users")
-        .select("id")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    if user_row is None:
-        return False
-    row = user_row.data
-    if not row or not row.get("id"):
-        return False
-    user_uuid = row["id"]
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow(
+            "SELECT id FROM users WHERE auth_user_id = $1", auth_user_id
+        )
+        if user_row is None:
+            return False
+        user_uuid = user_row["id"]
 
-    sb.table("analysis_history").delete().eq("id", history_id).eq("user_id", user_uuid).execute()
-    return True
+        result = await conn.execute(
+            """
+            DELETE FROM analysis_history
+            WHERE id = $1 AND user_id = $2
+            """,
+            uuid.UUID(history_id),
+            user_uuid,
+        )
+        return result != "DELETE 0"
 
 
-def get_sha_cached_analysis(sb: Client, auth_user_id: str, repo_url: str, branch: str, repo_sha: str) -> Optional[dict]:
+async def get_sha_cached_analysis(
+    pool: asyncpg.Pool,
+    auth_user_id: str,
+    repo_url: str,
+    branch: str,
+    repo_sha: str,
+) -> Optional[dict]:
     """
     查询最近一次分析结果，条件：repo_url + branch + repo_sha 完全相同。
-
-    用于智能缓存：若 SHA 未变，直接复用已有结果，无需重新分析。
-    返回 result_data（完整分析结果），若不存在则返回 None。
+    用于智能缓存：若 SHA 未变，直接复用已有结果。
     """
-    user_row = (
-        sb.table("users")
-        .select("id")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    if user_row is None or not user_row.data or not user_row.data.get("id"):
-        return None
-    user_uuid = user_row.data["id"]
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow(
+            "SELECT id FROM users WHERE auth_user_id = $1", auth_user_id
+        )
+        if user_row is None:
+            return None
+        user_uuid = user_row["id"]
 
-    record = (
-        sb.table("analysis_history")
-        .select("result_data, repo_sha, created_at")
-        .eq("user_id", user_uuid)
-        .eq("repo_url", repo_url)
-        .eq("branch", branch)
-        .eq("repo_sha", repo_sha)
-        .order("created_at", desc=True)
-        .limit(1)
-        .maybe_single()
-        .execute()
-    )
-    if record is None or not record.data:
-        return None
-    return record.data.get("result_data")
+        row = await conn.fetchrow(
+            """
+            SELECT result_data, repo_sha, created_at FROM analysis_history
+            WHERE user_id = $1 AND repo_url = $2 AND branch = $3 AND repo_sha = $4
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            user_uuid,
+            repo_url,
+            branch,
+            repo_sha,
+        )
+        if row is None:
+            return None
+        return row["result_data"]
 
 
-def upsert_user(sb: Client, auth_user_id: str, payload: dict) -> UserProfile:
+async def upsert_user(pool: asyncpg.Pool, auth_user_id: str, payload: dict) -> UserProfile:
     """
     Upsert GitHub 用户信息。
 
-    去重策略（防止同一 GitHub 账户因 auth_user_id 变化而重复创建）：
+    去重策略：
     1. 先按 auth_user_id 查找（稳定路径）
     2. 如果找不到，再按 login 查找：
-       - 找到 → 更新旧记录的 auth_user_id（保留原 users.id，历史记录不受影响）
+       - 找到 → 更新旧记录的 auth_user_id（复用 users.id，历史记录不受影响）
        - 未找到 → 正常创建新记录
     """
-    payload_clean = {k: v for k, v in payload.items() if v is not None and v != ""}
-    payload_clean["auth_user_id"] = auth_user_id
-    payload_clean["updated_at"] = datetime.utcnow().isoformat()
+    async with pool.acquire() as conn:
+        payload_clean = {k: v for k, v in payload.items() if v is not None and v != ""}
+        payload_clean["auth_user_id"] = auth_user_id
+        payload_clean["updated_at"] = datetime.now(timezone.utc)
 
-    # 尝试 1：按 auth_user_id 查找（正常路径）
-    existing = (
-        sb.table("users")
-        .select("*")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
+        existing = await conn.fetchrow(
+            "SELECT * FROM users WHERE auth_user_id = $1", auth_user_id
+        )
 
-    if existing is not None and existing.data:
-        # 路径 A：auth_user_id 已存在，直接更新
-        sb.table("users").upsert(payload_clean, on_conflict="auth_user_id").execute()
-    else:
-        # 路径 B：auth_user_id 变化，检查是否有相同 login 的旧记录
-        login_val = payload_clean.get("login")
-        if login_val:
-            same_login = (
-                sb.table("users")
-                .select("id, auth_user_id")
-                .eq("login", login_val)
-                .maybe_single()
-                .execute()
+        if existing is not None:
+            await conn.execute(
+                """
+                UPDATE users SET
+                    github_id = COALESCE($2, github_id),
+                    login = $3,
+                    email = COALESCE($4, email),
+                    avatar_url = $5,
+                    name = $6,
+                    bio = $7,
+                    company = $8,
+                    location = $9,
+                    blog = $10,
+                    public_repos = COALESCE($11, public_repos),
+                    followers = COALESCE($12, followers),
+                    following = COALESCE($13, following),
+                    updated_at = $14
+                WHERE auth_user_id = $1
+                """,
+                auth_user_id,
+                payload_clean.get("github_id"),
+                payload_clean.get("login", ""),
+                payload_clean.get("email"),
+                payload_clean.get("avatar_url"),
+                payload_clean.get("name"),
+                payload_clean.get("bio"),
+                payload_clean.get("company"),
+                payload_clean.get("location"),
+                payload_clean.get("blog"),
+                payload_clean.get("public_repos"),
+                payload_clean.get("followers"),
+                payload_clean.get("following"),
+                payload_clean["updated_at"],
             )
-            if same_login is not None and same_login.data:
-                # 同一 GitHub 账户（login 相同），复用旧记录的 id
-                # 先把旧记录的 auth_user_id 更新为新的（突破 auth_user_id UNIQUE 约束）
-                old_id = same_login.data["id"]
-                sb.table("users").update({"auth_user_id": auth_user_id}).eq("id", old_id).execute()
-                # 再正常 upsert（此时 auth_user_id 唯一，不会再产生重复）
-                sb.table("users").upsert(payload_clean, on_conflict="auth_user_id").execute()
-            else:
-                # 路径 C：真正的全新用户，直接 upsert
-                sb.table("users").upsert(payload_clean, on_conflict="auth_user_id").execute()
         else:
-            # 无 login 字段，fallback 直接 upsert
-            sb.table("users").upsert(payload_clean, on_conflict="auth_user_id").execute()
+            login_val = payload_clean.get("login")
+            if login_val:
+                same_login = await conn.fetchrow(
+                    "SELECT id, auth_user_id FROM users WHERE login = $1", login_val
+                )
+                if same_login is not None:
+                    await conn.execute(
+                        "UPDATE users SET auth_user_id = $1 WHERE id = $2",
+                        auth_user_id,
+                        same_login["id"],
+                    )
+                    await conn.execute(
+                        """
+                        UPDATE users SET
+                            github_id = COALESCE($2, github_id),
+                            email = COALESCE($3, email),
+                            avatar_url = $4,
+                            name = $5,
+                            bio = $6,
+                            company = $7,
+                            location = $8,
+                            blog = $9,
+                            public_repos = COALESCE($10, public_repos),
+                            followers = COALESCE($11, followers),
+                            following = COALESCE($12, following),
+                            updated_at = $13
+                        WHERE auth_user_id = $1
+                        """,
+                        auth_user_id,
+                        payload_clean.get("github_id"),
+                        payload_clean.get("email"),
+                        payload_clean.get("avatar_url"),
+                        payload_clean.get("name"),
+                        payload_clean.get("bio"),
+                        payload_clean.get("company"),
+                        payload_clean.get("location"),
+                        payload_clean.get("blog"),
+                        payload_clean.get("public_repos"),
+                        payload_clean.get("followers"),
+                        payload_clean.get("following"),
+                        payload_clean["updated_at"],
+                    )
+                else:
+                    await conn.execute(
+                        """
+                        INSERT INTO users
+                            (auth_user_id, github_id, login, email, avatar_url,
+                             name, bio, company, location, blog,
+                             public_repos, followers, following, updated_at)
+                        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                        """,
+                        auth_user_id,
+                        payload_clean.get("github_id"),
+                        payload_clean.get("login", ""),
+                        payload_clean.get("email"),
+                        payload_clean.get("avatar_url"),
+                        payload_clean.get("name"),
+                        payload_clean.get("bio"),
+                        payload_clean.get("company"),
+                        payload_clean.get("location"),
+                        payload_clean.get("blog"),
+                        payload_clean.get("public_repos"),
+                        payload_clean.get("followers"),
+                        payload_clean.get("following"),
+                        payload_clean["updated_at"],
+                    )
+            else:
+                await conn.execute(
+                    """
+                    INSERT INTO users (auth_user_id, login, updated_at)
+                    VALUES ($1, $2, $3)
+                    """,
+                    auth_user_id,
+                    auth_user_id.split("-")[0] if "-" in auth_user_id else auth_user_id,
+                    payload_clean["updated_at"],
+                )
 
-    fetched = (
-        sb.table("users")
-        .select("*")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    r = fetched.data if hasattr(fetched, "data") else fetched
-    if not r:
-        raise RuntimeError("Upsert user failed: user not found after upsert")
-    return UserProfile(
-        id=r["id"],
-        auth_user_id=r["auth_user_id"],
-        github_id=r.get("github_id"),
-        login=r["login"],
-        email=r.get("email"),
-        avatar_url=r.get("avatar_url"),
-        name=r.get("name"),
-        bio=r.get("bio"),
-        company=r.get("company"),
-        location=r.get("location"),
-        blog=r.get("blog"),
-        public_repos=r.get("public_repos", 0),
-        followers=r.get("followers", 0),
-        following=r.get("following", 0),
-        created_at=r["created_at"],
-        updated_at=r.get("updated_at", r["created_at"]),
-    )
+        r = await conn.fetchrow(
+            "SELECT * FROM users WHERE auth_user_id = $1", auth_user_id
+        )
+        if r is None:
+            raise RuntimeError("Upsert user failed: user not found after upsert")
+
+        return UserProfile(
+            id=str(r["id"]),
+            auth_user_id=str(r["auth_user_id"]),
+            github_id=r.get("github_id"),
+            login=r["login"],
+            email=r.get("email"),
+            avatar_url=r.get("avatar_url"),
+            name=r.get("name"),
+            bio=r.get("bio"),
+            company=r.get("company"),
+            location=r.get("location"),
+            blog=r.get("blog"),
+            public_repos=r["public_repos"] or 0,
+            followers=r["followers"] or 0,
+            following=r["following"] or 0,
+            created_at=r["created_at"].isoformat(),
+            updated_at=r.get("updated_at", r["created_at"]).isoformat()
+            if r.get("updated_at")
+            else r["created_at"].isoformat(),
+        )
 
 
-def get_user_profile(sb: Client, auth_user_id: str) -> Optional[UserProfile]:
+async def get_user_profile(pool: asyncpg.Pool, auth_user_id: str) -> Optional[UserProfile]:
     """获取用户资料。"""
-    data = (
-        sb.table("users")
-        .select("*")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    if data is None:
-        return None
-    r = data.data
-    if not r or not isinstance(r, dict):
-        return None
-    return UserProfile(
-        id=r["id"],
-        auth_user_id=r["auth_user_id"],
-        github_id=r.get("github_id"),
-        login=r["login"],
-        email=r.get("email"),
-        avatar_url=r.get("avatar_url"),
-        name=r.get("name"),
-        bio=r.get("bio"),
-        company=r.get("company"),
-        location=r.get("location"),
-        blog=r.get("blog"),
-        public_repos=r.get("public_repos", 0),
-        followers=r.get("followers", 0),
-        following=r.get("following", 0),
-        created_at=r["created_at"],
-        updated_at=r.get("updated_at", r["created_at"]),
-    )
+    async with pool.acquire() as conn:
+        r = await conn.fetchrow(
+            "SELECT * FROM users WHERE auth_user_id = $1", auth_user_id
+        )
+        if r is None:
+            return None
+        return UserProfile(
+            id=str(r["id"]),
+            auth_user_id=str(r["auth_user_id"]),
+            github_id=r.get("github_id"),
+            login=r["login"],
+            email=r.get("email"),
+            avatar_url=r.get("avatar_url"),
+            name=r.get("name"),
+            bio=r.get("bio"),
+            company=r.get("company"),
+            location=r.get("location"),
+            blog=r.get("blog"),
+            public_repos=r["public_repos"] or 0,
+            followers=r["followers"] or 0,
+            following=r["following"] or 0,
+            created_at=r["created_at"].isoformat(),
+            updated_at=r.get("updated_at", r["created_at"]).isoformat()
+            if r.get("updated_at")
+            else r["created_at"].isoformat(),
+        )
 
 
-def get_user_uuid(sb: Client, auth_user_id: str) -> Optional[str]:
+async def get_user_uuid(pool: asyncpg.Pool, auth_user_id: str) -> Optional[str]:
     """根据 auth_user_id 查找用户的 uuid。"""
-    resp = (
-        sb.table("users")
-        .select("id")
-        .eq("auth_user_id", auth_user_id)
-        .maybe_single()
-        .execute()
-    )
-    if resp is None:
-        return None
-    row = resp.data
-    if not row or not isinstance(row, dict):
-        return None
-    return row.get("id")
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM users WHERE auth_user_id = $1", auth_user_id
+        )
+        if row is None:
+            return None
+        return str(row["id"])
 
 
 # ─── 管理端（Admin）数据库操作 ─────────────────────────────────────────────────
 
-def db_get_overview_stats(sb: Client) -> AdminOverviewResponse:
+
+async def db_get_overview_stats(pool: asyncpg.Pool) -> AdminOverviewResponse:
     """获取全站概览统计数据。"""
-    # 总用户数
-    user_count_data = sb.table("users").select("id", count="exact").execute()
-    total_users = user_count_data.count or 0
+    async with pool.acquire() as conn:
+        user_count_row = await conn.fetchrow(
+            "SELECT COUNT(*) as cnt FROM users"
+        )
+        total_users = user_count_row["cnt"]
 
-    # 总分析次数 + 统计信息
-    all_history = sb.table("analysis_history").select(
-        "health_score, risk_level, created_at"
-    ).execute()
-    all_rows = all_history.data or []
-    total_analysis = len(all_rows)
+        all_history = await conn.fetch(
+            "SELECT health_score, risk_level, created_at FROM analysis_history"
+        )
+        total_analysis = len(all_history)
 
-    # 今日分析次数
-    from datetime import datetime, timezone
-    today = datetime.now(timezone.utc).date().isoformat()
-    today_data = (
-        sb.table("analysis_history")
-        .select("id", count="exact")
-        .gte("created_at", f"{today}T00:00:00Z")
-        .execute()
-    )
-    today_analysis = today_data.count or 0
+        today = datetime.now(timezone.utc).date().isoformat()
+        today_row = await conn.fetchrow(
+            """
+            SELECT COUNT(*) as cnt FROM analysis_history
+            WHERE created_at >= $1
+            """,
+            f"{today}T00:00:00Z",
+        )
+        today_analysis = today_row["cnt"]
 
-    # 平均健康分
-    scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
-    avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
+        scores = [r["health_score"] for r in all_history if r.get("health_score") is not None]
+        avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
+        high_risk_count = sum(1 for r in all_history if r.get("risk_level") == "高危")
+        medium_risk_count = sum(1 for r in all_history if r.get("risk_level") == "中等")
 
-    high_risk_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
-    medium_risk_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
-
-    return AdminOverviewResponse(
-        total_users=total_users,
-        total_analysis=total_analysis,
-        today_analysis=today_analysis,
-        avg_health_score=avg_hs,
-        high_risk_count=high_risk_count,
-        medium_risk_count=medium_risk_count,
-    )
+        return AdminOverviewResponse(
+            total_users=total_users,
+            total_analysis=total_analysis,
+            today_analysis=today_analysis,
+            avg_health_score=avg_hs,
+            high_risk_count=high_risk_count,
+            medium_risk_count=medium_risk_count,
+        )
 
 
-def db_get_all_users(
-    sb: Client,
+async def db_get_all_users(
+    pool: asyncpg.Pool,
     page: int = 1,
     page_size: int = 10,
-    search: str | None = None,
+    search: Optional[str] = None,
 ) -> AdminUserListResponse:
     """管理端：获取全部用户列表（分页，支持按 login/email 搜索）。"""
     offset = (page - 1) * page_size
 
-    query = sb.table("users").select("*").order("created_at", desc=True).range(offset, offset + page_size - 1)
-    if search:
-        query = query.or_(f"login.ilike.%{search}%,email.ilike.%{search}%")
-
-    data = query.execute()
-
-    count_query = sb.table("users").select("id", count="exact")
-    if search:
-        count_query = count_query.or_(f"login.ilike.%{search}%,email.ilike.%{search}%")
-    count_data = count_query.execute()
-    total = count_data.count or 0
+    async with pool.acquire() as conn:
+        if search:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM users
+                WHERE login ILIKE $1 OR email ILIKE $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                """,
+                f"%{search}%",
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow(
+                """
+                SELECT COUNT(*) as cnt FROM users
+                WHERE login ILIKE $1 OR email ILIKE $1
+                """,
+                f"%{search}%",
+            )
+            total = count_row["cnt"]
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM users
+                ORDER BY created_at DESC
+                LIMIT $1 OFFSET $2
+                """,
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow("SELECT COUNT(*) as cnt FROM users")
+            total = count_row["cnt"]
 
     items = [
         AdminUserItem(
@@ -547,55 +636,89 @@ def db_get_all_users(
             public_repos=r.get("public_repos", 0),
             followers=r.get("followers", 0),
             following=r.get("following", 0),
-            created_at=r["created_at"],
-            updated_at=r.get("updated_at", r["created_at"]),
+            created_at=r["created_at"].isoformat(),
+            updated_at=r.get("updated_at", r["created_at"]).isoformat()
+            if r.get("updated_at")
+            else r["created_at"].isoformat(),
         )
-        for r in data.data
+        for r in rows
     ]
     return AdminUserListResponse(items=items, total=total, page=page, pageSize=page_size)
 
 
-def db_update_user(sb: Client, user_id: str, data: dict) -> bool:
+async def db_update_user(pool: asyncpg.Pool, user_id: str, data: dict) -> bool:
     """管理端：更新指定用户信息（支持禁用/启用等）。"""
-    update_fields = {k: v for k, v in data.items() if k not in ("id", "auth_user_id", "created_at")}
-    update_fields["updated_at"] = datetime.utcnow().isoformat()
-    result = sb.table("users").update(update_fields).eq("id", user_id).execute()
-    return (result.data is not None and len(result.data) > 0) or (hasattr(result, "count") and result.count > 0)
+    async with pool.acquire() as conn:
+        update_fields = {
+            k: v
+            for k, v in data.items()
+            if k not in ("id", "auth_user_id", "created_at")
+        }
+        update_fields["updated_at"] = datetime.utcnow().isoformat()
+
+        if not update_fields:
+            return False
+
+        set_clauses = [f"{k} = ${i+2}" for i, k in enumerate(update_fields.keys())]
+        set_sql = ", ".join(set_clauses)
+        values = list(update_fields.values())
+        values.append(uuid.UUID(user_id))
+
+        result = await conn.execute(
+            f"UPDATE users SET {set_sql} WHERE id = ${len(values)}",
+            *values,
+        )
+        return result != "UPDATE 0"
 
 
-def db_get_all_history(
-    sb: Client,
+async def db_get_all_history(
+    pool: asyncpg.Pool,
     page: int = 1,
     page_size: int = 10,
-    search: str | None = None,
+    search: Optional[str] = None,
 ) -> AdminHistoryListResponse:
     """管理端：获取全站分析历史（分页）。"""
     offset = (page - 1) * page_size
 
-    query = (
-        sb.table("analysis_history")
-        .select("*")
-        .order("created_at", desc=True)
-        .range(offset, offset + page_size - 1)
-    )
-    if search:
-        query = query.ilike("repo_name", f"%{search}%")
+    async with pool.acquire() as conn:
+        if search:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM analysis_history
+                WHERE repo_name ILIKE $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                """,
+                f"%{search}%",
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow(
+                "SELECT COUNT(*) as cnt FROM analysis_history WHERE repo_name ILIKE $1",
+                f"%{search}%",
+            )
+            total = count_row["cnt"]
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM analysis_history
+                ORDER BY created_at DESC
+                LIMIT $1 OFFSET $2
+                """,
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow("SELECT COUNT(*) as cnt FROM analysis_history")
+            total = count_row["cnt"]
 
-    data = query.execute()
-
-    count_query = sb.table("analysis_history").select("id", count="exact")
-    if search:
-        count_query = count_query.ilike("repo_name", f"%{search}%")
-    count_data = count_query.execute()
-    total = count_data.count or 0
-
-    # 统计信息（不计筛选）
-    stats_all = sb.table("analysis_history").select("health_score, risk_level").execute()
-    all_rows = stats_all.data or []
-    scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
-    avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
-    high_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
-    med_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
+        stats_all = await conn.fetch(
+            "SELECT health_score, risk_level FROM analysis_history"
+        )
+        all_rows = stats_all
+        scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
+        avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
+        high_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
+        med_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
 
     items = [
         AdminHistoryItem(
@@ -614,9 +737,9 @@ def db_get_all_history(
             result_data=r.get("result_data"),
             langsmith_trace_id=r.get("langsmith_trace_id"),
             thread_id=r.get("thread_id"),
-            created_at=r["created_at"],
+            created_at=r["created_at"].isoformat(),
         )
-        for r in data.data
+        for r in rows
     ]
     return AdminHistoryListResponse(
         items=items,
@@ -632,82 +755,78 @@ def db_get_all_history(
     )
 
 
-def db_delete_history_by_admin(sb: Client, record_id: str) -> bool:
+async def db_delete_history_by_admin(pool: asyncpg.Pool, record_id: str) -> bool:
     """管理端：删除指定分析记录（不校验用户权限）。"""
-    result = sb.table("analysis_history").delete().eq("id", record_id).execute()
-    return (result.data is not None and len(result.data) > 0) or (hasattr(result, "count") and result.count > 0)
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM analysis_history WHERE id = $1",
+            uuid.UUID(record_id),
+        )
+        return result != "DELETE 0"
 
 
-def db_get_history_by_id(sb: Client, record_id: str) -> Optional[AdminHistoryItem]:
+async def db_get_history_by_id(pool: asyncpg.Pool, record_id: str) -> Optional[AdminHistoryItem]:
     """根据 record_id 获取单条分析历史记录。"""
-    data = (
-        sb.table("analysis_history")
-        .select("*")
-        .eq("id", record_id)
-        .maybe_single()
-        .execute()
-    )
-    if data is None:
-        return None
-    r = data.data
-    if not r or not isinstance(r, dict):
-        return None
-    return AdminHistoryItem(
-        id=r["id"],
-        user_id=r["user_id"],
-        repo_url=r["repo_url"],
-        repo_name=r["repo_name"],
-        branch=r.get("branch", "main"),
-        repo_sha=r.get("repo_sha"),
-        health_score=r.get("health_score"),
-        quality_score=r.get("quality_score"),
-        risk_level=r.get("risk_level"),
-        risk_level_color=r.get("risk_level_color"),
-        risk_level_bg=r.get("risk_level_bg"),
-        border_color=r.get("border_color"),
-        result_data=r.get("result_data"),
-        langsmith_trace_id=r.get("langsmith_trace_id"),
-        thread_id=r.get("thread_id"),
-        created_at=r["created_at"],
-    )
+    async with pool.acquire() as conn:
+        r = await conn.fetchrow(
+            "SELECT * FROM analysis_history WHERE id = $1",
+            uuid.UUID(record_id),
+        )
+        if r is None:
+            return None
+        return AdminHistoryItem(
+            id=r["id"],
+            user_id=r["user_id"],
+            repo_url=r["repo_url"],
+            repo_name=r["repo_name"],
+            branch=r.get("branch", "main"),
+            repo_sha=r.get("repo_sha"),
+            health_score=r.get("health_score"),
+            quality_score=r.get("quality_score"),
+            risk_level=r.get("risk_level"),
+            risk_level_color=r.get("risk_level_color"),
+            risk_level_bg=r.get("risk_level_bg"),
+            border_color=r.get("border_color"),
+            result_data=r.get("result_data"),
+            langsmith_trace_id=r.get("langsmith_trace_id"),
+            thread_id=r.get("thread_id"),
+            created_at=r["created_at"].isoformat(),
+        )
 
 
-def db_get_user_by_id(sb: Client, user_id: str) -> Optional[AdminUserItem]:
+async def db_get_user_by_id(pool: asyncpg.Pool, user_id: str) -> Optional[AdminUserItem]:
     """根据 user_id（UUID）获取用户信息。"""
-    data = (
-        sb.table("users")
-        .select("*")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if data is None:
-        return None
-    r = data.data
-    if not r or not isinstance(r, dict):
-        return None
-    return AdminUserItem(
-        id=r["id"],
-        auth_user_id=r["auth_user_id"],
-        github_id=r.get("github_id"),
-        login=r["login"],
-        email=r.get("email"),
-        avatar_url=r.get("avatar_url"),
-        name=r.get("name"),
-        bio=r.get("bio"),
-        company=r.get("company"),
-        location=r.get("location"),
-        blog=r.get("blog"),
-        public_repos=r.get("public_repos", 0),
-        followers=r.get("followers", 0),
-        following=r.get("following", 0),
-        created_at=r["created_at"],
-        updated_at=r.get("updated_at", r["created_at"]),
-    )
+    async with pool.acquire() as conn:
+        r = await conn.fetchrow(
+            "SELECT * FROM users WHERE id = $1",
+            uuid.UUID(user_id),
+        )
+        if r is None:
+            return None
+        return AdminUserItem(
+            id=r["id"],
+            auth_user_id=r["auth_user_id"],
+            github_id=r.get("github_id"),
+            login=r["login"],
+            email=r.get("email"),
+            avatar_url=r.get("avatar_url"),
+            name=r.get("name"),
+            bio=r.get("bio"),
+            company=r.get("company"),
+            location=r.get("location"),
+            blog=r.get("blog"),
+            public_repos=r.get("public_repos", 0),
+            followers=r.get("followers", 0),
+            following=r.get("following", 0),
+            created_at=r["created_at"].isoformat(),
+            updated_at=r.get("updated_at", r["created_at"]).isoformat()
+            if r.get("updated_at")
+            else r["created_at"].isoformat(),
+        )
 
 
-def db_get_user_analysis_history(
-    sb: Client,
+async def db_get_user_analysis_history(
+    pool: asyncpg.Pool,
     user_id: str,
     page: int = 1,
     page_size: int = 10,
@@ -715,31 +834,58 @@ def db_get_user_analysis_history(
 ) -> AdminHistoryListResponse:
     """获取指定用户的分析历史（分页）。"""
     offset = (page - 1) * page_size
+    user_uuid = uuid.UUID(user_id)
 
-    query = (
-        sb.table("analysis_history")
-        .select("*")
-        .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .range(offset, offset + page_size - 1)
-    )
-    if search:
-        query = query.ilike("repo_name", f"%{search}%")
+    async with pool.acquire() as conn:
+        if search:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM analysis_history
+                WHERE user_id = $1 AND repo_name ILIKE $2
+                ORDER BY created_at DESC
+                LIMIT $3 OFFSET $4
+                """,
+                user_uuid,
+                f"%{search}%",
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow(
+                """
+                SELECT COUNT(*) as cnt FROM analysis_history
+                WHERE user_id = $1 AND repo_name ILIKE $2
+                """,
+                user_uuid,
+                f"%{search}%",
+            )
+            total = count_row["cnt"]
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT * FROM analysis_history
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                """,
+                user_uuid,
+                page_size,
+                offset,
+            )
+            count_row = await conn.fetchrow(
+                "SELECT COUNT(*) as cnt FROM analysis_history WHERE user_id = $1",
+                user_uuid,
+            )
+            total = count_row["cnt"]
 
-    data = query.execute()
-
-    count_query = sb.table("analysis_history").select("id", count="exact").eq("user_id", user_id)
-    if search:
-        count_query = count_query.ilike("repo_name", f"%{search}%")
-    count_data = count_query.execute()
-    total = count_data.count or 0
-
-    stats_all = sb.table("analysis_history").select("health_score, risk_level").eq("user_id", user_id).execute()
-    all_rows = stats_all.data or []
-    scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
-    avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
-    high_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
-    med_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
+        stats_all = await conn.fetch(
+            "SELECT health_score, risk_level FROM analysis_history WHERE user_id = $1",
+            user_uuid,
+        )
+        all_rows = stats_all
+        scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
+        avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
+        high_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
+        med_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
 
     items = [
         AdminHistoryItem(
@@ -758,9 +904,9 @@ def db_get_user_analysis_history(
             result_data=r.get("result_data"),
             langsmith_trace_id=r.get("langsmith_trace_id"),
             thread_id=r.get("thread_id"),
-            created_at=r["created_at"],
+            created_at=r["created_at"].isoformat(),
         )
-        for r in data.data
+        for r in rows
     ]
     return AdminHistoryListResponse(
         items=items,
@@ -776,8 +922,8 @@ def db_get_user_analysis_history(
     )
 
 
-def db_get_filtered_history(
-    sb: Client,
+async def db_get_filtered_history(
+    pool: asyncpg.Pool,
     page: int = 1,
     page_size: int = 10,
     user_id: Optional[str] = None,
@@ -793,48 +939,77 @@ def db_get_filtered_history(
     """管理端：高级筛选分析历史（支持多条件组合）。"""
     offset = (page - 1) * page_size
 
-    query = sb.table("analysis_history").select("*").order("created_at", desc=True)
+    conditions = []
+    params: list = []
+    param_idx = 1
+
+    def add_cond(sql_snippet: str, *vals: any):
+        nonlocal param_idx
+        conditions.append(sql_snippet)
+        for v in vals:
+            params.append(v)
+            param_idx += 1
 
     if user_id:
-        query = query.eq("user_id", user_id)
+        add_cond(f"user_id = ${param_idx}", uuid.UUID(user_id))
     if risk_level:
-        query = query.eq("risk_level", risk_level)
-    if date_from:
-        query = query.gte("created_at", f"{date_from}T00:00:00Z")
-    if date_to:
-        query = query.lte("created_at", f"{date_to}T23:59:59Z")
-    if repo_name:
-        query = query.ilike("repo_name", f"%{repo_name}%")
-    if branch:
-        query = query.eq("branch", branch)
-
-    # 质量分筛选（通过 ilike 或范围过滤，health_score 存储的是数值）
-    # 先执行主查询，再在内存中过滤 health_score 范围（Supabase postgrest 不支持 range on numeric via python sdk 直接）
-    # 使用 gte/lte 配合 health_score 字段
+        add_cond(f"risk_level = ${param_idx}", risk_level)
     if quality_score_min is not None:
-        query = query.gte("health_score", quality_score_min)
+        add_cond(f"health_score >= ${param_idx}", quality_score_min)
     if quality_score_max is not None:
-        query = query.lte("health_score", quality_score_max)
+        add_cond(f"health_score <= ${param_idx}", quality_score_max)
+    if date_from:
+        add_cond(f"created_at >= ${param_idx}", f"{date_from}T00:00:00Z")
+    if date_to:
+        add_cond(f"created_at <= ${param_idx}", f"{date_to}T23:59:59Z")
+    if repo_name:
+        add_cond(f"repo_name ILIKE ${param_idx}", f"%{repo_name}%")
+    if branch:
+        add_cond(f"branch = ${param_idx}", branch)
 
-    data = query.execute()
+    where_sql = " AND ".join(conditions) if conditions else "1=1"
 
-    # 内存中过滤 search（repo_name 模糊搜索已在服务端处理）
-    filtered = data.data or []
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            f"""
+            SELECT * FROM analysis_history
+            WHERE {where_sql}
+            ORDER BY created_at DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+            """,
+            *params,
+            page_size,
+            offset,
+        )
+
+        count_row = await conn.fetchrow(
+            f"SELECT COUNT(*) as cnt FROM analysis_history WHERE {where_sql}",
+            *params,
+        )
+        total = count_row["cnt"]
+
+        stats_all = await conn.fetch(
+            "SELECT health_score, risk_level FROM analysis_history"
+        )
+        all_rows = stats_all
+        scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
+        avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
+        high_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
+        med_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
+
+    filtered = list(rows)
     if search:
         import re
         pattern = re.compile(search, re.IGNORECASE)
-        filtered = [r for r in filtered if pattern.search(r.get("repo_name", "")) or pattern.search(r.get("repo_url", ""))]
+        filtered = [
+            r
+            for r in filtered
+            if pattern.search(r.get("repo_name", "") or "")
+            or pattern.search(r.get("repo_url", "") or "")
+        ]
 
     total = len(filtered)
-    page_items = filtered[offset:offset + page_size]
-
-    # 统计（全局，不受筛选影响以提供参照）
-    stats_all = sb.table("analysis_history").select("health_score, risk_level").execute()
-    all_rows = stats_all.data or []
-    scores = [r["health_score"] for r in all_rows if r.get("health_score") is not None]
-    avg_hs = round(sum(scores) / len(scores), 1) if scores else 0.0
-    high_count = sum(1 for r in all_rows if r.get("risk_level") == "高危")
-    med_count = sum(1 for r in all_rows if r.get("risk_level") == "中等")
+    page_items = filtered[offset : offset + page_size]
 
     items = [
         AdminHistoryItem(
@@ -853,7 +1028,7 @@ def db_get_filtered_history(
             result_data=r.get("result_data"),
             langsmith_trace_id=r.get("langsmith_trace_id"),
             thread_id=r.get("thread_id"),
-            created_at=r["created_at"],
+            created_at=r["created_at"].isoformat(),
         )
         for r in page_items
     ]
@@ -871,44 +1046,56 @@ def db_get_filtered_history(
     )
 
 
-# ─── Chat ────────────────────────────────────────────────────────────────────
+# ─── Chat ─────────────────────────────────────────────────────────────────────
 
-def create_chat_session(sb: Client, user_uuid: str, title: str | None = None) -> ChatSession:
+
+async def create_chat_session(
+    pool: asyncpg.Pool,
+    user_uuid: str,
+    title: Optional[str] = None,
+) -> ChatSession:
     """创建新的 Chat Session。"""
     title = title or "新对话"
-    data = (
-        sb.table("chat_sessions")
-        .insert({"user_id": user_uuid, "title": title})
-        .execute()
-    ).data[0]
-    return ChatSession(
-        id=data["id"],
-        user_id=data["user_id"],
-        title=data["title"],
-        created_at=data["created_at"],
-        updated_at=data["updated_at"],
-    )
-
-
-def get_chat_sessions(sb: Client, user_uuid: str) -> list[ChatSession]:
-    """获取用户所有 Chat Sessions（按更新时间倒序）。"""
-    rows = (
-        sb.table("chat_sessions")
-        .select("*")
-        .eq("user_id", user_uuid)
-        .order("updated_at", desc=True)
-        .execute()
-    ).data
-    return [
-        ChatSession(
-            id=r["id"],
-            user_id=r["user_id"],
-            title=r["title"],
-            created_at=r["created_at"],
-            updated_at=r["updated_at"],
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO chat_sessions (user_id, title)
+            VALUES ($1, $2)
+            RETURNING id, user_id, title, created_at, updated_at
+            """,
+            uuid.UUID(user_uuid),
+            title,
         )
-        for r in rows
-    ]
+        return ChatSession(
+            id=row["id"],
+            user_id=row["user_id"],
+            title=row["title"],
+            created_at=row["created_at"].isoformat(),
+            updated_at=row["updated_at"].isoformat(),
+        )
+
+
+async def get_chat_sessions(pool: asyncpg.Pool, user_uuid: str) -> list[ChatSession]:
+    """获取用户所有 Chat Sessions（按更新时间倒序）。"""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM chat_sessions
+            WHERE user_id = $1
+            ORDER BY updated_at DESC
+            """,
+            uuid.UUID(user_uuid),
+        )
+        return [
+            ChatSession(
+                id=r["id"],
+                user_id=r["user_id"],
+                title=r["title"],
+                created_at=r["created_at"].isoformat(),
+                updated_at=r["updated_at"].isoformat(),
+            )
+            for r in rows
+        ]
 
 
 def _normalize_rag_source(src: dict) -> dict:
@@ -922,102 +1109,115 @@ def _normalize_rag_source(src: dict) -> dict:
     return {**defaults, **src}
 
 
-def get_chat_messages(sb: Client, session_id: str) -> list[ChatMessage]:
+async def get_chat_messages(pool: asyncpg.Pool, session_id: str) -> list[ChatMessage]:
     """获取某个 Session 的所有消息。"""
-    rows = (
-        sb.table("chat_messages")
-        .select("*")
-        .eq("session_id", session_id)
-        .order("created_at", desc=False)
-        .execute()
-    ).data
-
-    messages = []
-    for r in rows:
-        rag_context = None
-        if r.get("rag_context"):
-            raw_ctx = r["rag_context"]
-            if isinstance(raw_ctx, list):
-                rag_context = [RAGSource(**_normalize_rag_source(src)) if isinstance(src, dict) else src for src in raw_ctx]
-            elif isinstance(raw_ctx, str):
-                import json as _json
-                parsed = _json.loads(raw_ctx)
-                rag_context = [RAGSource(**_normalize_rag_source(src)) for src in parsed]
-
-        messages.append(
-            ChatMessage(
-                id=r["id"],
-                session_id=r["session_id"],
-                role=r["role"],
-                content=r["content"],
-                rag_context=rag_context,
-                analysis_id=r.get("analysis_id"),
-                created_at=r["created_at"],
-            )
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM chat_messages
+            WHERE session_id = $1
+            ORDER BY created_at ASC
+            """,
+            uuid.UUID(session_id),
         )
-    return messages
+
+        messages = []
+        for r in rows:
+            rag_context = None
+            raw_ctx = r.get("rag_context")
+            if raw_ctx is not None:
+                if isinstance(raw_ctx, list):
+                    rag_context = [
+                        RAGSource(**_normalize_rag_source(src))
+                        if isinstance(src, dict)
+                        else src
+                        for src in raw_ctx
+                    ]
+                elif isinstance(raw_ctx, str):
+                    parsed = json.loads(raw_ctx)
+                    rag_context = [
+                        RAGSource(**_normalize_rag_source(src)) for src in parsed
+                    ]
+
+            messages.append(
+                ChatMessage(
+                    id=r["id"],
+                    session_id=r["session_id"],
+                    role=r["role"],
+                    content=r["content"],
+                    rag_context=rag_context,
+                    analysis_id=r.get("analysis_id"),
+                    created_at=r["created_at"].isoformat(),
+                )
+            )
+        return messages
 
 
-def save_chat_message(
-    sb: Client,
+async def save_chat_message(
+    pool: asyncpg.Pool,
     session_id: str,
     role: str,
     content: str,
-    rag_context: list[dict] | None = None,
-    analysis_id: str | None = None,
+    rag_context: Optional[list[dict]] = None,
+    analysis_id: Optional[str] = None,
 ) -> ChatMessage:
     """保存一条消息到数据库。"""
-    import json as _json
-    insert_data: dict = {
-        "session_id": session_id,
-        "role": role,
-        "content": content,
-    }
-    if rag_context:
-        insert_data["rag_context"] = _json.dumps(rag_context)
-    if analysis_id:
-        insert_data["analysis_id"] = analysis_id
+    rag_context_json = json.dumps(rag_context) if rag_context else None
 
-    data = (
-        sb.table("chat_messages")
-        .insert(insert_data)
-        .execute()
-    ).data[0]
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO chat_messages (session_id, role, content, rag_context, analysis_id)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            """,
+            uuid.UUID(session_id),
+            role,
+            content,
+            rag_context_json,
+            uuid.UUID(analysis_id) if analysis_id else None,
+        )
 
-    rag_ctx_out = None
-    if data.get("rag_context"):
-        parsed = _json.loads(data["rag_context"]) if isinstance(data["rag_context"], str) else data["rag_context"]
-        rag_ctx_out = [RAGSource(**_normalize_rag_source(src)) for src in parsed]
+        rag_ctx_out = None
+        raw_ctx = row.get("rag_context")
+        if raw_ctx:
+            parsed = json.loads(raw_ctx) if isinstance(raw_ctx, str) else raw_ctx
+            rag_ctx_out = [RAGSource(**_normalize_rag_source(src)) for src in parsed]
 
-    return ChatMessage(
-        id=data["id"],
-        session_id=data["session_id"],
-        role=data["role"],
-        content=data["content"],
-        rag_context=rag_ctx_out,
-        analysis_id=data.get("analysis_id"),
-        created_at=data["created_at"],
-    )
+        return ChatMessage(
+            id=row["id"],
+            session_id=row["session_id"],
+            role=row["role"],
+            content=row["content"],
+            rag_context=rag_ctx_out,
+            analysis_id=row.get("analysis_id"),
+            created_at=row["created_at"].isoformat(),
+        )
 
 
-def delete_chat_session(sb: Client, session_id: str, user_uuid: str) -> bool:
+async def delete_chat_session(
+    pool: asyncpg.Pool,
+    session_id: str,
+    user_uuid: str,
+) -> bool:
     """删除一个 Chat Session（级联删除消息）。"""
-    result = (
-        sb.table("chat_sessions")
-        .delete()
-        .eq("id", session_id)
-        .eq("user_id", user_uuid)
-        .execute()
-    )
-    return len(result.data) > 0
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            """
+            DELETE FROM chat_sessions
+            WHERE id = $1 AND user_id = $2
+            """,
+            uuid.UUID(session_id),
+            uuid.UUID(user_uuid),
+        )
+        return result != "DELETE 0"
 
 
-def get_session_owner(sb: Client, session_id: str) -> str | None:
+async def get_session_owner(pool: asyncpg.Pool, session_id: str) -> Optional[str]:
     """查询某个 session 的 owner user_uuid，用于权限校验。"""
-    rows = (
-        sb.table("chat_sessions")
-        .select("user_id")
-        .eq("id", session_id)
-        .execute()
-    ).data
-    return rows[0]["user_id"] if rows else None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT user_id FROM chat_sessions WHERE id = $1",
+            uuid.UUID(session_id),
+        )
+        return str(row["user_id"]) if row else None

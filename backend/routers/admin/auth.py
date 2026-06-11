@@ -3,12 +3,11 @@ Admin 认证相关路由 (/api/admin/*)
 管理员登录、注销、个人信息
 """
 from datetime import datetime, timezone
-
 from pydantic import BaseModel
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends
 
-from dependencies import get_current_admin, get_sb_client
-from supabase_client import get_supabase_admin
+from dependencies import get_current_admin, get_db
+
 
 router = APIRouter(prefix="/api/admin", tags=["admin-auth"])
 
@@ -30,38 +29,36 @@ async def api_admin_login(req: AdminLoginRequest, request: Request):
     管理员登录接口。
     验证用户名密码，签发 token，返回给前端存储。
     """
-    from middleware.admin_auth import (
-        get_admin_user_by_username,
-        verify_password,
-        create_admin_token,
-    )
+    from middleware.admin_auth import get_admin_user_by_username, verify_password, create_admin_token
 
-    # 1. 查询用户
-    admin_user = get_admin_user_by_username(req.username)
+    pool = await get_db()
+    admin_user = await get_admin_user_by_username(pool, req.username)
     if not admin_user:
+        from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 
-    # 2. 验证密码
     if not verify_password(req.password, admin_user["password_hash"]):
+        from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 
-    # 3. 生成 token 并记录
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
-    token, expires_at = create_admin_token(
+    token, expires_at = await create_admin_token(
+        pool,
         admin_user_id=admin_user["id"],
         ip_address=ip_address,
         user_agent=user_agent,
     )
 
-    # 4. 更新最后登录时间
     try:
-        sb = get_supabase_admin()
-        sb.table("admin_users").update({
-            "last_login_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", admin_user["id"]).execute()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE admin_users SET last_login_at = $1 WHERE id = $2",
+                datetime.now(timezone.utc),
+                admin_user["id"],
+            )
     except Exception:
-        pass  # 不影响登录流程
+        pass
 
     return AdminLoginResponse(
         token=token,
@@ -77,16 +74,14 @@ async def api_admin_login(req: AdminLoginRequest, request: Request):
 
 
 @router.post("/logout")
-async def api_admin_logout(
-    request: Request,
-    admin: dict = Depends(get_current_admin),
-):
+async def api_admin_logout(request: Request, admin: dict = Depends(get_current_admin)):
     """注销当前 token（删除服务端 token 记录）。"""
     from middleware.admin_auth import revoke_admin_token
 
     auth_header = request.headers.get("Authorization", "")
     token = auth_header[7:] if auth_header.startswith("Bearer ") else ""
-    revoke_admin_token(token)
+    pool = await get_db()
+    await revoke_admin_token(pool, token)
     return {"success": True, "admin": admin}
 
 

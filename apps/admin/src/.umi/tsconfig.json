@@ -10,7 +10,7 @@
     "allowJs": true,
     "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "importHelpers": true,
+    "importHelpers": false,
     "noEmit": true,
     "jsx": "react-jsx",
     "esModuleInterop": true,

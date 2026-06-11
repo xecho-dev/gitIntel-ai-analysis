@@ -3,18 +3,18 @@
 所有路由共用的认证和数据库连接依赖
 """
 from fastapi import Request, HTTPException
-from supabase_client import get_supabase_admin
+from postgres_client import get_pool
 from middleware.auth import require_auth
 
 
-def get_current_admin(request: Request) -> dict:
+async def get_current_admin(request: Request, pool) -> dict:
     """
     管理员认证依赖。
     从 Authorization header 中验证 admin token，验证失败抛出 401。
     成功时返回管理员信息 dict: {id, username, nickname, avatar, role}
     """
     from middleware.admin_auth import require_admin_auth
-    return require_admin_auth(request)
+    return await require_admin_auth(request, pool)
 
 
 def get_auth_user_id(request: Request) -> str:
@@ -29,24 +29,24 @@ def get_auth_user_id(request: Request) -> str:
     return auth_user_id
 
 
-def get_sb_client() -> "Client":
+async def get_db():
     """
-    获取 Supabase Admin 客户端（绕过 RLS）。
+    获取 PostgreSQL 连接池。
     连接失败时抛出 503 错误。
     """
     try:
-        return get_supabase_admin()
+        return await get_pool()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
 
-def require_user_profile(sb: "Client", auth_user_id: str) -> str:
+async def require_user_profile(pool, auth_user_id: str) -> str:
     """
     确保用户已完成 GitHub 资料同步（users 表中有记录）。
     返回 user_uuid，失败时抛出 HTTPException。
     """
     from services.database import get_user_uuid
-    user_uuid = get_user_uuid(sb, auth_user_id)
+    user_uuid = await get_user_uuid(pool, auth_user_id)
     if not user_uuid:
         raise HTTPException(
             status_code=404,

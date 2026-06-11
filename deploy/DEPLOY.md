@@ -54,8 +54,8 @@
             │ 内部网络
             ▼
 ┌─────────────────────────┐
-│  Supabase (云服务)       │
-│  数据库 / 认证           │
+│  PostgreSQL (自托管)    │
+│  数据库                 │
 └─────────────────────────┘
 ```
 
@@ -147,9 +147,7 @@ cat github-actions-key
 |-------------|------|--------|
 | `FRONTEND_URL` | 前端访问地址 | `http://47.80.59.132`（生产环境建议用域名 + HTTPS） |
 | `OPENAI_API_KEY` | OpenAI API Key | `sk-...` |
-| `SUPABASE_URL` | Supabase 项目 URL | `https://xxx.supabase.co` |
-| `SUPABASE_ANON_KEY` | Supabase 匿名密钥 | `eyJhbGci...` |
-| `SUPABASE_JWT_SECRET` | Supabase JWT Secret | `your-jwt-secret` |
+| `DATABASE_URL` | PostgreSQL 连接字符串 | `postgresql://user:pass@host:5432/db` |
 | `GITHUB_TOKEN` | GitHub Personal Access Token（用于访问私有仓库） | `ghp_...` |
 
 ### 获取 GitHub Token
@@ -305,11 +303,11 @@ docker system prune -a --volumes
 检查 Supabase 配置是否正确：
 
 ```bash
-# 进入后端容器
+# 测试 PostgreSQL 连接
 docker compose exec backend bash
 
-# 测试 Supabase 连接
-python -c "import os; print(os.getenv('SUPABASE_URL'))"
+# 测试连接
+python -c "import os; print(os.getenv('DATABASE_URL'))"
 ```
 
 ---

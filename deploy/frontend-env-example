@@ -11,10 +11,6 @@
 # 后端 API 地址（Nginx 代理后访问）
 NEXT_PUBLIC_API_URL=https://your-domain.com/api
 
-# ========== Supabase ==========
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
 # ========== NextAuth（如果启用认证） ==========
 NEXTAUTH_URL=https://your-domain.com
 NEXTAUTH_SECRET=generate-a-random-secret-here-use-at-least-32-chars

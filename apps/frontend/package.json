@@ -16,7 +16,6 @@
     "@auth/core": "^0.38.0",
     "@gitintel/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
-    "@supabase/supabase-js": "^2.49.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.546.0",

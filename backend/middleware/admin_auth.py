@@ -1,18 +1,16 @@
 """
 管理员身份验证中间件和实用程序。
-使用Supabase验证登录时颁发的管理员令牌。
+使用本地 PostgreSQL 数据库验证管理员令牌。
 """
 import os
 import secrets
+import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, Request
 
-from supabase_client import get_supabase_admin
-
-
-ADMIN_TOKEN_TTL_HOURS = int(os.getenv("ADMIN_TOKEN_TTL_HOURS", "24"))
+import asyncpg
 
 
 def _generate_token() -> str:
@@ -20,7 +18,8 @@ def _generate_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def create_admin_token(
+async def create_admin_token(
+    pool: asyncpg.Pool,
     admin_user_id: str,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
@@ -29,22 +28,26 @@ def create_admin_token(
     Issue a new admin login token, store it in admin_tokens table.
     Returns (token, expires_at).
     """
-    sb = get_supabase_admin()
-    token = _generate_token()
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=ADMIN_TOKEN_TTL_HOURS)
+    async with pool.acquire() as conn:
+        token = _generate_token()
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=ADMIN_TOKEN_TTL_HOURS)
 
-    sb.table("admin_tokens").insert({
-        "admin_user_id": admin_user_id,
-        "token": token,
-        "expires_at": expires_at.isoformat(),
-        "ip_address": ip_address,
-        "user_agent": user_agent,
-    }).execute()
+        await conn.execute(
+            """
+            INSERT INTO admin_tokens (admin_user_id, token, expires_at, ip_address, user_agent)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            admin_user_id,
+            token,
+            expires_at,
+            ip_address,
+            user_agent,
+        )
 
     return token, expires_at
 
 
-def verify_admin_token(token: str) -> Optional[dict]:
+async def verify_admin_token(pool: asyncpg.Pool, token: str) -> Optional[dict]:
     """
     Verify an admin token. Returns the admin_user row if valid and not expired.
     Returns None if invalid or expired.
@@ -52,58 +55,63 @@ def verify_admin_token(token: str) -> Optional[dict]:
     if not token:
         return None
 
-    sb = get_supabase_admin()
+    async with pool.acquire() as conn:
+        token_row = await conn.fetchrow(
+            """
+            SELECT admin_user_id, expires_at FROM admin_tokens
+            WHERE token = $1 AND expires_at > NOW()
+            """,
+            token,
+        )
 
-    # Two-step query: first find token, then look up user (avoids FK schema-cache issues)
-    token_result = (
-        sb.table("admin_tokens")
-        .select("admin_user_id, expires_at")
-        .eq("token", token)
-        .gte("expires_at", datetime.now(timezone.utc).isoformat())
-        .execute()
-    )
+        if token_row is None:
+            return None
 
-    if not token_result.data:
-        return None
+        admin_user_id = token_row["admin_user_id"]
 
-    admin_user_id = token_result.data[0]["admin_user_id"]
+        user_row = await conn.fetchrow(
+            """
+            SELECT id, username, nickname, avatar, role FROM admin_users
+            WHERE id = $1 AND is_active = true
+            """,
+            admin_user_id,
+        )
 
-    user_result = (
-        sb.table("admin_users")
-        .select("id, username, nickname, avatar, role")
-        .eq("id", admin_user_id)
-        .eq("is_active", True)
-        .execute()
-    )
+        if user_row is None:
+            return None
 
-    if not user_result.data:
-        return None
-
-    user = user_result.data[0]
-    return {
-        "id": user["id"],
-        "username": user["username"],
-        "nickname": user["nickname"],
-        "avatar": user["avatar"],
-        "role": user["role"],
-    }
+        return {
+            "id": str(user_row["id"]),
+            "username": user_row["username"],
+            "nickname": user_row["nickname"],
+            "avatar": user_row["avatar"],
+            "role": user_row["role"],
+        }
 
 
-def revoke_admin_token(token: str) -> bool:
+async def revoke_admin_token(pool: asyncpg.Pool, token: str) -> bool:
     """Revoke (delete) an admin token."""
-    sb = get_supabase_admin()
-    result = sb.table("admin_tokens").delete().eq("token", token).execute()
-    return len(result.data) > 0
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM admin_tokens WHERE token = $1",
+            token,
+        )
+        return result != "DELETE 0"
 
 
-def revoke_all_tokens_for_user(admin_user_id: str) -> int:
+async def revoke_all_tokens_for_user(pool: asyncpg.Pool, admin_user_id: str) -> int:
     """Revoke all tokens for a given admin user."""
-    sb = get_supabase_admin()
-    result = sb.table("admin_tokens").delete().eq("admin_user_id", admin_user_id).execute()
-    return len(result.data)
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM admin_tokens WHERE admin_user_id = $1",
+            admin_user_id,
+        )
+        import re
+        m = re.match(r"DELETE (\d+)", result)
+        return int(m.group(1)) if m else 0
 
 
-def require_admin_auth(request: Request) -> dict:
+async def require_admin_auth(request: Request, pool: asyncpg.Pool) -> dict:
     """
     FastAPI dependency: verify the admin token from Authorization header.
     Raises HTTPException 401 if invalid.
@@ -114,37 +122,32 @@ def require_admin_auth(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="缺少管理员授权凭证")
 
     token = auth_header[7:]
-    admin = verify_admin_token(token)
+    admin = await verify_admin_token(pool, token)
     if not admin:
         raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
 
     return admin
 
 
-def get_admin_user_by_username(username: str) -> Optional[dict]:
+async def get_admin_user_by_username(pool: asyncpg.Pool, username: str) -> Optional[dict]:
     """Look up an admin user by username (for login verification)."""
-    sb = get_supabase_admin()
-    result = (
-        sb.table("admin_users")
-        .select("*")
-        .eq("username", username)
-        .eq("is_active", True)
-        .execute()
-    )
-    if not result.data:
-        return None
-    return result.data[0]
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT * FROM admin_users WHERE username = $1 AND is_active = true",
+            username,
+        )
+        if row is None:
+            return None
+        return dict(row)
 
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
-    import bcrypt
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, hashed: str) -> bool:
     """Verify a password against a bcrypt hash."""
-    import bcrypt
     try:
         return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:

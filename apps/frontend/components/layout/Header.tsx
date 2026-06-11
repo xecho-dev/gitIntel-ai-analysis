@@ -7,11 +7,11 @@ import { signOut, useSession } from "next-auth/react";
 import { LayoutDashboard, History, UserCircle, LogOut, Github } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
-// const NAV_ITEMS = [
-//   { href: '/workspace', label: '工作台', icon: LayoutDashboard },
-//   { href: '/history', label: '历史记录', icon: History },
-//   { href: '/account', label: '账户中心', icon: UserCircle },
-// ];
+const NAV_ITEMS = [
+  { href: '/workspace', label: '工作台', icon: LayoutDashboard },
+  { href: '/history', label: '历史记录', icon: History },
+  { href: '/account', label: '账户中心', icon: UserCircle },
+];
 
 export const Header = () => {
   const pathname = usePathname();
@@ -38,7 +38,7 @@ export const Header = () => {
             GitIntel
           </span>
         </div>
-          {/* <nav className="hidden md:flex gap-1">
+          <nav className="hidden md:flex gap-1">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -57,7 +57,8 @@ export const Header = () => {
               </Link>
             );
           })}
-        </nav> */}
+
+          </nav>
       </div>
 
       <div className="flex items-center gap-4">

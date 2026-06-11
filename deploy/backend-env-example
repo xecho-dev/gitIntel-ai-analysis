@@ -11,13 +11,9 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # OpenAI API 基础地址（可选，默认官方接口）
 OPENAI_BASE_URL=https://api.openai.com/v1
 
-# ========== Supabase ==========
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-
-# Supabase JWT Secret（用于验证用户 Token）
-# 在 Supabase Dashboard > Project Settings > API 中获取
-SUPABASE_JWT_SECRET=your-jwt-secret-from-supabase-dashboard
+# ========== PostgreSQL ==========
+# 格式: postgresql://user:password@host:port/database
+DATABASE_URL=postgresql://gitintel:password@your-pg-host:5432/gitintel
 
 # ========== 服务器配置 ==========
 # 后端监听端口（保持默认 8000）

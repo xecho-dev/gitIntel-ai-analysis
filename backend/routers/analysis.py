@@ -6,18 +6,26 @@ import json
 import logging
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
-from dependencies import get_auth_user_id, get_sb_client, require_user_profile
+from dependencies import get_auth_user_id
 from graph.analysis_graph import stream_analysis_sse, _state_to_sse_events
 from schemas.request import AnalyzeRequest
-from supabase_client import get_supabase_admin
 from tools.github_tools import get_branch_sha
 from graph.executor import parse_repo_url
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 logger = logging.getLogger("gitintel")
+
+# 同步访问点：在 main.py 的 lifespan 中通过 APP_POOL 注入
+_APP_POOL = None
+
+
+def set_app_pool(pool) -> None:
+    """由 main.py 调用，在应用启动时注入 pool 引用。"""
+    global _APP_POOL
+    _APP_POOL = pool
 
 
 @router.post("/analyze")
@@ -33,21 +41,18 @@ async def analyze(req: AnalyzeRequest, request: Request):
     """
     logger.info(f"[/api/analyze] 收到请求: repo_url={req.repo_url}, branch={req.branch}")
 
-    # ─── Step 1: 用户认证 ────────────────────────────────────────
     auth_user_id = get_auth_user_id(request)
     logger.info(f"[/api/analyze] 认证通过: auth_user_id={auth_user_id}")
 
-    # ─── Step 2: 生成 thread_id ─────────────────────────────────
     thread_id = f"{req.repo_url}::{req.branch}"
 
-    # ─── Step 3: SSE 流式响应 ───────────────────────────────────
     def event_stream():
+        """同步 generator（StreamingResponse 要求），通过 module-level _APP_POOL 访问 pool。"""
         from services.database import save_analysis, get_sha_cached_analysis
 
-        # 立即发送初始事件
         yield "data: {\"type\": \"connected\", \"agent\": \"pipeline\", \"message\": \"连接已建立，开始分析...\", \"percent\": 0}\n\n"
 
-        # ─── Step 3a: 智能缓存检查 ─────────────────────────────────
+        # ─── 智能缓存检查 ────────────────────────────────────────────
         cached_result: dict | None = None
         if not req.skip_cache:
             try:
@@ -55,59 +60,72 @@ async def analyze(req: AnalyzeRequest, request: Request):
                 if parsed:
                     owner, repo = parsed
                     current_sha = get_branch_sha(owner, repo, req.branch)
-                    sb = get_supabase_admin()
-                    cached_result = get_sha_cached_analysis(sb, auth_user_id, req.repo_url, req.branch, current_sha)
-
-                    if cached_result:
-                        logger.info(f"[/api/analyze] 智能缓存命中: {req.repo_url} SHA={current_sha}")
-                        final_result_data = cached_result.get("final_result") or cached_result
-
-                        state = {
-                            "repo_url": req.repo_url,
-                            "branch": req.branch,
-                            "loaded_files": final_result_data.get("repo_loader", {}).get("loaded_files", {}),
-                            "loaded_paths": final_result_data.get("repo_loader", {}).get("loaded_paths", []),
-                            "repo_sha": current_sha,
-                            "react_events": [],
-                            "react_summary": final_result_data.get("repo_loader", {}).get("summary", ""),
-                            "react_iterations": final_result_data.get("repo_loader", {}).get("total_iterations", 0),
-                            "code_parser_result": final_result_data.get("code_parser"),
-                            "explorer_result": final_result_data.get("explorer"),
-                            "tech_stack_result": final_result_data.get("tech_stack"),
-                            "quality_result": final_result_data.get("quality") or {},
-                            "dependency_result": final_result_data.get("dependency"),
-                            "architecture_result": final_result_data.get("architecture"),
-                            "suggestion_result": final_result_data.get("suggestion"),
-                            "optimization_result": final_result_data.get("suggestion"),
-                            "optimization_events": [],
-                            "final_result": final_result_data,
-                            "errors": [],
-                        }
-
-                        status_sent: set = set()
-                        result_sent: set = set()
-                        for node_name in ("react_loader", "explorer", "architecture", "react_suggestion"):
-                            for sse in _state_to_sse_events(
-                                node_name=node_name,
-                                state=state,
-                                owner=owner,
-                                repo=repo,
-                                status_sent=status_sent,
-                                result_sent=result_sent,
-                            ):
-                                yield sse
-
-                        yield "data: [DONE]\n\n"
-                        return
+                    pool = _APP_POOL
+                    if pool is None:
+                        logger.error("[/api/analyze] _APP_POOL 未初始化，跳过缓存检查")
                     else:
-                        logger.info(f"[/api/analyze] SHA 未命中，继续分析: {req.repo_url} SHA={current_sha}")
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            cached_result = loop.run_until_complete(
+                                get_sha_cached_analysis(
+                                    pool, auth_user_id, req.repo_url, req.branch, current_sha
+                                )
+                            )
+                        finally:
+                            loop.close()
+
+                        if cached_result:
+                            logger.info(f"[/api/analyze] 智能缓存命中: {req.repo_url} SHA={current_sha}")
+                            final_result_data = cached_result.get("final_result") or cached_result
+
+                            state = {
+                                "repo_url": req.repo_url,
+                                "branch": req.branch,
+                                "loaded_files": final_result_data.get("repo_loader", {}).get("loaded_files", {}),
+                                "loaded_paths": final_result_data.get("repo_loader", {}).get("loaded_paths", []),
+                                "repo_sha": current_sha,
+                                "react_events": [],
+                                "react_summary": final_result_data.get("repo_loader", {}).get("summary", ""),
+                                "react_iterations": final_result_data.get("repo_loader", {}).get("total_iterations", 0),
+                                "code_parser_result": final_result_data.get("code_parser"),
+                                "explorer_result": final_result_data.get("explorer"),
+                                "tech_stack_result": final_result_data.get("tech_stack"),
+                                "quality_result": final_result_data.get("quality") or {},
+                                "dependency_result": final_result_data.get("dependency"),
+                                "architecture_result": final_result_data.get("architecture"),
+                                "suggestion_result": final_result_data.get("suggestion"),
+                                "optimization_result": final_result_data.get("suggestion"),
+                                "optimization_events": [],
+                                "final_result": final_result_data,
+                                "errors": [],
+                            }
+
+                            status_sent: set = set()
+                            result_sent: set = set()
+                            for node_name in ("react_loader", "explorer", "architecture", "react_suggestion"):
+                                for sse in _state_to_sse_events(
+                                    node_name=node_name,
+                                    state=state,
+                                    owner=owner,
+                                    repo=repo,
+                                    status_sent=status_sent,
+                                    result_sent=result_sent,
+                                ):
+                                    yield sse
+
+                            yield "data: [DONE]\n\n"
+                            return
+                        else:
+                            logger.info(f"[/api/analyze] SHA 未命中，继续分析: {req.repo_url} SHA={current_sha}")
                 else:
                     logger.warning(f"[/api/analyze] URL 解析失败，跳过缓存检查: {req.repo_url}")
             except Exception as cache_err:
                 logger.warning(f"[/api/analyze] 缓存检查失败: {cache_err}")
                 cached_result = None
 
-        # 收集事件
+        # ─── 收集流式事件 ───────────────────────────────────────────
         collected_events: list[dict] = []
 
         def collect(event_str: str) -> str:
@@ -139,7 +157,7 @@ async def analyze(req: AnalyzeRequest, request: Request):
             yield "data: [DONE]\n\n"
             return
 
-        # ─── Step 4: 保存结果到数据库 ──────────────────────────────
+        # ─── 保存结果到数据库 ────────────────────────────────────────
         try:
             if not collected_events:
                 logger.warning(f"[/api/analyze] 无 result 事件，跳过保存")
@@ -163,15 +181,22 @@ async def analyze(req: AnalyzeRequest, request: Request):
 
             logger.info(f"[/api/analyze] 分析完成，准备保存 history，agents={list(result_data.keys())}")
 
-            try:
-                sb = get_supabase_admin()
-            except RuntimeError as e:
-                logger.error(f"[/api/analyze] Supabase 连接失败: {e}")
+            pool = _APP_POOL
+            if pool is None:
+                logger.error("[/api/analyze] _APP_POOL 未初始化，无法保存历史记录")
                 return
 
             try:
-                saved = save_analysis(sb, auth_user_id, req.repo_url, req.branch, result_data, thread_id=thread_id)
-                logger.info(f"[/api/analyze] 历史记录保存成功: id={saved.id}")
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    saved = loop.run_until_complete(
+                        save_analysis(pool, auth_user_id, req.repo_url, req.branch, result_data, thread_id=thread_id)
+                    )
+                    logger.info(f"[/api/analyze] 历史记录保存成功: id={saved.id}")
+                finally:
+                    loop.close()
             except Exception as e:
                 logger.error(f"[/api/analyze] 保存历史记录失败: {type(e).__name__}: {e}")
         except Exception as e:

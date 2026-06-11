@@ -29,7 +29,7 @@ Deep scan any public repository, automatically generate architecture quality, co
 | **Optimization Suggestions** | RAG-enhanced actionable refactoring recommendations |
 | **SSE Streaming** | Real-time analysis progress, no waiting for full results |
 | **Reflection Mechanism** | Self-correction with confidence scoring and 4-dimension evaluation |
-| **GitHub OAuth** | NextAuth.js v5 + Supabase GitHub login |
+| **GitHub OAuth** | NextAuth.js v5 + GitHub OAuth |
 | **Health Score** | Comprehensive 5-dimension scoring with visual cards |
 | **AI Assistant** | RAG-powered intelligent Q&A with multi-layer memory system |
 
@@ -74,7 +74,7 @@ Deep scan any public repository, automatically generate architecture quality, co
 | Charts | Recharts |
 | Styling | Tailwind CSS v3/v4 |
 | Authentication | NextAuth.js v5 (GitHub Provider) |
-| Database Client | `@supabase/supabase-js` |
+| Database Client | `asyncpg` (PostgreSQL) |
 
 ### Backend
 
@@ -85,7 +85,7 @@ Deep scan any public repository, automatically generate architecture quality, co
 | Code Analysis | Tree-sitter (Python, TypeScript, etc.) |
 | Vector Store | ChromaDB + LangChain |
 | LLM Integration | LangChain + DashScope |
-| Database ORM | Supabase Python Client |
+| Database ORM | `asyncpg` (native PostgreSQL driver) |
 | Deployment | uvicorn (ASGI) |
 
 ---
@@ -121,7 +121,7 @@ gitintel-ai-analysis/                     # Root (pnpm workspace)
 │   │   └── lib/                           # Utilities
 │   │       ├── api.ts                     # BFF API client (SSE)
 │   │       ├── auth.ts                   # NextAuth config
-│   │       ├── supabase.ts               # Supabase client
+│   │       ├── postgres_client.ts       # PostgreSQL client
 │   │       └── utils.ts                   # Helper functions
 │   │
 │   └── admin/                             # Umi.js Admin (Port 3001)
@@ -443,9 +443,8 @@ User Input (GitHub URL)
 ### Frontend (`apps/frontend/.env.local`)
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+# PostgreSQL
+DATABASE_URL=postgresql://gitintel:password@localhost:5432/gitintel
 
 # NextAuth v5
 AUTH_SECRET=your_auth_secret
@@ -468,8 +467,8 @@ OPENAI_API_KEY=your_api_key
 OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 OPENAI_MODEL=qwen-plus
 
-# Supabase
-SUPABASE_SERVICE_KEY=your_service_key
+# PostgreSQL
+DATABASE_URL=postgresql://gitintel:password@localhost:5432/gitintel
 
 # Token Control
 MAX_OUTPUT_TOKENS=1024
