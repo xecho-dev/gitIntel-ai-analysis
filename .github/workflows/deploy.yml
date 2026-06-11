@@ -250,7 +250,7 @@ jobs:
           export DASHVECTOR_API_KEY="${{ secrets.DASHVECTOR_API_KEY }}"
           export DASHVECTOR_ENDPOINT="${{ secrets.DASHVECTOR_ENDPOINT }}"
           export DASHVECTOR_COLLECTION="${{ secrets.DASHVECTOR_COLLECTION }}"
-          DEPLOY_PATH="/opt/gitintel"
+          export DEPLOY_PATH="/opt/gitintel"
           COMMIT_SHORT="${{ needs.build.outputs.commit_short }}"
 
           ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST bash -s << 'ENDSSH'
