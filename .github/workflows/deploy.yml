@@ -86,7 +86,7 @@ jobs:
         id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/frontend
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/frontend
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=ref,event=branch
@@ -99,7 +99,7 @@ jobs:
           push: true
           file: ./Dockerfile.frontend
           tags: ${{ steps.meta-frontend.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/frontend:buildcache
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/gitintel/frontend:buildcache
           build-args: |
             NEXT_PUBLIC_API_URL=http://backend:8000
             NEXT_PUBLIC_AUTH_URL=${{ secrets.FRONTEND_URL }}
@@ -113,7 +113,7 @@ jobs:
         id: meta-admin
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/admin
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/admin
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=ref,event=branch
@@ -126,14 +126,14 @@ jobs:
           push: true
           file: ./Dockerfile.admin
           tags: ${{ steps.meta-admin.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/admin:buildcache
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/gitintel/admin:buildcache
 
       # --- 后端镜像构建 ---
       - name: Extract metadata (backend)
         id: meta-backend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/backend
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/backend
           tags: |
             type=sha,prefix=,suffix=,format=short
             type=ref,event=branch
@@ -146,7 +146,7 @@ jobs:
           push: true
           file: ./Dockerfile.backend
           tags: ${{ steps.meta-backend.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/backend:buildcache
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/gitintel/backend:buildcache
 
   # ==================== 部署到服务器 ====================
   deploy:
@@ -187,9 +187,9 @@ jobs:
           REPO_LOWER: ${{ github.repository_owner }}/gitintel
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GHP_TOKEN }}
-          FRONTEND_IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}/frontend:latest
-          ADMIN_IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}/admin:latest
-          BACKEND_IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}/backend:latest
+          FRONTEND_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/frontend:latest
+          ADMIN_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/admin:latest
+          BACKEND_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/backend:latest
           DEPLOY_PATH: /opt/gitintel
           COMMIT_SHORT: ${{ needs.build.outputs.commit_short }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
