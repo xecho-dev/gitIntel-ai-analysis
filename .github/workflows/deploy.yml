@@ -180,44 +180,46 @@ jobs:
 
       # --- 传输环境变量文件 ---
       - name: Prepare environment file
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GHP_TOKEN }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
+          AUTH_GITHUB_SECRET: ${{ secrets.AUTH_GITHUB_SECRET }}
+          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GHP_TOKEN }}
+          LANGSMITH_TRACING: ${{ secrets.LANGSMITH_TRACING }}
+          LANGSMITH_ENDPOINT: ${{ secrets.LANGSMITH_ENDPOINT }}
+          LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          DASHVECTOR_API_KEY: ${{ secrets.DASHVECTOR_API_KEY }}
+          DASHVECTOR_ENDPOINT: ${{ secrets.DASHVECTOR_ENDPOINT }}
+          DASHVECTOR_COLLECTION: ${{ secrets.DASHVECTOR_COLLECTION }}
         run: |
-          cat > deploy/env << 'ENVFILE'
-          # PostgreSQL 密码（用于 docker-compose.yml 中的 postgres 服务）
-          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-
-          # OpenAI 配置
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
-
-          # GitHub Token（访问私有仓库）
-          GITHUB_TOKEN=${{ secrets.GHP_TOKEN }}
-
-          # 前端访问地址（用于后端 CORS 白名单）
-          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-
-          # NextAuth 密钥
-          AUTH_SECRET=${{ secrets.AUTH_SECRET }}
-          AUTH_URL=${{ secrets.FRONTEND_URL }}
-
-          # GitHub OAuth 配置（前端构建时已嵌入，此处保留用于兼容）
-          AUTH_GITHUB_ID=${{ secrets.AUTH_GITHUB_ID }}
-          AUTH_GITHUB_SECRET=${{ secrets.AUTH_GITHUB_SECRET }}
-
-          # GitHub Container Registry 配置（用于服务器拉取镜像）
-          REGISTRY=${{ env.REGISTRY }}
-          REGISTRY_USERNAME=${{ github.actor }}
-          REGISTRY_TOKEN=${{ secrets.GHP_TOKEN }}
-
-          # LangSmith（链路追踪，可选）
-          LANGSMITH_TRACING=${{ secrets.LANGSMITH_TRACING }}
-          LANGSMITH_ENDPOINT=${{ secrets.LANGSMITH_ENDPOINT }}
-          LANGSMITH_PROJECT=${{ secrets.LANGSMITH_PROJECT }}
-          LANGSMITH_API_KEY=${{ secrets.LANGSMITH_API_KEY }}
-
-          # DashVector（RAG 向量存储）
-          DASHVECTOR_API_KEY=${{ secrets.DASHVECTOR_API_KEY }}
-          DASHVECTOR_ENDPOINT=${{ secrets.DASHVECTOR_ENDPOINT }}
-          DASHVECTOR_COLLECTION=${{ secrets.DASHVECTOR_COLLECTION }}
+          cat > deploy/env << "ENVFILE"
+          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          OPENAI_BASE_URL=$OPENAI_BASE_URL
+          GITHUB_TOKEN=$GITHUB_TOKEN
+          FRONTEND_URL=$FRONTEND_URL
+          AUTH_SECRET=$AUTH_SECRET
+          AUTH_URL=$FRONTEND_URL
+          AUTH_GITHUB_ID=$AUTH_GITHUB_ID
+          AUTH_GITHUB_SECRET=$AUTH_GITHUB_SECRET
+          REGISTRY=$REGISTRY
+          REGISTRY_USERNAME=$REGISTRY_USERNAME
+          REGISTRY_TOKEN=$REGISTRY_TOKEN
+          LANGSMITH_TRACING=$LANGSMITH_TRACING
+          LANGSMITH_ENDPOINT=$LANGSMITH_ENDPOINT
+          LANGSMITH_PROJECT=$LANGSMITH_PROJECT
+          LANGSMITH_API_KEY=$LANGSMITH_API_KEY
+          DASHVECTOR_API_KEY=$DASHVECTOR_API_KEY
+          DASHVECTOR_ENDPOINT=$DASHVECTOR_ENDPOINT
+          DASHVECTOR_COLLECTION=$DASHVECTOR_COLLECTION
           ENVFILE
 
       - name: Upload files to server
@@ -227,38 +229,40 @@ jobs:
 
       # --- 执行远程部署脚本 ---
       - name: Deploy to server
+        env:
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          REGISTRY: ${{ env.REGISTRY }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GHP_TOKEN }}
+          REPO_LOWER: ${{ github.repository_owner }}/gitintel
+          FRONTEND_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/frontend:latest
+          ADMIN_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/admin:latest
+          BACKEND_IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gitintel/backend:latest
+          DEPLOY_PATH: /opt/gitintel
+          COMMIT_SHORT: ${{ needs.build.outputs.commit_short }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          AUTH_GITHUB_ID: ${{ secrets.AUTH_GITHUB_ID }}
+          AUTH_GITHUB_SECRET: ${{ secrets.AUTH_GITHUB_SECRET }}
+          LANGSMITH_TRACING: ${{ secrets.LANGSMITH_TRACING }}
+          LANGSMITH_ENDPOINT: ${{ secrets.LANGSMITH_ENDPOINT }}
+          LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+          DASHVECTOR_API_KEY: ${{ secrets.DASHVECTOR_API_KEY }}
+          DASHVECTOR_ENDPOINT: ${{ secrets.DASHVECTOR_ENDPOINT }}
+          DASHVECTOR_COLLECTION: ${{ secrets.DASHVECTOR_COLLECTION }}
         run: |
           cat > /tmp/gitintel_deploy.sh << "SCRIPTEOF"
           #!/bin/bash
           set -e
 
-          DEPLOY_PATH="/opt/gitintel"
-          SERVER_USER="{{ secrets.SERVER_USER }}"
-          REGISTRY="{{ env.REGISTRY }}"
-          REPO_LOWER="{{ github.repository_owner }}/gitintel"
-          FRONTEND_IMAGE="$REGISTRY/$REPO_LOWER/frontend:latest"
-          ADMIN_IMAGE="$REGISTRY/$REPO_LOWER/admin:latest"
-          BACKEND_IMAGE="$REGISTRY/$REPO_LOWER/backend:latest"
-          REGISTRY_USERNAME="{{ github.actor }}"
-          REGISTRY_TOKEN="{{ secrets.GHP_TOKEN }}"
           export DEPLOY_PATH SERVER_USER REGISTRY REPO_LOWER FRONTEND_IMAGE ADMIN_IMAGE BACKEND_IMAGE REGISTRY_USERNAME REGISTRY_TOKEN
-          export POSTGRES_PASSWORD="{{ secrets.POSTGRES_PASSWORD }}"
-          export OPENAI_API_KEY="{{ secrets.OPENAI_API_KEY }}"
-          export OPENAI_BASE_URL="{{ secrets.OPENAI_BASE_URL }}"
-          export GITHUB_TOKEN="{{ secrets.GHP_TOKEN }}"
-          export FRONTEND_URL="{{ secrets.FRONTEND_URL }}"
-          export AUTH_SECRET="{{ secrets.AUTH_SECRET }}"
-          export AUTH_URL="{{ secrets.FRONTEND_URL }}"
-          export AUTH_GITHUB_ID="{{ secrets.AUTH_GITHUB_ID }}"
-          export AUTH_GITHUB_SECRET="{{ secrets.AUTH_GITHUB_SECRET }}"
-          export LANGSMITH_TRACING="{{ secrets.LANGSMITH_TRACING }}"
-          export LANGSMITH_ENDPOINT="{{ secrets.LANGSMITH_ENDPOINT }}"
-          export LANGSMITH_PROJECT="{{ secrets.LANGSMITH_PROJECT }}"
-          export LANGSMITH_API_KEY="{{ secrets.LANGSMITH_API_KEY }}"
-          export DASHVECTOR_API_KEY="{{ secrets.DASHVECTOR_API_KEY }}"
-          export DASHVECTOR_ENDPOINT="{{ secrets.DASHVECTOR_ENDPOINT }}"
-          export DASHVECTOR_COLLECTION="{{ secrets.DASHVECTOR_COLLECTION }}"
-          COMMIT_SHORT="{{ needs.build.outputs.commit_short }}"
+          export POSTGRES_PASSWORD FRONTEND_URL AUTH_SECRET AUTH_GITHUB_ID AUTH_GITHUB_SECRET
+          export LANGSMITH_TRACING LANGSMITH_ENDPOINT LANGSMITH_PROJECT LANGSMITH_API_KEY
+          export DASHVECTOR_API_KEY DASHVECTOR_ENDPOINT DASHVECTOR_COLLECTION
+          export AUTH_URL="$FRONTEND_URL"
 
           echo "========== 开始部署 GitIntel =========="
           echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
@@ -471,13 +475,8 @@ jobs:
           echo "========== 部署完成 =========="
           SCRIPTEOF
 
-          scp -o StrictHostKeyChecking=no \
-            /tmp/gitintel_deploy.sh \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/gitintel_deploy.sh"
-
-          ssh -o StrictHostKeyChecking=no \
-            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
-            "chmod +x /tmp/gitintel_deploy.sh && bash /tmp/gitintel_deploy.sh"
+          scp -o StrictHostKeyChecking=no /tmp/gitintel_deploy.sh $SERVER_USER@$SERVER_HOST:/tmp/gitintel_deploy.sh
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST "chmod +x /tmp/gitintel_deploy.sh && bash /tmp/gitintel_deploy.sh"
 
   # ==================== 健康检查 ====================
   # health-check:
