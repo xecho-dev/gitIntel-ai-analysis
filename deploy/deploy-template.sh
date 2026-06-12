@@ -51,6 +51,7 @@ services:
       POSTGRES_PASSWORD: POSTGRES_PASSWORD_PLACEHOLDER
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
     networks:
       - gitintel-net
     healthcheck:
@@ -78,6 +79,7 @@ services:
       POSTGRES_PASSWORD: POSTGRES_PASSWORD_PLACEHOLDER
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
     networks:
       - gitintel-net
     healthcheck:
