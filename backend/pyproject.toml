@@ -1,5 +1,8 @@
 [tool.uv]
-index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+index-url = "https://pypi.org/simple"
+extra-index-url = [
+    "https://pypi.tuna.tsinghua.edu.cn/simple",
+]
 
 [project]
 name = "gitintel-backend"
